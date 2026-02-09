@@ -1,287 +1,334 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/LOBSTER-v1.0.0-ff3e3e?style=for-the-badge&labelColor=1a1a2e" alt="Version">
-  <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge&labelColor=1a1a2e" alt="License">
-  <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-brightgreen?style=for-the-badge&labelColor=1a1a2e" alt="Platform">
-  <img src="https://img.shields.io/badge/Runtime-Bun-f472b6?style=for-the-badge&labelColor=1a1a2e" alt="Bun">
-  <br>
-  <a href="https://www.bridgemind.ai/vibeathon">
-    <img src="https://img.shields.io/badge/🏆_Bridge_Mind_Vibeathon-Feb_1--14,_2026-ff6b35?style=for-the-badge&labelColor=1a1a2e" alt="Bridge Mind Vibeathon">
-  </a>
-</p>
+<div align="center">
 
-<p align="center">
-<pre align="center">
-        ██╗      ██████╗ ██████╗ ███████╗████████╗███████╗██████╗
-        ██║     ██╔═══██╗██╔══██╗██╔════╝╚══██╔══╝██╔════╝██╔══██╗
-        ██║     ██║   ██║██████╔╝███████╗   ██║   █████╗  ██████╔╝
-        ██║     ██║   ██║██╔══██╗╚════██║   ██║   ██╔══╝  ██╔══██╗
-        ███████╗╚██████╔╝██████╔╝███████║   ██║   ███████╗██║  ██║
-        ╚══════╝ ╚═════╝ ╚═════╝ ╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
-</pre>
-</p>
+<br>
 
-<h3 align="center">AI-Powered Coding Agent with a Built-In Development Team</h3>
+<img src="https://img.shields.io/badge/%F0%9F%A6%9E-LOBSTER-ff3e3e?style=for-the-badge&labelColor=0d1117&fontSize=40" height="45" alt="LOBSTER">
 
-<p align="center">
-  <em>One command. Multiple AI agents. Plan, build, review, test — all coordinated.</em>
-</p>
+<br><br>
 
-<p align="center">
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-how-it-works">How It Works</a> •
-  <a href="#-features">Features</a> •
-  <a href="#%EF%B8%8F-plugin-system">Plugins</a> •
-  <a href="#-configuration">Config</a>
-</p>
+# Stop coding alone. Deploy a team.
 
----
+<h4>
 
-## 🚀 Quick Start
+An AI-powered coding agent that runs a full dev team in your terminal —<br>
+architect, coder, reviewer, tester — coordinated, access-controlled, and relentless.
 
-**macOS / Linux:**
+</h4>
+
+<br>
+
+[![Version](https://img.shields.io/github/v/tag/HuskySteam/LOBSTER?label=version&style=for-the-badge&color=ff3e3e&labelColor=0d1117)](https://github.com/HuskySteam/LOBSTER/releases)
+&nbsp;
+[![Stars](https://img.shields.io/github/stars/HuskySteam/LOBSTER?style=for-the-badge&color=f4c542&labelColor=0d1117)](https://github.com/HuskySteam/LOBSTER/stargazers)
+&nbsp;
+[![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge&labelColor=0d1117)](LICENSE)
+&nbsp;
+[![Platform](https://img.shields.io/badge/Win%20%7C%20Mac%20%7C%20Linux-brightgreen?style=for-the-badge&labelColor=0d1117&label=runs%20on)](https://github.com/HuskySteam/LOBSTER/releases)
+
+<br>
+
 ```bash
+# macOS / Linux
 curl -fsSL https://raw.githubusercontent.com/HuskySteam/LOBSTER/main/install.sh | bash
-```
 
-**Windows (PowerShell):**
-```powershell
+# Windows (PowerShell)
 irm https://raw.githubusercontent.com/HuskySteam/LOBSTER/main/install.ps1 | iex
 ```
 
-**Then just run:**
+<br>
+
+[**Get Started**](#-get-started) &nbsp;&nbsp;|&nbsp;&nbsp; [**How It Works**](#-how-it-works) &nbsp;&nbsp;|&nbsp;&nbsp; [**Features**](#-features) &nbsp;&nbsp;|&nbsp;&nbsp; [**Providers**](#-20-llm-providers) &nbsp;&nbsp;|&nbsp;&nbsp; [**Extend**](#-extend-everything)
+
+<br>
+
+</div>
+
+---
+
+<br>
+
+## What makes LOBSTER different?
+
+<table>
+<tr>
+<td width="50%">
+
+### Other AI tools
+
+```
+You  →  Single Agent  →  Output
+
+- One model, one shot
+- You review everything
+- You write the tests
+- You catch the bugs
+- You are the team
+```
+
+</td>
+<td width="50%">
+
+### LOBSTER
+
+```
+You  →  Team Lead  →  Agents  →  Output
+             │
+     ┌───────┼───────┐
+     ▼       ▼       ▼
+  Architect Coder  Reviewer
+             │       │
+             └──fix──┘
+                 │
+              Tester ✓
+```
+
+</td>
+</tr>
+</table>
+
+<br>
+
+> **One prompt. Four agents. Zero babysitting.**
+>
+> Reviewer and Architect agents literally cannot write files — they only have read-only tools. No agent reviews its own code. This is enforced, not suggested.
+
+<br>
+
+---
+
+<br>
+
+## 🚀 Get Started
+
 ```bash
 lobster
 ```
 
-<details>
-<summary><b>📦 Other installation methods</b></summary>
+That's it. You're in the TUI. Start talking.
 
-**From source:**
+<details>
+<summary><b>Install from source</b></summary>
+
 ```bash
-git clone https://github.com/HuskySteam/LOBSTER.git
-cd lobster
-bun install
+git clone https://github.com/HuskySteam/LOBSTER.git && cd lobster
+bun install    # requires Bun >= 1.3.5
 bun dev
 ```
-Requires [Bun](https://bun.sh) >= 1.3.5
 
-**Upgrade:**
+</details>
+
+<details>
+<summary><b>Upgrade</b></summary>
+
 ```bash
 lobster upgrade
 ```
 
 </details>
 
----
-
-## 🧠 What is LOBSTER?
-
-Most AI coding tools are a **single agent in a box**. You type a prompt, it generates code, done. No review. No tests. No memory.
-
-LOBSTER gives you a **full AI development team** — not one agent, but a coordinated system of specialized agents that **plan, build, review, test, and learn from each other**.
-
-```
-You: "Build a user authentication system with JWT and tests"
-
-LOBSTER:
-  ✓ Architect designs the interface          [2s]
-  ✓ Coder implements JWT auth service        [8s]
-  ✓ Coder adds rate limiting middleware      [5s]
-  ✓ Reviewer catches missing input validation [3s]
-  ✓ Coder fixes validation                  [4s]
-  ✓ Tester writes & runs 12 tests           [6s]
-  ✓ All agents pass — shipping it
-```
-
-It's also a complete agentic coding CLI: **40+ tools**, multi-provider LLM support, persistent memory, cost tracking, and automatic context injection.
-
-Built as a fork of [OpenCode](https://github.com/anomalyco/opencode) with full [Claude Code](https://github.com/anthropics/claude-code) plugin compatibility.
-
----
-
-## ⚡ How It Works
-
-### The Agent Team
-
-```
-                    ┌─────────────────────────────────┐
-                    │          🎯 TEAM LEAD            │
-                    │   Decomposes • Assigns • Tracks  │
-                    └──────┬──────┬──────┬──────┬─────┘
-                           │      │      │      │
-                    ┌──────▼─┐ ┌──▼────┐ ┌▼─────┐ ┌▼──────────┐
-                    │ 💻     │ │ 🔍    │ │ 🧪   │ │ 📐        │
-                    │ CODER  │ │REVIEW │ │TESTER│ │ ARCHITECT  │
-                    │        │ │       │ │      │ │            │
-                    │ Write  │ │ Bugs  │ │ Test │ │ Design     │
-                    │ code   │ │ Sec.  │ │ Run  │ │ Structure  │
-                    │ [R/W]  │ │ [R/O] │ │[R/W] │ │ [R/O]      │
-                    └────────┘ └───────┘ └──────┘ └────────────┘
-```
-
-> **Access control is enforced** — Reviewer and Architect agents literally cannot write files. They only have read-only tools. This prevents an agent from reviewing its own code.
-
-### The Workflow
-
-| Step | What Happens |
-|------|-------------|
-| **1. Decompose** | Your task is split into subtasks with dependencies |
-| **2. Validate** | Cycle detection, file conflict warnings, blocking resolution |
-| **3. Execute** | Agents work in dependency order with enforced access levels |
-| **4. Track** | Live progress bars, status dashboard, auto-unblocking |
-| **5. Review Loop** | Coder → Reviewer → Tester → fix → repeat until all pass |
-
 <details>
-<summary><b>📋 See a full example</b></summary>
+<summary><b>Run as API server</b></summary>
 
-```
-> Build a user authentication system with JWT, rate limiting, and tests
-
-┌─ Task Decomposition ────────────────────────────────────────────┐
-│                                                                  │
-│  #1  Define auth types & interfaces      → architect  [high]    │
-│  #2  Implement JWT auth service          → coder      [high]    │
-│  #3  Add rate limiting middleware        → coder      [high]    │
-│  #4  Write auth unit tests              → tester     [medium]  │
-│  #5  Security review                    → reviewer   [medium]  │
-│  #6  Integration tests                  → tester     [low]     │
-│                                                                  │
-│  Dependencies: #2,#3 → after #1  |  #4,#5 → after #2,#3       │
-│  Conflicts: none detected                                       │
-└──────────────────────────────────────────────────────────────────┘
-
-Progress: ████████████████████ 100% (6/6)
-
-✅ #1 Define auth types & interfaces      architect   [done]
-✅ #2 Implement JWT auth service           coder       [done]
-✅ #3 Add rate limiting middleware         coder       [done]
-✅ #4 Write auth unit tests               tester      [done]
-✅ #5 Security review                     reviewer    [done]
-✅ #6 Integration tests                   tester      [done]
+```bash
+lobster serve              # default port 4096
+lobster serve --port 8080  # custom port
 ```
 
 </details>
 
----
-
-## 🔧 Features
-
-### 🤖 40+ Built-in Tools
-
-| Category | Tools | Description |
-|----------|-------|-------------|
-| **File Ops** | `read`, `write`, `edit`, `multiedit`, `glob`, `ls` | Read, create, modify files with precision |
-| **Search** | `grep`, `codesearch`, `websearch`, `webfetch` | Regex, semantic, web search + page fetch |
-| **Execute** | `bash`, `task`, `batch` | Shell commands, sub-agents, parallel ops |
-| **Plan** | `plan`, `todo` | Implementation plans with dependency tracking |
-| **Code Intel** | `lsp` | Go-to-def, find refs, diagnostics via LSP |
-
-### 🧩 Claude Code Plugin Compatibility
-
-Install plugins directly from Claude Code marketplaces:
-
-```
-/plugin                              # Open plugin manager
-/plugin install feature-dev          # Install from marketplace
-/plugin marketplace add owner/repo   # Add marketplace source
-/plugin list                         # Show installed
-/plugin remove <name>                # Uninstall
-```
-
-Browse and install from the **unified marketplace tab** in the plugin manager dialog — aggregates plugins from all configured sources with source badges.
-
-### 🧠 Persistent Memory
-
-Your AI remembers across sessions. Architecture decisions, coding patterns, past mistakes — all stored and auto-loaded.
-
-```
-Session 1:  "We use bcrypt, not argon2 — deployment doesn't support it"
-            → Saved to memory
-
-Session 2:  "Build the password reset endpoint"
-            → AI uses bcrypt automatically (loaded from memory)
-```
-
-### 📊 Smart Pattern Detection
-
-Analyzes review history to detect recurring antipatterns:
-
-- Groups similar findings by frequency
-- Detects quality trends (improving / degrading)
-- Extracts lessons from past mistakes
-- Injects warnings so agents proactively avoid known issues
-
-### 🎯 Auto-Context Injection
-
-Every message is enriched with relevant context automatically:
-
-1. **Task classification** — bug fix, feature, refactor, test?
-2. **Stack detection** — parses `package.json` for frameworks
-3. **File relevance** — TF-IDF scoring ranks every file against your message
-4. **Git history** — recent changes on the most relevant files
-
-### 💰 Cost & Token Tracking
-
-```
-/cost                    # View per-model costs
-/budget $5               # Set spending limit with alerts
-```
-
-Tracks every token, estimates costs per model, warns at 80% budget.
-
-### 🌐 Multi-Provider LLM Support
-
-| Provider | Models |
-|----------|--------|
-| **Anthropic** | Claude 4.5 / 4.6 (default) |
-| **OpenAI** | GPT-4o, o1, o3 |
-| **Google** | Gemini |
-| **AWS Bedrock** | Claude via AWS |
-| **Azure OpenAI** | GPT via Azure |
-| + | Groq, Mistral, Cohere, xAI, OpenRouter, Together AI, and more |
+<br>
 
 ---
 
-## 🔌️ Plugin System
+<br>
 
-Fully extensible through a `.lobster/` directory:
+## 🧠 How It Works
 
-| Type | Location | Description |
-|------|----------|-------------|
-| **Plugins** | `.lobster/plugins/*.ts` | Hook into agent lifecycle |
-| **Tools** | `.lobster/tool/*.ts` + `*.txt` | Custom capabilities |
-| **Agents** | `.lobster/agent/*.md` | Specialized agents with access rules |
-| **Skills** | `.lobster/skill/*/SKILL.md` | Slash command templates |
-| **Commands** | `.lobster/command/*.md` | Custom slash commands |
+You give LOBSTER a task. It doesn't just start coding.
 
-Ships with **5 plugins**, **18 tools**, **7 agents**, **7 skills** out of the box.
+```
+You: "Build a user authentication system with JWT, rate limiting, and tests"
+```
+
+```
+┌─ Decomposition ─────────────────────────────────────────────────┐
+│                                                                  │
+│  #1  Define auth types & interfaces      → architect    [R/O]   │
+│  #2  Implement JWT auth service          → coder        [R/W]   │
+│  #3  Add rate limiting middleware        → coder        [R/W]   │
+│  #4  Security review                    → reviewer      [R/O]   │
+│  #5  Write unit + integration tests     → tester        [R/W]   │
+│                                                                  │
+│  Dependencies: #2,#3 wait for #1  ·  #4,#5 wait for #2,#3      │
+│  Conflicts: none                                                 │
+└──────────────────────────────────────────────────────────────────┘
+
+  ✓ #1 Define auth types & interfaces      architect    done   2s
+  ✓ #2 Implement JWT auth service          coder        done   8s
+  ✓ #3 Add rate limiting middleware        coder        done   5s
+  ⚠ #4 Security review                    reviewer     found: missing input validation
+  ✓    Coder fixes validation              coder        done   4s
+  ✓ #4 Security review (pass 2)           reviewer     done   3s
+  ✓ #5 Write unit + integration tests     tester       done   6s
+
+  All agents pass. 5 files created, 12 tests passing.
+```
+
+The review loop **keeps going** until the reviewer and tester are satisfied. No human in the loop unless you want to be.
+
+<br>
 
 ---
 
-## 🖥️ Three Interfaces
+<br>
 
-| Interface | Command | Best For |
-|-----------|---------|----------|
-| **TUI** | `lobster` | Interactive development with rich terminal UI |
-| **CLI** | `lobster run "message"` | Quick tasks and scripting |
-| **API** | `lobster serve` | Programmatic access on port 4096 |
+## ⚡ Features
 
-### TUI Dashboards
+<table>
+<tr>
+<td width="33%">
 
-| Command | Shows |
-|---------|-------|
-| `/review` | Review loop pipeline, iteration count, quality score |
-| `/findings` | Navigable review findings (j/k/Enter/a/r/s) |
-| `/health` | Quality score, costs, memory stats |
-| `/patterns` | Recurring antipatterns with trends |
+### 40+ Tools
+
+`read` `write` `edit` `multiedit`
+`glob` `grep` `ls` `bash`
+`codesearch` `websearch` `webfetch`
+`task` `batch` `plan` `todo` `lsp`
+
+File ops, search, execution,
+planning, and code intelligence
+— all built in.
+
+</td>
+<td width="33%">
+
+### Persistent Memory
+
+Your AI remembers across sessions.
+Architecture decisions, patterns,
+mistakes — stored and auto-loaded.
+
+```
+Session 1: "Use bcrypt"  → saved
+Session 2: Uses bcrypt automatically
+```
+
+</td>
+<td width="33%">
+
+### Cost Control
+
+Track every token. Set budgets.
+Get warnings before you overspend.
+
+```
+/cost       # breakdown
+/budget $5  # set limit
+```
+
+Alerts at 80%. Per-model tracking.
+
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td width="33%">
+
+### Claude Code Plugins
+
+Drop-in compatible with the
+Claude Code plugin ecosystem.
+
+```
+/plugin install feature-dev
+/plugin marketplace add org/repo
+```
+
+</td>
+<td width="33%">
+
+### Pattern Detection
+
+Analyzes review history.
+Groups recurring issues.
+Detects quality trends.
+Injects warnings proactively.
+
+</td>
+<td width="33%">
+
+### Three Interfaces
+
+**TUI** — `lobster`
+**CLI** — `lobster run "msg"`
+**API** — `lobster serve`
+
+Interactive, scriptable,
+or programmatic.
+
+</td>
+</tr>
+</table>
+
+<br>
 
 ---
+
+<br>
+
+## 🌐 20+ LLM Providers
+
+Use any model you want. Switch with one config change.
+
+<table>
+<tr>
+<td><b>Anthropic</b><br><code>Claude 4.5 / 4.6</code></td>
+<td><b>OpenAI</b><br><code>GPT-4o · o1 · o3</code></td>
+<td><b>Google</b><br><code>Gemini</code></td>
+<td><b>AWS Bedrock</b><br><code>Claude via AWS</code></td>
+</tr>
+<tr>
+<td><b>Azure OpenAI</b><br><code>GPT via Azure</code></td>
+<td><b>Groq</b><br><code>Fast inference</code></td>
+<td><b>Mistral</b><br><code>Open models</code></td>
+<td><b>xAI · OpenRouter · Together AI · Cohere</b></td>
+</tr>
+</table>
+
+Powered by [Vercel AI SDK v5](https://sdk.vercel.ai). Add your own provider with a few lines of config.
+
+<br>
+
+---
+
+<br>
+
+## 🔌 Extend Everything
+
+Drop files into `.lobster/` and they just work:
+
+```
+.lobster/
+├── plugins/     Lifecycle hooks — run code before/after any tool
+├── tool/        Custom tools — *.ts with Zod schemas + *.txt descriptions
+├── agent/       Custom agents — Markdown files with permission rules
+├── skill/       Slash commands — /your-command triggers a template
+├── command/     Command aliases — shorthand for anything
+└── memory/      Persistent storage — survives across sessions
+```
+
+<br>
+
+---
+
+<br>
 
 ## ⚙️ Configuration
 
-Create `lobster.jsonc` in your project root:
-
 ```jsonc
+// lobster.jsonc
 {
   "provider": {
     "default": "anthropic"
@@ -289,12 +336,10 @@ Create `lobster.jsonc` in your project root:
   "plugin": [
     "file://.lobster/plugins/lobster-orchestrator.ts",
     "file://.lobster/plugins/lobster-memory.ts",
-    "file://.lobster/plugins/lobster-cost-tracker.ts",
-    "file://.lobster/plugins/lobster-auto-context.ts",
-    "file://.lobster/plugins/lobster-team.ts"
+    "file://.lobster/plugins/lobster-cost-tracker.ts"
   ],
   "mcp": {
-    "lobster-context": {
+    "context": {
       "type": "local",
       "command": ["bun", "run", "./lobster-mcp/src/index.ts"]
     }
@@ -302,74 +347,67 @@ Create `lobster.jsonc` in your project root:
 }
 ```
 
+<br>
+
 ---
 
-## 📁 Architecture
+<br>
+
+## 📟 Commands
 
 ```
-lobster/
-├── packages/
-│   ├── lobster/              # Core CLI + TUI
-│   │   └── src/
-│   │       ├── cli/          # CLI commands + TUI (SolidJS)
-│   │       ├── tool/         # 40+ built-in tools
-│   │       ├── provider/     # LLM provider integrations
-│   │       ├── agent/        # Agent system
-│   │       ├── plugin/       # Plugin runtime
-│   │       ├── session/      # Session management
-│   │       ├── lsp/          # Language Server Protocol
-│   │       ├── mcp/          # Model Context Protocol
-│   │       └── server/       # API server (Hono)
-│   ├── plugin/               # Plugin SDK
-│   ├── sdk/                  # JS SDK
-│   └── script/               # Build scripts
-├── .lobster/
-│   ├── plugins/              # 5 lifecycle plugins
-│   ├── tool/                 # 18 custom tools
-│   ├── agent/                # 7 specialized agents
-│   ├── skill/                # 7 slash command skills
-│   └── memory/               # Persistent storage
-└── lobster-mcp/              # Context manager MCP server
+lobster                    Interactive TUI
+lobster run "do something" One-shot CLI
+lobster serve              API server (port 4096)
+lobster upgrade            Update to latest version
+lobster models             List available models
+lobster auth               Manage API keys
+lobster agent              Manage agents
+lobster stats              Token & cost stats
+lobster pr                 Pull request tools
+lobster mcp                Run as MCP server
 ```
 
----
-
-## 📟 CLI Reference
-
-| Command | Description |
-|---------|-------------|
-| `lobster` | Start interactive TUI |
-| `lobster run [message]` | Run with a message |
-| `lobster serve` | Start API server |
-| `lobster upgrade` | Upgrade to latest |
-| `lobster models` | List available models |
-| `lobster auth` | Manage authentication |
-| `lobster agent` | Manage agents |
-| `lobster stats` | Usage statistics |
-| `lobster session` | Manage sessions |
-| `lobster pr` | Pull request commands |
-| `lobster mcp` | MCP server mode |
+<br>
 
 ---
 
-## 🏗️ Built With
+<br>
 
-[OpenCode](https://github.com/anomalyco/opencode) • [Bun](https://bun.sh) • [SolidJS](https://www.solidjs.com/) • [AI SDK](https://sdk.vercel.ai) • [MCP](https://modelcontextprotocol.io) • [Claude Code](https://github.com/anthropics/claude-code)
+<div align="center">
+
+### Architecture
+
+</div>
+
+```
+packages/
+├── lobster/        Core — CLI, TUI (SolidJS), 40+ tools, providers, sessions, agents
+├── plugin/         Plugin SDK — @lobster-ai/plugin
+├── sdk/            Client SDK — @lobster-ai/sdk (auto-generated from OpenAPI)
+├── script/         Build & release tooling
+├── util/           Shared utilities
+└── slack/          Slack integration
+```
+
+<div align="center">
+
+Built on [OpenCode](https://github.com/anomalyco/opencode) · [Bun](https://bun.sh) · [SolidJS](https://www.solidjs.com) · [Vercel AI SDK](https://sdk.vercel.ai) · [MCP](https://modelcontextprotocol.io)
+
+<br>
 
 ---
 
-## 🏆 Bridge Mind Vibeathon
+<br>
 
-<p align="center">
-  <a href="https://www.bridgemind.ai/vibeathon">
-    <img src="https://img.shields.io/badge/🏆_Bridge_Mind_Vibeathon-Feb_1--14,_2026-ff6b35?style=for-the-badge&labelColor=1a1a2e" alt="Bridge Mind Vibeathon">
-  </a>
-</p>
+<a href="https://www.bridgemind.ai/vibeathon">
+<img src="https://img.shields.io/badge/%F0%9F%8F%86_Bridge_Mind_Vibeathon-Feb_1--14,_2026-ff6b35?style=for-the-badge&labelColor=0d1117" alt="Bridge Mind Vibeathon">
+</a>
 
-This project was built for the **[Bridge Mind Vibeathon](https://www.bridgemind.ai/vibeathon)** (February 1-14, 2026) — a competitive hackathon focused on building innovative AI-powered tools. LOBSTER demonstrates how AI agents can coordinate as a team to deliver production-quality code through structured planning, multi-agent review loops, and persistent learning.
+<br><br>
 
----
+**MIT License** · Made by [HuskySteam](https://github.com/HuskySteam)
 
-<p align="center">
-  <b>MIT License</b> — Built with 🦞 by <a href="https://github.com/HuskySteam">HuskySteam</a>
-</p>
+<br>
+
+</div>
