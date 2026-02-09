@@ -492,23 +492,12 @@ export namespace ClaudeCompat {
       },
     })
 
-    const timeout = AbortSignal.timeout(30_000)
-    const killOnTimeout = () => {
-      proc.kill()
-    }
-    timeout.addEventListener("abort", killOnTimeout)
-
     // Consume both streams in parallel to avoid deadlocks
     const [stdout, stderr, exitCode] = await Promise.all([
       new Response(proc.stdout).text(),
       new Response(proc.stderr).text(),
       proc.exited,
     ])
-
-    timeout.removeEventListener("abort", killOnTimeout)
-    if (timeout.aborted) {
-      throw new Error(`Hook command timed out after 30s: ${command}`)
-    }
 
     if (exitCode === 1) {
       return { blocked: true }

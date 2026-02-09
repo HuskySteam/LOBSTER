@@ -970,24 +970,10 @@ export namespace Provider {
       const customFetch = options["fetch"]
 
       options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
-        // Preserve custom fetch if it exists, wrap it with timeout logic
         const fetchFn = customFetch ?? fetch
         const opts = init ?? {}
 
-        {
-          // Only forward the caller's abort signal (user cancel).
-          // Do NOT add AbortSignal.timeout() here — it is a hard deadline
-          // that kills long-running streams even while data is flowing.
-          // Bun's idle timeout (below) handles hung connections instead.
-          if (opts.signal) {
-            opts.signal = opts.signal
-          }
-        }
-
         // Strip openai itemId metadata following what codex does
-        // Codex uses #[serde(skip_serializing)] on id fields for all item types:
-        // Message, Reasoning, FunctionCall, LocalShellCall, CustomToolCall, WebSearchCall
-        // IDs are only re-attached for Azure with store=true
         if (model.api.npm === "@ai-sdk/openai" && opts.body && opts.method === "POST") {
           const bodyStr = opts.body as string
           if (bodyStr.includes('"input"')) {
@@ -1007,10 +993,8 @@ export namespace Provider {
 
         return fetchFn(input, {
           ...opts,
-          // Bun idle timeout: resets whenever data is received.
-          // Long-streaming responses survive; hung connections die after 120s of silence.
           // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
-          timeout: options["timeout"] ?? 120_000,
+          timeout: false,
         })
       }
 
