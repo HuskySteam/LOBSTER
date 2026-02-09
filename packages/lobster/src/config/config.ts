@@ -115,11 +115,18 @@ export namespace Config {
 
     // Project config overrides global and remote config.
     if (!Flag.LOBSTER_DISABLE_PROJECT_CONFIG) {
-      for (const file of ["lobster.jsonc", "lobster.json"]) {
-        const found = await Filesystem.findUp(file, Instance.directory, Instance.worktree)
-        for (const resolved of found.toReversed()) {
-          result = mergeConfigConcatArrays(result, await loadFile(resolved))
-        }
+      const [jsonc, json] = await Promise.all([
+        Filesystem.findUp("lobster.jsonc", Instance.directory, Instance.worktree),
+        Filesystem.findUp("lobster.json", Instance.directory, Instance.worktree),
+      ])
+      // Load all found files in parallel, then merge in correct order
+      const allFiles = [
+        ...jsonc.toReversed().map((f) => ({ file: f, type: "jsonc" as const })),
+        ...json.toReversed().map((f) => ({ file: f, type: "json" as const })),
+      ]
+      const loaded = await Promise.all(allFiles.map((entry) => loadFile(entry.file)))
+      for (const config of loaded) {
+        result = mergeConfigConcatArrays(result, config)
       }
     }
 

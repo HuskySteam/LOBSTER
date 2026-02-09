@@ -23,6 +23,8 @@ import { WebSearchTool } from "./websearch"
 import { CodeSearchTool } from "./codesearch"
 import { Flag } from "@/flag/flag"
 import { Log } from "@/util/log"
+import { Bus } from "@/bus"
+import { MCP } from "@/mcp"
 import { LspTool } from "./lsp"
 import { Truncate } from "./truncation"
 import { PlanExitTool, PlanEnterTool } from "./plan"
@@ -39,6 +41,20 @@ import { MemoryRecallTool } from "./memory-recall"
 
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })
+
+  // Cache for tool init results, keyed by agent+model+version
+  const initCache = new Map<string, any[]>()
+  let initCacheVersion = 0
+
+  export function invalidateToolCache() {
+    initCacheVersion++
+    initCache.clear()
+  }
+
+  // Invalidate tool cache when MCP tools change
+  Bus.subscribe(MCP.ToolsChanged, () => {
+    invalidateToolCache()
+  })
 
   export const state = Instance.state(async () => {
     const custom = [] as Tool.Info[]
@@ -71,6 +87,8 @@ export namespace ToolRegistry {
     }
 
     return { custom }
+  }, async () => {
+    invalidateToolCache()
   })
 
   function fromPlugin(id: string, def: ToolDefinition): Tool.Info {
@@ -159,6 +177,10 @@ export namespace ToolRegistry {
     },
     agent?: Agent.Info,
   ) {
+    const cacheKey = `${agent?.name ?? ""}:${model.providerID}:${model.modelID}:${initCacheVersion}`
+    const cached = initCache.get(cacheKey)
+    if (cached) return cached
+
     const tools = await all()
     const result = await Promise.all(
       tools
@@ -184,6 +206,7 @@ export namespace ToolRegistry {
           }
         }),
     )
+    initCache.set(cacheKey, result)
     return result
   }
 }

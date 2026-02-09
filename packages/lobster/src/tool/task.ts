@@ -214,6 +214,37 @@ export const TaskTool = Tool.define("task", async (ctx) => {
         let promptParts: Awaited<ReturnType<typeof SessionPrompt.resolvePromptParts>>
         try {
           promptParts = await SessionPrompt.resolvePromptParts(params.prompt)
+
+          // Inject team context so the agent knows its teammates and current tasks
+          const members = await TeamManager.getMembers(teamName)
+          const tasks = await TeamManager.listTasks(teamName)
+          const rosterLines = members
+            .filter((m) => m.name !== agentName)
+            .map((m) => `- ${m.name} (type: ${m.agentType}, status: ${m.status})`)
+          const taskLines = tasks
+            .filter((t) => t.status !== "deleted")
+            .map((t) => `- #${t.id} [${t.status}] ${t.subject}${t.owner ? ` (owner: ${t.owner})` : ""}`)
+
+          const teamContext = [
+            `<team-context>`,
+            `Team: ${teamName}`,
+            `Your name: ${agentName}`,
+            ``,
+            `## Teammates`,
+            rosterLines.length > 0 ? rosterLines.join("\n") : "(no other members yet)",
+            ``,
+            `## Current Task List`,
+            taskLines.length > 0 ? taskLines.join("\n") : "(no tasks yet)",
+            ``,
+            `Use sendmessage type:"message" recipient:"<name>" to message any teammate directly.`,
+            `Check tasklist to find and claim available work.`,
+            `</team-context>`,
+          ].join("\n")
+
+          promptParts.push({
+            type: "text",
+            text: teamContext,
+          })
         } catch (err) {
           // Roll back member registration on failure
           await TeamManager.removeMember(teamName, agentName)
