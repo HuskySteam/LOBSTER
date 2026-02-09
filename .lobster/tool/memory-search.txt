@@ -1,0 +1,7 @@
+Search stored memories by keyword. Finds relevant memories based on title, tags, and category matching.
+
+Use this tool to find specific memories when you need to recall knowledge about a topic:
+- Searches across memory titles, tags, categories, and summaries
+- Results are ranked by relevance score
+- Higher scores mean more query words matched in more important fields (title > tags > category)
+- Adjust the limit parameter to control how many results are returned

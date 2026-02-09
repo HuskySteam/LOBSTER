@@ -1,0 +1,5 @@
+Create a team coordination session for parallel multi-agent work. Decomposes a task into subtasks, assigns them to specialized agents (coder, tester, reviewer, architect), detects file conflicts, and returns an execution protocol.
+
+Use this tool when a task benefits from parallel work by multiple specialized agents. Provide the task description and a list of subtasks with their details. Each subtask can optionally specify an agent override; otherwise agents are auto-assigned based on keywords.
+
+Returns an assignment table, conflict warnings if multiple subtasks touch the same files, and a recommended execution order based on dependencies.

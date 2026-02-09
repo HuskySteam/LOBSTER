@@ -1,0 +1,5 @@
+Find files relevant to a task description. Uses keyword matching to discover which files are most relevant to the given query.
+
+Use this tool when you need to discover which files in the project are related to a specific task or topic. Provide a natural language description of what you are looking for.
+
+Returns a ranked list of files with relevance scores based on keyword matching against file contents.

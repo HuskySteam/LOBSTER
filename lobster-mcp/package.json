@@ -1,0 +1,14 @@
+{
+  "name": "lobster-mcp",
+  "version": "1.0.0",
+  "description": "LOBSTER Smart Context Manager - MCP server for intelligent file discovery",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}

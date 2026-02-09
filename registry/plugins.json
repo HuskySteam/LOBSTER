@@ -1,0 +1,199 @@
+{
+  "version": 1,
+  "updated": "2026-02-08",
+  "categories": ["Auth", "Agents", "Tools", "Memory", "UI", "Safety", "Productivity"],
+  "plugins": [
+    {
+      "name": "opencode-anthropic-auth",
+      "npm": "opencode-anthropic-auth@0.0.13",
+      "description": "Anthropic API key authentication",
+      "category": "Auth"
+    },
+    {
+      "name": "opencode-antigravity-auth",
+      "npm": "opencode-antigravity-auth@1.4.6",
+      "description": "Google Gemini/Anthropic model access via IDE auth",
+      "category": "Auth"
+    },
+    {
+      "name": "opencode-antigravity-multi-auth",
+      "npm": "opencode-antigravity-multi-auth@1.0.8",
+      "description": "Multiple Google account support with rotation",
+      "category": "Auth"
+    },
+    {
+      "name": "opencode-gemini-auth",
+      "npm": "opencode-gemini-auth@1.3.10",
+      "description": "Google account OAuth for Gemini models",
+      "category": "Auth"
+    },
+    {
+      "name": "opencode-openai-codex-auth",
+      "npm": "opencode-openai-codex-auth@4.4.0",
+      "description": "ChatGPT Plus/Pro OAuth authentication",
+      "category": "Auth"
+    },
+    {
+      "name": "opencode-orchestrator",
+      "npm": "opencode-orchestrator@1.2.58",
+      "description": "Multi-agent workflows with Planner, Coder, Reviewer",
+      "category": "Agents"
+    },
+    {
+      "name": "opencode-swarm-plugin",
+      "npm": "opencode-swarm-plugin@0.63.2",
+      "description": "Swarm-based agent coordination",
+      "category": "Agents"
+    },
+    {
+      "name": "opencode-ralph-wiggum",
+      "npm": "opencode-ralph-wiggum@1.0.0",
+      "description": "Self-correcting agent iteration loop",
+      "category": "Agents"
+    },
+    {
+      "name": "opencode-sessions",
+      "npm": "opencode-sessions@1.0.0",
+      "description": "Multi-agent collaboration support",
+      "category": "Agents"
+    },
+    {
+      "name": "opencode-devcontainers",
+      "npm": "opencode-devcontainers@0.3.2",
+      "description": "Multi-branch container isolation",
+      "category": "Tools"
+    },
+    {
+      "name": "opencode-worktree",
+      "npm": "opencode-worktree@0.4.0",
+      "description": "Zero-friction git worktree automation",
+      "category": "Tools"
+    },
+    {
+      "name": "opencode-pilot",
+      "npm": "opencode-pilot@0.23.1",
+      "description": "GitHub/Linear automation daemon",
+      "category": "Tools"
+    },
+    {
+      "name": "opencode-beads",
+      "npm": "opencode-beads@0.4.0",
+      "description": "Issue tracker integration with commands",
+      "category": "Tools"
+    },
+    {
+      "name": "opencode-froggy",
+      "npm": "opencode-froggy@0.10.0",
+      "description": "Hooks, specialized agents, and gitingest tools",
+      "category": "Tools"
+    },
+    {
+      "name": "opencode-plugin-openspec",
+      "npm": "opencode-plugin-openspec@0.1.2",
+      "description": "Architecture planning agent",
+      "category": "Tools"
+    },
+    {
+      "name": "opencode-snippets",
+      "npm": "opencode-snippets@1.7.0",
+      "description": "Inline text expansion utility",
+      "category": "Tools"
+    },
+    {
+      "name": "opencode-agent-memory",
+      "npm": "opencode-agent-memory@0.1.0",
+      "description": "Letta-inspired persistent memory",
+      "category": "Memory"
+    },
+    {
+      "name": "opencode-mem",
+      "npm": "opencode-mem@2.7.4",
+      "description": "Vector database persistent memory",
+      "category": "Memory"
+    },
+    {
+      "name": "opencode-handoff",
+      "npm": "opencode-handoff@0.3.2",
+      "description": "Session continuation and handoff prompts",
+      "category": "Memory"
+    },
+    {
+      "name": "opencode-sync-plugin",
+      "npm": "opencode-sync-plugin@0.3.7",
+      "description": "Auto-sync session data and titles",
+      "category": "Memory"
+    },
+    {
+      "name": "oh-my-opencode",
+      "npm": "oh-my-opencode@3.3.1",
+      "description": "Multi-model orchestration, agents, and pre-built tools",
+      "category": "UI"
+    },
+    {
+      "name": "opencode-notify",
+      "npm": "opencode-notify@0.3.1",
+      "description": "Native OS notifications on completion",
+      "category": "UI"
+    },
+    {
+      "name": "opencode-smart-voice-notify",
+      "npm": "opencode-smart-voice-notify@1.3.2",
+      "description": "TTS notifications with reminder logic",
+      "category": "UI"
+    },
+    {
+      "name": "opencode-smart-title",
+      "npm": "opencode-smart-title@1.0.3",
+      "description": "AI-powered session title generation",
+      "category": "UI"
+    },
+    {
+      "name": "envsitter-guard",
+      "npm": "envsitter-guard@0.0.4",
+      "description": "Prevents sensitive .env file exposure",
+      "category": "Safety"
+    },
+    {
+      "name": "opencode-ignore",
+      "npm": "opencode-ignore@1.1.0",
+      "description": "Pattern-based file/directory filtering",
+      "category": "Safety"
+    },
+    {
+      "name": "opencode-optimal-model-temps",
+      "npm": "opencode-optimal-model-temps@1.0.2",
+      "description": "Temperature optimization per model",
+      "category": "Safety"
+    },
+    {
+      "name": "opencode-mystatus",
+      "npm": "opencode-mystatus@1.2.4",
+      "description": "AI subscription quota checker",
+      "category": "Productivity"
+    },
+    {
+      "name": "opencode-synced",
+      "npm": "opencode-synced@0.9.0",
+      "description": "Cross-machine configuration sync",
+      "category": "Productivity"
+    },
+    {
+      "name": "opencode-skills",
+      "npm": "opencode-skills@1.0.0",
+      "description": "Capability management system",
+      "category": "Productivity"
+    },
+    {
+      "name": "opencode-agent-skills",
+      "npm": "opencode-agent-skills@0.6.4",
+      "description": "Dynamic capabilities loader from project directories",
+      "category": "Productivity"
+    },
+    {
+      "name": "micode",
+      "npm": "micode@0.9.1",
+      "description": "Brainstorm-Plan-Implement workflow",
+      "category": "Productivity"
+    }
+  ]
+}

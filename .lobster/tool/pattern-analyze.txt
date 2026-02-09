@@ -1,0 +1,3 @@
+Analyze review findings and project memories to detect recurring patterns, trends, and lessons learned. Groups similar issues, identifies improving or degrading trends across iterations, and extracts lessons from stored memories.
+
+Run this tool periodically to update pattern insights. Results are written to .lobster/memory/pattern-insights.json and displayed in the TUI pattern insights dashboard (/patterns command).

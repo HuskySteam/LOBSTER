@@ -1,0 +1,5 @@
+Mark a subtask as completed in the current team session. Records results, unblocks dependent subtasks, and checks if the entire session is complete.
+
+Use this after finishing work on a subtask. Provide the subtask_id, a summary of what was done, and optionally list files changed, issues found, or a verdict.
+
+Returns updated progress and any subtasks that are now unblocked and ready to start.

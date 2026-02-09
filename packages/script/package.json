@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/package",
+  "name": "@lobster-ai/script",
+  "version": "1.1.53",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "devDependencies": {
+    "@types/bun": "catalog:"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

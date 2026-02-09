@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {},
+  "plugin": [
+    "file://.lobster/plugins/lobster-orchestrator.ts",
+    "file://.lobster/plugins/lobster-memory.ts",
+    "file://.lobster/plugins/lobster-cost-tracker.ts",
+    "file://.lobster/plugins/lobster-auto-context.ts",
+    "file://.lobster/plugins/lobster-team.ts"
+  ],
+  "mcp": {
+    "lobster-context": {
+      "type": "local",
+      "command": ["bun", "run", "./lobster-mcp/src/index.ts"]
+    }
+  },
+  "tools": {
+    "github-triage": false,
+    "github-pr-search": false
+  }
+}

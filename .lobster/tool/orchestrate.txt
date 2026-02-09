@@ -1,0 +1,1 @@
+Start a multi-agent code review loop. Coordinates coder, reviewer, and tester agents to generate, review, and test code iteratively. Returns a structured protocol for the primary agent to follow.

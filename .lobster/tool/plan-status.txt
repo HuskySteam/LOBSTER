@@ -1,0 +1,8 @@
+View or update an implementation plan's status. Shows step-by-step progress with visual indicators.
+
+Use this tool to:
+- View the current plan and its progress
+- Mark steps as in_progress, completed, or skipped
+- Update the overall plan status (in_progress, completed, abandoned)
+
+If no plan_id is given, shows the latest plan. Use update_step + step_status to update individual steps. Use plan_status to update the overall plan status.

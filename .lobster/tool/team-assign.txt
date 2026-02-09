@@ -1,0 +1,3 @@
+Reassign a subtask to a different agent in the current team session. Use this when you need to change the agent assigned to a subtask.
+
+Provide the subtask_id and the new agent name (coder, tester, reviewer, or architect). The subtask must not already be completed.

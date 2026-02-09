@@ -1,0 +1,10 @@
+Store a memory for future sessions. Saves architecture decisions, coding patterns, past mistakes, and other knowledge that should persist across sessions.
+
+Use this tool whenever you learn something important about the project that should be remembered:
+- Architecture decisions and rationale
+- Coding patterns and conventions used in the project
+- Mistakes made and how they were fixed
+- User preferences for code style or workflow
+- Any other knowledge that would be valuable in future sessions
+
+Provide a clear title, detailed content, and relevant tags for searchability.

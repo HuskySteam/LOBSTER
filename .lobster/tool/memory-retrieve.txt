@@ -1,0 +1,7 @@
+Retrieve stored memories by category. Returns recent memories with full content.
+
+Use this tool to recall previously stored knowledge:
+- Filter by category (architecture, pattern, decision, mistake, preference, other)
+- Or retrieve all memories across categories
+- Results are sorted by most recent first
+- Adjust the limit parameter to control how many memories are returned

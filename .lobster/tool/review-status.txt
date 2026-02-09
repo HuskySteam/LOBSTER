@@ -1,0 +1,1 @@
+Check the status of the current review loop including phase, iteration count, and verdict history.

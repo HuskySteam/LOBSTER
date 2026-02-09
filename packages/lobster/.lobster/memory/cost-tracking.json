@@ -1,0 +1,64 @@
+{
+  "sessions": {
+    "ses_3cc593ac4ffeSX9DXJpTgWICe0": {
+      "started_at": "2026-02-06T15:51:41.257Z",
+      "models": {
+        "glob": {
+          "input_tokens": 0,
+          "output_tokens": 159,
+          "calls": 2
+        },
+        "read": {
+          "input_tokens": 0,
+          "output_tokens": 98,
+          "calls": 1
+        },
+        "write": {
+          "input_tokens": 0,
+          "output_tokens": 6,
+          "calls": 1
+        }
+      }
+    },
+    "ses_3cc514ef1ffe1P4oIcFcEyqL0K": {
+      "started_at": "2026-02-06T16:00:15.987Z",
+      "models": {
+        "read": {
+          "input_tokens": 0,
+          "output_tokens": 112,
+          "calls": 1
+        }
+      }
+    },
+    "ses_3cc46d3f2fferQBxY1xdXNfG5m": {
+      "started_at": "2026-02-06T16:11:45.556Z",
+      "models": {
+        "read": {
+          "input_tokens": 0,
+          "output_tokens": 112,
+          "calls": 1
+        },
+        "write": {
+          "input_tokens": 0,
+          "output_tokens": 6,
+          "calls": 1
+        }
+      }
+    },
+    "ses_3cc2ae566ffepl77MiSEumKfxK": {
+      "started_at": "2026-02-06T16:42:15.555Z",
+      "models": {
+        "read": {
+          "input_tokens": 0,
+          "output_tokens": 18,
+          "calls": 1
+        },
+        "write": {
+          "input_tokens": 0,
+          "output_tokens": 6,
+          "calls": 1
+        }
+      }
+    }
+  }
+}

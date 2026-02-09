@@ -1,0 +1,9 @@
+Create a structured implementation plan for a complex task. Analyzes the codebase using keyword matching to find relevant files, groups them into dependency-ordered steps, estimates complexity, and identifies risks.
+
+Use this tool when you need to plan a multi-step implementation before writing code. Provide a clear task description and the tool will:
+- Scan the codebase for relevant files
+- Analyze file complexity and dependencies
+- Generate ordered implementation steps
+- Identify risks (high-complexity files, high fan-in modules, missing tests)
+
+The plan is saved to .lobster/memory/plans/ and can be tracked with the plan_status tool.

@@ -1,0 +1,5 @@
+View token usage and estimated costs for the current or specified session. Shows per-model breakdown with input/output token counts.
+
+Use this tool to check how many tokens have been used and how much the session has cost so far. Helps with budget awareness and cost optimization.
+
+Optionally provide a session_id to view costs for a specific session. If omitted, shows data for the current session.

@@ -1,0 +1,5 @@
+View the current team coordination session status. Shows per-subtask progress, assigned agents, file conflicts, and the ready-to-start queue.
+
+Use this tool to check on team progress at any point during a coordinated session. If no session_id is provided, shows the latest session.
+
+Returns a visual progress bar, per-subtask details with status icons, and a list of subtasks that are ready to start (all dependencies met).

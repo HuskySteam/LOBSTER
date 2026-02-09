@@ -1,0 +1,7 @@
+Record structured review findings from a code review. The reviewer agent should call this tool to write findings with severity levels, descriptions, and file locations. Findings are stored in .lobster/memory/review-findings.json and displayed in the TUI review results dashboard.
+
+Use this tool after reviewing code to record specific issues found:
+- critical: Security vulnerabilities, data loss risks
+- high: Bugs, missing error handling, logic errors
+- medium: Code quality issues, missing validation
+- low: Style issues, minor improvements

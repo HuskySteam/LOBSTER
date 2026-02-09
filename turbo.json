@@ -1,0 +1,16 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "globalEnv": ["CI", "LOBSTER_DISABLE_SHARE"],
+  "globalPassThroughEnv": ["CI", "LOBSTER_DISABLE_SHARE"],
+  "tasks": {
+    "typecheck": {},
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "lobster#test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    }
+  }
+}

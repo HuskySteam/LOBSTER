@@ -1,0 +1,5 @@
+Set a spending budget for AI usage. Alerts when approaching or exceeding the budget limit.
+
+Use this tool to set a maximum spending budget in USD. Once set, you will receive alerts when spending approaches the threshold (default 80% of budget).
+
+Provide the budget amount in USD and optionally an alert threshold as a fraction between 0.0 and 1.0.
