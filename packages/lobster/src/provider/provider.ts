@@ -1178,7 +1178,10 @@ export namespace Provider {
 
     const provider = await list()
       .then((val) => Object.values(val))
-      .then((x) => x.find((p) => !cfg.provider || Object.keys(cfg.provider).includes(p.id)))
+      .then((x) => {
+        const providerKeys = cfg.provider ? Object.keys(cfg.provider) : []
+        return x.find((p) => providerKeys.length === 0 || providerKeys.includes(p.id))
+      })
     if (!provider) throw new Error("no providers found")
     const [model] = sort(Object.values(provider.models))
     if (!model) throw new Error("no models found")
