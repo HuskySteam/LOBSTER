@@ -17,7 +17,9 @@ ts-dist
 /result
 refs
 Session.vim
-opencode.json
+/opencode.json
+**/opencode.json
+!**/theme/opencode.json
 a.out
 target
 .scripts
