@@ -1,7 +1,19 @@
 import { realpathSync } from "fs"
+import { rename, unlink } from "fs/promises"
 import { dirname, join, normalize, resolve, relative } from "path"
 
 export namespace Filesystem {
+  export async function atomicWrite(filepath: string, content: string) {
+    const tmpPath = filepath + ".tmp"
+    try {
+      await Bun.write(tmpPath, content)
+      await rename(tmpPath, filepath)
+    } catch (e) {
+      await unlink(tmpPath).catch(() => {})
+      throw e
+    }
+  }
+
   export const exists = (p: string) =>
     Bun.file(p)
       .stat()

@@ -64,7 +64,7 @@ export const EditTool = Tool.define("edit", {
         const parentDir = path.dirname(filePath)
         const { mkdir } = await import("fs/promises")
         await mkdir(parentDir, { recursive: true })
-        await Bun.write(filePath, params.newString)
+        await Filesystem.atomicWrite(filePath, params.newString)
         await Bus.publish(File.Event.Edited, {
           file: filePath,
         })
@@ -97,7 +97,7 @@ export const EditTool = Tool.define("edit", {
         },
       })
 
-      await file.write(contentNew)
+      await Filesystem.atomicWrite(filePath, contentNew)
       await Bus.publish(File.Event.Edited, {
         file: filePath,
       })

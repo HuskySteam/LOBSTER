@@ -42,7 +42,7 @@ export const WriteTool = Tool.define("write", {
       },
     })
 
-    await Bun.write(filepath, params.content)
+    await Filesystem.atomicWrite(filepath, params.content)
     await Bus.publish(File.Event.Edited, {
       file: filepath,
     })
