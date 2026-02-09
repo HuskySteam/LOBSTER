@@ -51,12 +51,12 @@ export namespace ToolRegistry {
     initCache.clear()
   }
 
-  // Invalidate tool cache when MCP tools change
-  Bus.subscribe(MCP.ToolsChanged, () => {
-    invalidateToolCache()
-  })
-
   export const state = Instance.state(async () => {
+    // Subscribe to MCP tool changes (must be inside Instance.state to have context)
+    Bus.subscribe(MCP.ToolsChanged, () => {
+      invalidateToolCache()
+    })
+
     const custom = [] as Tool.Info[]
     const glob = new Bun.Glob("{tool,tools}/*.{js,ts}")
 
