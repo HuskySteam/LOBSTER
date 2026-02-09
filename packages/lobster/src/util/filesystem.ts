@@ -45,8 +45,12 @@ export namespace Filesystem {
   }
 
   export function contains(parent: string, child: string) {
-    const normalizedParent = resolve(normalize(parent))
-    const normalizedChild = resolve(normalize(child))
+    let normalizedParent = resolve(normalize(parent))
+    let normalizedChild = resolve(normalize(child))
+    if (process.platform === "win32") {
+      normalizedParent = normalizedParent.toLowerCase()
+      normalizedChild = normalizedChild.toLowerCase()
+    }
     return !relative(normalizedParent, normalizedChild).startsWith("..")
   }
 

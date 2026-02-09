@@ -201,12 +201,12 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
         case "add":
           // Create parent directories (recursive: true is safe on existing/root dirs)
           await fs.mkdir(path.dirname(change.filePath), { recursive: true })
-          await fs.writeFile(change.filePath, change.newContent, "utf-8")
+          await Filesystem.atomicWrite(change.filePath, change.newContent)
           updates.push({ file: change.filePath, event: "add" })
           break
 
         case "update":
-          await fs.writeFile(change.filePath, change.newContent, "utf-8")
+          await Filesystem.atomicWrite(change.filePath, change.newContent)
           updates.push({ file: change.filePath, event: "change" })
           break
 
@@ -214,7 +214,7 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
           if (change.movePath) {
             // Create parent directories (recursive: true is safe on existing/root dirs)
             await fs.mkdir(path.dirname(change.movePath), { recursive: true })
-            await fs.writeFile(change.movePath, change.newContent, "utf-8")
+            await Filesystem.atomicWrite(change.movePath, change.newContent)
             await fs.unlink(change.filePath)
             updates.push({ file: change.filePath, event: "unlink" })
             updates.push({ file: change.movePath, event: "add" })

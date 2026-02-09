@@ -2,6 +2,7 @@ import type { Argv } from "yargs"
 import { UI } from "../ui"
 import * as prompts from "@clack/prompts"
 import { Installation } from "../../installation"
+import { semver } from "bun"
 
 export const UpgradeCommand = {
   command: "upgrade [target]",
@@ -16,7 +17,7 @@ export const UpgradeCommand = {
         alias: "m",
         describe: "installation method to use",
         type: "string",
-        choices: ["curl", "github", "npm", "pnpm", "bun", "brew", "choco", "scoop"],
+        choices: ["curl", "github", "npm", "pnpm", "bun", "yarn", "brew", "choco", "scoop"],
       })
   },
   handler: async (args: { target?: string; method?: string }) => {
@@ -44,8 +45,14 @@ export const UpgradeCommand = {
     prompts.log.info("Using method: " + method)
     const target = args.target ? args.target.replace(/^v/, "") : await Installation.latest()
 
-    if (Installation.VERSION === target) {
+    const cmp = semver.order(Installation.VERSION, target)
+    if (cmp === 0) {
       prompts.log.warn(`lobster upgrade skipped: ${target} is already installed`)
+      prompts.outro("Done")
+      return
+    }
+    if (cmp > 0) {
+      prompts.log.warn(`lobster upgrade skipped: ${target} is older than current version ${Installation.VERSION}`)
       prompts.outro("Done")
       return
     }

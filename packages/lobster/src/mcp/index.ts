@@ -235,7 +235,7 @@ export namespace MCP {
 
   async function fetchResourcesForClient(clientName: string, client: Client) {
     const resources = await client.listResources().catch((e) => {
-      log.error("failed to get prompts", { clientName, error: e.message })
+      log.error("failed to get resources", { clientName, error: e.message })
       return undefined
     })
 
@@ -604,7 +604,14 @@ export namespace MCP {
       for (const mcpTool of toolsResult.tools) {
         const sanitizedClientName = clientName.replace(/[^a-zA-Z0-9_-]/g, "_")
         const sanitizedToolName = mcpTool.name.replace(/[^a-zA-Z0-9_-]/g, "_")
-        result[sanitizedClientName + "_" + sanitizedToolName] = await convertMcpTool(mcpTool, client, timeout)
+        let key = sanitizedClientName + "_" + sanitizedToolName
+        if (result[key]) {
+          log.warn("mcp tool name collision, appending suffix", { key })
+          let suffix = 2
+          while (result[`${key}_${suffix}`]) suffix++
+          key = `${key}_${suffix}`
+        }
+        result[key] = await convertMcpTool(mcpTool, client, timeout)
       }
     }
     return result

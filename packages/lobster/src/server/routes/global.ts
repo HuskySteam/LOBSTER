@@ -67,18 +67,33 @@ export const GlobalRoutes = lazy(() =>
       async (c) => {
         log.info("global event connected")
         return streamSSE(c, async (stream) => {
-          stream.writeSSE({
-            data: JSON.stringify({
-              payload: {
-                type: "server.connected",
-                properties: {},
-              },
-            }),
-          })
-          async function handler(event: any) {
+          try {
             await stream.writeSSE({
-              data: JSON.stringify(event),
+              data: JSON.stringify({
+                payload: {
+                  type: "server.connected",
+                  properties: {},
+                },
+              }),
             })
+          } catch {
+            return
+          }
+          let closed = false
+          const cleanup = () => {
+            if (closed) return
+            closed = true
+            clearInterval(heartbeat)
+            GlobalBus.off("event", handler)
+          }
+          async function handler(event: any) {
+            try {
+              await stream.writeSSE({
+                data: JSON.stringify(event),
+              })
+            } catch {
+              cleanup()
+            }
           }
           GlobalBus.on("event", handler)
 
@@ -91,13 +106,12 @@ export const GlobalRoutes = lazy(() =>
                   properties: {},
                 },
               }),
-            })
+            }).catch(() => cleanup())
           }, 30000)
 
           await new Promise<void>((resolve) => {
             stream.onAbort(() => {
-              clearInterval(heartbeat)
-              GlobalBus.off("event", handler)
+              cleanup()
               resolve()
               log.info("global event disconnected")
             })

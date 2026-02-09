@@ -10,9 +10,14 @@ export function csrf(): MiddlewareHandler {
       return next()
 
     // Skip CSRF for internal App().fetch() requests (no real HTTP origin)
+    // Verify request actually comes from internal fetch, not just a spoofed Host header
     try {
       const url = new URL(c.req.url)
-      if (url.hostname === "lobster.internal") return next()
+      if (url.hostname === "lobster.internal") {
+        const origin = c.req.header("origin")
+        const referer = c.req.header("referer")
+        if (!origin && !referer) return next()
+      }
     } catch {
       // URL parsing failed — proceed with CSRF check
     }

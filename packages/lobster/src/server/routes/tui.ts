@@ -24,7 +24,10 @@ export async function callTui(ctx: Context) {
     path: ctx.req.path,
     body,
   })
-  return response.next()
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("TUI control request timed out after 30s")), 30_000),
+  )
+  return Promise.race([response.next(), timeout])
 }
 
 const TuiControlRoutes = new Hono()
@@ -168,7 +171,7 @@ export const TuiRoutes = lazy(() =>
       }),
       async (c) => {
         await Bus.publish(TuiEvent.CommandExecute, {
-          command: "session.list",
+          command: "theme.switch",
         })
         return c.json(true)
       },

@@ -974,10 +974,11 @@ export namespace Provider {
         const fetchFn = customFetch ?? fetch
         const opts = init ?? {}
 
-        if (options["timeout"] !== undefined && options["timeout"] !== null) {
+        {
+          const timeout = options["timeout"] ?? 120_000
           const signals: AbortSignal[] = []
           if (opts.signal) signals.push(opts.signal)
-          if (options["timeout"] !== false) signals.push(AbortSignal.timeout(options["timeout"]))
+          if (timeout !== false) signals.push(AbortSignal.timeout(timeout))
 
           const combined = signals.length > 1 ? AbortSignal.any(signals) : signals[0]
 

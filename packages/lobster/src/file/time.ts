@@ -8,6 +8,11 @@ export namespace FileTime {
   // All tools that overwrite existing files should run their
   // assert/read/write/update sequence inside withLock(filepath, ...)
   // so concurrent writes to the same file are serialized.
+  //
+  // Known limitation (TOCTOU): The lock serializes lobster's own writes
+  // but cannot protect against external modifications between the mtime
+  // check in assert() and the actual write. An external process (editor,
+  // another terminal) may modify the file in that window.
   export const state = Instance.state(() => {
     const read: {
       [sessionID: string]: {

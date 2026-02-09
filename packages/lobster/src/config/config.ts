@@ -185,8 +185,15 @@ export namespace Config {
 
     // Inline config content overrides all non-managed config sources.
     if (Flag.LOBSTER_CONFIG_CONTENT) {
-      result = mergeConfigConcatArrays(result, JSON.parse(Flag.LOBSTER_CONFIG_CONTENT))
-      log.debug("loaded custom config from LOBSTER_CONFIG_CONTENT")
+      const parsed = Info.safeParse(JSON.parse(Flag.LOBSTER_CONFIG_CONTENT))
+      if (parsed.success) {
+        result = mergeConfigConcatArrays(result, parsed.data)
+        log.debug("loaded custom config from LOBSTER_CONFIG_CONTENT")
+      } else {
+        log.warn("LOBSTER_CONFIG_CONTENT failed schema validation, ignoring", {
+          issues: parsed.error.issues,
+        })
+      }
     }
 
     // Load managed config files last (highest priority) - enterprise admin-controlled
@@ -1423,7 +1430,7 @@ export namespace Config {
   }
 
   export async function update(config: Info) {
-    const filepath = path.join(Instance.directory, "config.json")
+    const filepath = path.join(Instance.directory, "lobster.json")
     const existing = await loadFile(filepath)
     await Bun.write(filepath, JSON.stringify(mergeDeep(existing, config), null, 2))
     await Instance.dispose()

@@ -169,11 +169,6 @@ export namespace File {
     "com",
     "bat",
     "cmd",
-    "ps1",
-    "sh",
-    "bash",
-    "zsh",
-    "fish",
   ])
 
   const imageExtensions = new Set([

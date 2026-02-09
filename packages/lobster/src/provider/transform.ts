@@ -68,7 +68,7 @@ export namespace ProviderTransform {
         .filter((msg): msg is ModelMessage => msg !== undefined && msg.content !== "")
     }
 
-    if (model.api.id.includes("claude")) {
+    if (model.api.npm === "@ai-sdk/anthropic" || model.api.id.includes("claude")) {
       return msgs.map((msg) => {
         if ((msg.role === "assistant" || msg.role === "tool") && Array.isArray(msg.content)) {
           msg.content = msg.content.map((part) => {
@@ -85,6 +85,7 @@ export namespace ProviderTransform {
       })
     }
     if (
+      model.api.npm === "@ai-sdk/mistral" ||
       model.providerID === "mistral" ||
       model.api.id.toLowerCase().includes("mistral") ||
       model.api.id.toLocaleLowerCase().includes("devstral")
@@ -98,10 +99,12 @@ export namespace ProviderTransform {
           msg.content = msg.content.map((part) => {
             if ((part.type === "tool-call" || part.type === "tool-result") && "toolCallId" in part) {
               // Mistral requires alphanumeric tool call IDs with exactly 9 characters
-              const normalizedId = part.toolCallId
-                .replace(/[^a-zA-Z0-9]/g, "") // Remove non-alphanumeric characters
-                .substring(0, 9) // Take first 9 characters
-                .padEnd(9, "0") // Pad with zeros if less than 9 characters
+              // Use xxHash32 to avoid collisions from simple truncation
+              const hash = Bun.hash.xxHash32(part.toolCallId).toString(36)
+              const normalizedId = hash
+                .replace(/[^a-zA-Z0-9]/g, "")
+                .substring(0, 9)
+                .padEnd(9, "0")
 
               return {
                 ...part,
@@ -132,6 +135,7 @@ export namespace ProviderTransform {
 
     if (typeof model.capabilities.interleaved === "object" && model.capabilities.interleaved.field) {
       const field = model.capabilities.interleaved.field
+      const providerKey = sdkKey(model.api.npm) ?? "openaiCompatible"
       return msgs.map((msg) => {
         if (msg.role === "assistant" && Array.isArray(msg.content)) {
           const reasoningParts = msg.content.filter((part: any) => part.type === "reasoning")
@@ -147,8 +151,8 @@ export namespace ProviderTransform {
               content: filteredContent,
               providerOptions: {
                 ...msg.providerOptions,
-                openaiCompatible: {
-                  ...(msg.providerOptions as any)?.openaiCompatible,
+                [providerKey]: {
+                  ...(msg.providerOptions as any)?.[providerKey],
                   [field]: reasoningText,
                 },
               },
@@ -762,9 +766,12 @@ export namespace ProviderTransform {
           if (key === "enum" && Array.isArray(value)) {
             // Convert all enum values to strings
             result[key] = value.map((v) => String(v))
-            // If we have integer type with enum, change type to string
+            // If we have integer type with enum, change type to string and note the conversion
             if (result.type === "integer" || result.type === "number") {
+              const originalType = result.type
               result.type = "string"
+              const note = `(Converted from ${originalType} enum to string for Gemini compatibility)`
+              result.description = result.description ? `${result.description} ${note}` : note
             }
           } else if (typeof value === "object" && value !== null) {
             result[key] = sanitizeGemini(value)

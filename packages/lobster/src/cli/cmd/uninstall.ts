@@ -214,11 +214,18 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
   if (method === "curl" && targets.binary) {
     UI.empty()
     prompts.log.message("To finish removing the binary, run:")
-    prompts.log.info(`  rm "${targets.binary}"`)
-
-    const binDir = path.dirname(targets.binary)
-    if (binDir.includes(".lobster")) {
-      prompts.log.info(`  rmdir "${binDir}" 2>/dev/null`)
+    if (process.platform === "win32") {
+      prompts.log.info(`  del "${targets.binary}"`)
+      const binDir = path.dirname(targets.binary)
+      if (binDir.includes(".lobster")) {
+        prompts.log.info(`  rd /s /q "${binDir}"`)
+      }
+    } else {
+      prompts.log.info(`  rm "${targets.binary}"`)
+      const binDir = path.dirname(targets.binary)
+      if (binDir.includes(".lobster")) {
+        prompts.log.info(`  rmdir "${binDir}" 2>/dev/null`)
+      }
     }
   }
 

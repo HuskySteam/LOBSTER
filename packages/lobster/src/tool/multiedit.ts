@@ -24,6 +24,7 @@ export const MultiEditTool = Tool.define("multiedit", {
     const tool = await EditTool.init()
     const results = []
     for (const [, edit] of params.edits.entries()) {
+      ctx.abort.throwIfAborted()
       const result = await tool.execute(
         {
           filePath: edit.filePath || params.filePath,

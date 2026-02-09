@@ -137,7 +137,7 @@ export namespace Agent {
             grep: "allow",
             glob: "allow",
             list: "allow",
-            bash: "allow",
+            bash: "deny",
             webfetch: "allow",
             websearch: "allow",
             codesearch: "allow",

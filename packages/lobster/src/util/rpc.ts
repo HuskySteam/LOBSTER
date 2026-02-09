@@ -15,10 +15,15 @@ export namespace Rpc {
       if (parsed.type === "rpc.request") {
         if (typeof rpc[parsed.method] !== "function") {
           console.error(`RPC method not found: ${parsed.method}`)
+          postMessage(JSON.stringify({ type: "rpc.result", id: parsed.id, error: `RPC method not found: ${parsed.method}` }))
           return
         }
-        const result = await rpc[parsed.method](parsed.input)
-        postMessage(JSON.stringify({ type: "rpc.result", result, id: parsed.id }))
+        try {
+          const result = await rpc[parsed.method](parsed.input)
+          postMessage(JSON.stringify({ type: "rpc.result", result, id: parsed.id }))
+        } catch (e) {
+          postMessage(JSON.stringify({ type: "rpc.result", id: parsed.id, error: e instanceof Error ? e.message : String(e) }))
+        }
       }
     }
   }
@@ -43,10 +48,14 @@ export namespace Rpc {
         return
       }
       if (parsed.type === "rpc.result") {
-        const resolve = pending.get(parsed.id)
-        if (resolve) {
-          resolve(parsed.result)
+        const handler = pending.get(parsed.id)
+        if (handler) {
           pending.delete(parsed.id)
+          if (parsed.error) {
+            handler({ __rpc_error: parsed.error })
+          } else {
+            handler({ __rpc_result: parsed.result })
+          }
         }
       }
       if (parsed.type === "rpc.event") {
@@ -66,9 +75,13 @@ export namespace Rpc {
             pending.delete(requestId)
             reject(new Error(`RPC call '${String(method)}' timed out after ${timeoutMs}ms`))
           }, timeoutMs)
-          pending.set(requestId, (result) => {
+          pending.set(requestId, (response) => {
             clearTimeout(timer)
-            resolve(result)
+            if (response.__rpc_error) {
+              reject(new Error(response.__rpc_error))
+              return
+            }
+            resolve(response.__rpc_result)
           })
           target.postMessage(JSON.stringify({ type: "rpc.request", method, input, id: requestId }))
         })
@@ -83,6 +96,13 @@ export namespace Rpc {
         return () => {
           handlers!.delete(handler)
         }
+      },
+      dispose() {
+        for (const [reqId, handler] of pending) {
+          handler({ __rpc_error: "RPC client disposed" })
+        }
+        pending.clear()
+        listeners.clear()
       },
     }
   }

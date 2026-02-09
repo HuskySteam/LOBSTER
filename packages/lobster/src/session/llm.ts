@@ -187,10 +187,11 @@ export namespace LLM {
         })
       },
       async experimental_repairToolCall(failed) {
-        const lower = failed.toolCall.toolName.toLowerCase()
-        if (lower !== failed.toolCall.toolName && tools[lower]) {
+        const name = failed.toolCall.toolName
+        const lower = name.toLowerCase()
+        if (lower !== name && tools[lower]) {
           l.info("repairing tool call", {
-            tool: failed.toolCall.toolName,
+            tool: name,
             repaired: lower,
           })
           return {
@@ -198,10 +199,33 @@ export namespace LLM {
             toolName: lower,
           }
         }
+        // Fuzzy match: find tool with smallest Levenshtein distance
+        const toolNames = Object.keys(tools)
+        let bestMatch: string | undefined
+        let bestDist = Infinity
+        for (const candidate of toolNames) {
+          const dist = levenshtein(lower, candidate.toLowerCase())
+          if (dist < bestDist) {
+            bestDist = dist
+            bestMatch = candidate
+          }
+        }
+        // Accept fuzzy match if edit distance <= 3
+        if (bestMatch && bestDist > 0 && bestDist <= 3) {
+          l.info("repairing tool call (fuzzy)", {
+            tool: name,
+            repaired: bestMatch,
+            distance: bestDist,
+          })
+          return {
+            ...failed.toolCall,
+            toolName: bestMatch,
+          }
+        }
         return {
           ...failed.toolCall,
           input: JSON.stringify({
-            tool: failed.toolCall.toolName,
+            tool: name,
             error: failed.error.message,
           }),
           toolName: "invalid",
@@ -279,5 +303,20 @@ export namespace LLM {
       }
     }
     return false
+  }
+
+  function levenshtein(a: string, b: string): number {
+    if (a.length === 0) return b.length
+    if (b.length === 0) return a.length
+    const matrix: number[][] = []
+    for (let i = 0; i <= a.length; i++) matrix[i] = [i]
+    for (let j = 0; j <= b.length; j++) matrix[0][j] = j
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1
+        matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + cost)
+      }
+    }
+    return matrix[a.length][b.length]
   }
 }

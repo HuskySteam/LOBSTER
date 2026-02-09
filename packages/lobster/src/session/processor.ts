@@ -30,7 +30,7 @@ export namespace SessionProcessor {
     model: Provider.Model
     abort: AbortSignal
   }) {
-    const toolcalls: Record<string, MessageV2.ToolPart> = {}
+    let toolcalls: Record<string, MessageV2.ToolPart> = {}
     let snapshot: string | undefined
     let blocked = false
     let attempt = 0
@@ -369,6 +369,24 @@ export namespace SessionProcessor {
                 SessionStatus.set(input.sessionID, { type: "idle" })
                 break
               }
+              // Mark stale running tools as error before retrying
+              for (const [id, tc] of Object.entries(toolcalls)) {
+                if (tc.state.status !== "completed" && tc.state.status !== "error") {
+                  await Session.updatePart({
+                    ...tc,
+                    state: {
+                      ...tc.state,
+                      status: "error",
+                      error: `Tool aborted before retry attempt ${attempt}`,
+                      time: {
+                        start: Date.now(),
+                        end: Date.now(),
+                      },
+                    },
+                  })
+                }
+              }
+              toolcalls = {}
               const delay = SessionRetry.delay(attempt, error.name === "APIError" ? error : undefined)
               SessionStatus.set(input.sessionID, {
                 type: "retry",
@@ -385,6 +403,10 @@ export namespace SessionProcessor {
               error: input.assistantMessage.error,
             })
             SessionStatus.set(input.sessionID, { type: "idle" })
+          }
+          // Reset retry counter after successful stream completion
+          if (!input.assistantMessage.error) {
+            attempt = 0
           }
           if (snapshot) {
             const patch = await Snapshot.patch(snapshot)

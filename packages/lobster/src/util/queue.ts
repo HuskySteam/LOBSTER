@@ -1,4 +1,5 @@
 const MAX_PENDING_RESOLVERS = 10_000
+const MAX_QUEUE_SIZE = 100_000
 
 export class AsyncQueue<T> implements AsyncIterable<T> {
   private queue: T[] = []
@@ -6,14 +7,20 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
 
   push(item: T) {
     const resolve = this.resolvers.shift()
-    if (resolve) resolve(item)
-    else this.queue.push(item)
+    if (resolve) {
+      resolve(item)
+      return
+    }
+    if (this.queue.length >= MAX_QUEUE_SIZE) {
+      throw new Error(`AsyncQueue: queue size limit reached (${MAX_QUEUE_SIZE})`)
+    }
+    this.queue.push(item)
   }
 
   async next(): Promise<T> {
     if (this.queue.length > 0) return this.queue.shift()!
     if (this.resolvers.length >= MAX_PENDING_RESOLVERS) {
-      console.warn(`AsyncQueue: pending resolvers reached limit (${MAX_PENDING_RESOLVERS})`)
+      throw new Error(`AsyncQueue: pending resolvers limit reached (${MAX_PENDING_RESOLVERS})`)
     }
     return new Promise((resolve) => this.resolvers.push(resolve))
   }

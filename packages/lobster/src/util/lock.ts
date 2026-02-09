@@ -51,55 +51,69 @@ export namespace Lock {
     }
   }
 
-  export async function read(key: string): Promise<Disposable> {
+  const DEFAULT_TIMEOUT = 30_000
+
+  export async function read(key: string, timeout = DEFAULT_TIMEOUT): Promise<Disposable> {
     const lock = get(key)
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      const dispose: Disposable = {
+        [Symbol.dispose]: () => {
+          lock.readers--
+          process(key)
+        },
+      }
+
       if (!lock.writer && lock.waitingWriters.length === 0) {
         lock.readers++
-        resolve({
-          [Symbol.dispose]: () => {
-            lock.readers--
-            process(key)
-          },
-        })
-      } else {
-        lock.waitingReaders.push(() => {
-          lock.readers++
-          resolve({
-            [Symbol.dispose]: () => {
-              lock.readers--
-              process(key)
-            },
-          })
-        })
+        resolve(dispose)
+        return
       }
+
+      const timer = setTimeout(() => {
+        const idx = lock.waitingReaders.indexOf(cb)
+        if (idx !== -1) lock.waitingReaders.splice(idx, 1)
+        reject(new Error(`Lock.read timed out after ${timeout}ms for key "${key}"`))
+      }, timeout)
+
+      const cb = () => {
+        clearTimeout(timer)
+        lock.readers++
+        resolve(dispose)
+      }
+      lock.waitingReaders.push(cb)
     })
   }
 
-  export async function write(key: string): Promise<Disposable> {
+  export async function write(key: string, timeout = DEFAULT_TIMEOUT): Promise<Disposable> {
     const lock = get(key)
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      const dispose: Disposable = {
+        [Symbol.dispose]: () => {
+          lock.writer = false
+          process(key)
+        },
+      }
+
       if (!lock.writer && lock.readers === 0) {
         lock.writer = true
-        resolve({
-          [Symbol.dispose]: () => {
-            lock.writer = false
-            process(key)
-          },
-        })
-      } else {
-        lock.waitingWriters.push(() => {
-          lock.writer = true
-          resolve({
-            [Symbol.dispose]: () => {
-              lock.writer = false
-              process(key)
-            },
-          })
-        })
+        resolve(dispose)
+        return
       }
+
+      const timer = setTimeout(() => {
+        const idx = lock.waitingWriters.indexOf(cb)
+        if (idx !== -1) lock.waitingWriters.splice(idx, 1)
+        reject(new Error(`Lock.write timed out after ${timeout}ms for key "${key}"`))
+      }, timeout)
+
+      const cb = () => {
+        clearTimeout(timer)
+        lock.writer = true
+        resolve(dispose)
+      }
+      lock.waitingWriters.push(cb)
     })
   }
 }

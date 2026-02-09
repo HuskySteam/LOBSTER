@@ -236,14 +236,18 @@ export namespace SessionPrompt {
     return parts
   }
 
+  const starting = new Set<string>()
   function start(sessionID: string) {
     const s = state()
     if (s[sessionID]) return
+    if (starting.has(sessionID)) return
+    starting.add(sessionID)
     const controller = new AbortController()
     s[sessionID] = {
       abort: controller,
       callbacks: [],
     }
+    starting.delete(sessionID)
     return controller.signal
   }
 
@@ -367,6 +371,7 @@ export namespace SessionPrompt {
           modelID: lastUser.model.modelID,
           providerID: lastUser.model.providerID,
           history: msgs,
+          abort,
         })
 
       const model = await Provider.getModel(lastUser.model.providerID, lastUser.model.modelID)
@@ -733,11 +738,8 @@ export namespace SessionPrompt {
     for await (const item of MessageV2.stream(sessionID)) {
       if (item.info.role === "user") continue
       const queued = state()[sessionID]?.callbacks ?? []
-      const resolved = new Set<number>()
-      for (let i = 0; i < queued.length; i++) {
-        if (resolved.has(i)) continue
-        resolved.add(i)
-        queued[i].resolve(item)
+      for (const cb of queued) {
+        cb.resolve(item)
       }
       return item
     }
@@ -865,7 +867,19 @@ export namespace SessionPrompt {
           always: ["*"],
         })
 
-        const result = await execute(args, opts)
+        let result: Awaited<ReturnType<typeof execute>>
+        try {
+          result = await execute(args, opts)
+        } catch (e) {
+          const errorMsg = e instanceof Error ? e.message : String(e)
+          return {
+            title: "",
+            metadata: {},
+            output: `MCP tool error: ${errorMsg}`,
+            attachments: [],
+            content: [{ type: "text" as const, text: `MCP tool error: ${errorMsg}` }],
+          }
+        }
 
         await Plugin.trigger(
           "tool.execute.after",
@@ -879,6 +893,20 @@ export namespace SessionPrompt {
 
         const textParts: string[] = []
         const attachments: MessageV2.FilePart[] = []
+
+        if (result.isError) {
+          const errorParts: string[] = []
+          for (const c of result.content) {
+            if (c.type === "text") errorParts.push(c.text)
+          }
+          return {
+            title: "",
+            metadata: { error: true },
+            output: `MCP tool error: ${errorParts.join("\n") || "unknown error"}`,
+            attachments: [],
+            content: result.content,
+          }
+        }
 
         for (const contentItem of result.content) {
           if (contentItem.type === "text") {
@@ -1897,7 +1925,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     history: MessageV2.WithParts[]
     providerID: string
     modelID: string
+    abort?: AbortSignal
   }) {
+    if (input.abort?.aborted) return
     if (input.session.parentID) return
     if (!Session.isDefaultTitle(input.session.title)) return
 
@@ -1937,7 +1967,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       small: true,
       tools: {},
       model,
-      abort: new AbortController().signal,
+      abort: input.abort ?? new AbortController().signal,
       sessionID: input.session.id,
       retries: 2,
       messages: [

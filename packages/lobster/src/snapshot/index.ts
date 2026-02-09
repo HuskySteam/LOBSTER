@@ -250,6 +250,9 @@ export namespace Snapshot {
 
   function gitdir() {
     const project = Instance.project
+    if (project.id.includes("..") || project.id.includes("/") || project.id.includes("\\")) {
+      throw new Error(`Invalid project id: ${project.id}`)
+    }
     return path.join(Global.Path.data, "snapshot", project.id)
   }
 }

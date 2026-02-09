@@ -138,7 +138,7 @@ export const rpc = {
     Log.Default.info("worker shutting down")
     if (eventStream.abort) eventStream.abort.abort()
     await Instance.disposeAll()
-    if (server) server.stop(true)
+    if (server) await server.stop(true)
   },
 }
 

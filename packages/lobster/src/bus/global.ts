@@ -8,3 +8,4 @@ export const GlobalBus = new EventEmitter<{
     },
   ]
 }>()
+GlobalBus.setMaxListeners(50)

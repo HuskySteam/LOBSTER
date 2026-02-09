@@ -54,6 +54,7 @@ export const BatchTool = Tool.define("batch", async () => {
         const partID = Identifier.ascending("part")
 
         try {
+          ctx.abort.throwIfAborted()
           if (DISALLOWED.has(call.tool)) {
             throw new Error(
               `Tool '${call.tool}' is not allowed in batch. Disallowed tools: ${Array.from(DISALLOWED).join(", ")}`,

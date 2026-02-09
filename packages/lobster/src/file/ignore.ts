@@ -19,7 +19,6 @@ export namespace FileIgnore {
     ".idea",
     ".turbo",
     ".output",
-    "desktop",
     ".sst",
     ".cache",
     ".webkit-cache",

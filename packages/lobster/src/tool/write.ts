@@ -26,31 +26,35 @@ export const WriteTool = Tool.define("write", {
     const filepath = path.isAbsolute(params.filePath) ? params.filePath : path.join(Instance.directory, params.filePath)
     await assertExternalDirectory(ctx, filepath)
 
-    const file = Bun.file(filepath)
-    const exists = await file.exists()
-    const contentOld = exists ? await file.text() : ""
-    if (exists) await FileTime.assert(ctx.sessionID, filepath)
+    let exists = false
+    let contentOld = ""
+    await FileTime.withLock(filepath, async () => {
+      const file = Bun.file(filepath)
+      exists = await file.exists()
+      contentOld = exists ? await file.text() : ""
+      if (exists) await FileTime.assert(ctx.sessionID, filepath)
 
-    const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
-    await ctx.ask({
-      permission: "edit",
-      patterns: [path.relative(Instance.worktree, filepath)],
-      always: ["*"],
-      metadata: {
-        filepath,
-        diff,
-      },
-    })
+      const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
+      await ctx.ask({
+        permission: "edit",
+        patterns: [path.relative(Instance.worktree, filepath)],
+        always: ["*"],
+        metadata: {
+          filepath,
+          diff,
+        },
+      })
 
-    await Filesystem.atomicWrite(filepath, params.content)
-    await Bus.publish(File.Event.Edited, {
-      file: filepath,
+      await Filesystem.atomicWrite(filepath, params.content)
+      await Bus.publish(File.Event.Edited, {
+        file: filepath,
+      })
+      await Bus.publish(FileWatcher.Event.Updated, {
+        file: filepath,
+        event: exists ? "change" : "add",
+      })
+      FileTime.read(ctx.sessionID, filepath)
     })
-    await Bus.publish(FileWatcher.Event.Updated, {
-      file: filepath,
-      event: exists ? "change" : "add",
-    })
-    FileTime.read(ctx.sessionID, filepath)
 
     let output = "Wrote file successfully."
     await LSP.touchFile(filepath, true)

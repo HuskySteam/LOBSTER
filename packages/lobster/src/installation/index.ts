@@ -61,7 +61,7 @@ export namespace Installation {
     if (process.execPath.includes(path.join(".lobster", "bin"))) return "curl"
     if (process.execPath.includes(path.join(".local", "bin"))) return "curl"
     // Windows: AppData\Local\lobster\bin
-    if (process.execPath.includes(path.join("lobster", "bin"))) return "github"
+    if (process.execPath.includes(path.join("AppData", "Local", "lobster", "bin"))) return "github"
     const exec = process.execPath.toLowerCase()
 
     const checks = [
@@ -166,10 +166,13 @@ export namespace Installation {
     const newBin = path.join(tmpDir, isWindows ? "lobster.exe" : "lobster")
     const currentBin = process.execPath
     if (isWindows) {
-      // Windows can't replace running exe directly — rename old, copy new, schedule cleanup
+      // Windows can't replace running exe directly — move old, copy new, schedule cleanup
       const oldBin = currentBin + ".old"
-      try { await $`del /f "${oldBin}"`.quiet().nothrow() } catch {}
-      await $`powershell.exe -Command "Rename-Item -Path '${currentBin}' -NewName '${path.basename(oldBin)}' -Force; Copy-Item -Path '${newBin}' -Destination '${currentBin}' -Force"`.quiet()
+      await $`powershell.exe -Command "Remove-Item -Path '${oldBin}' -Force -ErrorAction SilentlyContinue"`.quiet().nothrow()
+      await $`powershell.exe -Command "Move-Item -Path '${currentBin}' -Destination '${oldBin}' -Force"`.quiet()
+      await $`powershell.exe -Command "Copy-Item -Path '${newBin}' -Destination '${currentBin}' -Force"`.quiet()
+      // Schedule cleanup of old binary after process exits
+      await $`powershell.exe -Command "Start-Process -WindowStyle Hidden powershell -ArgumentList '-Command', 'Start-Sleep -Seconds 2; Remove-Item -Path \"${oldBin}\" -Force -ErrorAction SilentlyContinue'"`.quiet().nothrow()
     } else {
       await $`chmod +x ${newBin}`
       await $`mv ${newBin} ${currentBin}`
@@ -212,18 +215,27 @@ export namespace Installation {
         })
         break
       }
+      case "yarn":
+        cmd = $`yarn global add lobster-ai@${target}`
+        break
       case "choco":
-        cmd = $`echo Y | choco upgrade lobster --version=${target}`
+        cmd = $`choco upgrade lobster --version=${target} --yes`
         break
       case "scoop":
-        cmd = $`scoop install lobster@${target}`
+        cmd = $`scoop update lobster`
         break
       default:
         throw new Error(`Unknown method: ${method}`)
     }
     const result = await cmd.quiet().throws(false)
     if (result.exitCode !== 0) {
-      const stderr = method === "choco" ? "not running from an elevated command shell" : result.stderr.toString("utf8")
+      let stderr = result.stderr.toString("utf8")
+      if (method === "choco" && !stderr.trim()) {
+        stderr = result.stdout.toString("utf8")
+      }
+      if (method === "choco") {
+        stderr = stderr + "\nHint: choco requires an elevated (Administrator) command shell"
+      }
       throw new UpgradeFailedError({
         stderr: stderr,
       })

@@ -431,13 +431,31 @@ export namespace ClaudeCompat {
     return agents
   }
 
+  const CCHookEntrySchema = z.object({
+    matcher: z.string().optional(),
+    command: z.string(),
+  })
+
+  const CCHooksConfigSchema = z.object({
+    PreToolUse: z.array(CCHookEntrySchema).optional(),
+    PostToolUse: z.array(CCHookEntrySchema).optional(),
+    SessionStart: z.array(CCHookEntrySchema).optional(),
+    UserPromptSubmit: z.array(CCHookEntrySchema).optional(),
+    Stop: z.array(CCHookEntrySchema).optional(),
+  })
+
   async function loadShellHooks(dir: string): Promise<CCHooksConfig | null> {
     const hooksPath = path.join(dir, "hooks", "hooks.json")
     if (!(await Filesystem.exists(hooksPath))) return null
 
     try {
       const text = await Bun.file(hooksPath).text()
-      return JSON.parse(text) as CCHooksConfig
+      const parsed = CCHooksConfigSchema.safeParse(JSON.parse(text))
+      if (!parsed.success) {
+        log.warn("invalid hooks.json schema", { path: hooksPath, error: parsed.error.message })
+        return null
+      }
+      return parsed.data
     } catch (e) {
       log.warn("failed to parse hooks.json", { path: hooksPath, error: e })
       return null
@@ -474,12 +492,27 @@ export namespace ClaudeCompat {
       },
     })
 
+    const timeout = AbortSignal.timeout(30_000)
+    const killOnTimeout = () => {
+      proc.kill()
+    }
+    timeout.addEventListener("abort", killOnTimeout)
+
     // Consume both streams in parallel to avoid deadlocks
     const [stdout, stderr, exitCode] = await Promise.all([
       new Response(proc.stdout).text(),
       new Response(proc.stderr).text(),
       proc.exited,
     ])
+
+    timeout.removeEventListener("abort", killOnTimeout)
+    if (timeout.aborted) {
+      throw new Error(`Hook command timed out after 30s: ${command}`)
+    }
+
+    if (exitCode === 1) {
+      return { blocked: true }
+    }
 
     if (exitCode === 2) {
       throw new Error(`Hook command failed: ${stderr}`)

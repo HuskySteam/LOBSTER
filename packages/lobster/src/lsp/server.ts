@@ -766,6 +766,21 @@ export namespace LSPServer {
         const tempPath = path.join(Global.Path.bin, assetName)
         await Bun.file(tempPath).write(downloadResponse)
 
+        // Verify SHA256 checksum of the downloaded archive
+        const checksumKey = `zls-${release.tag_name}-${zlsArch}-${zlsPlatform}`
+        const expectedHash = CHECKSUMS[checksumKey]
+        if (expectedHash) {
+          if (!(await verifySHA256(tempPath, expectedHash))) {
+            log.error("zls archive failed integrity check, aborting")
+            await fs.rm(tempPath, { force: true })
+            return
+          }
+        } else {
+          log.warn("no checksum available for zls, skipping integrity verification", {
+            key: checksumKey,
+          })
+        }
+
         if (ext === "zip") {
           const ok = await Archive.extractZip(tempPath, Global.Path.bin)
             .then(() => true)
@@ -1068,6 +1083,21 @@ export namespace LSPServer {
         return
       }
       await Bun.write(archive, buf)
+
+      // Verify SHA256 checksum of the downloaded archive
+      const checksumKey = `clangd-${tag}-${token}`
+      const expectedHash = CHECKSUMS[checksumKey]
+      if (expectedHash) {
+        if (!(await verifySHA256(archive, expectedHash))) {
+          log.error("clangd archive failed integrity check, aborting")
+          await fs.rm(archive, { force: true })
+          return
+        }
+      } else {
+        log.warn("no checksum available for clangd, skipping integrity verification", {
+          key: checksumKey,
+        })
+      }
 
       const zip = name.endsWith(".zip")
       const tar = name.endsWith(".tar.xz")
@@ -1531,6 +1561,21 @@ export namespace LSPServer {
 
         const tempPath = path.join(Global.Path.bin, assetName)
         await Bun.file(tempPath).write(downloadResponse)
+
+        // Verify SHA256 checksum of the downloaded archive
+        const checksumKey = `lua-language-server-${release.tag_name}-${lualsPlatform}-${lualsArch}`
+        const expectedHash = CHECKSUMS[checksumKey]
+        if (expectedHash) {
+          if (!(await verifySHA256(tempPath, expectedHash))) {
+            log.error("lua-language-server archive failed integrity check, aborting")
+            await fs.rm(tempPath, { force: true })
+            return
+          }
+        } else {
+          log.warn("no checksum available for lua-language-server, skipping integrity verification", {
+            key: checksumKey,
+          })
+        }
 
         // Unlike zls which is a single self-contained binary,
         // lua-language-server needs supporting files (meta/, locale/, etc.)

@@ -211,7 +211,7 @@ export namespace Server {
             }
           })()
           const directory = path.resolve(decoded)
-          if (directory.includes("..")) {
+          if (directory !== path.normalize(directory) || decoded.includes("\0")) {
             return c.json({ error: "Invalid directory path" }, { status: 400 })
           }
           if (!existsSync(directory) || !statSync(directory).isDirectory()) {
@@ -517,17 +517,34 @@ export namespace Server {
           async (c) => {
             log.info("event connected")
             return streamSSE(c, async (stream) => {
-              stream.writeSSE({
-                data: JSON.stringify({
-                  type: "server.connected",
-                  properties: {},
-                }),
-              })
-              const unsub = Bus.subscribeAll(async (event) => {
+              try {
                 await stream.writeSSE({
-                  data: JSON.stringify(event),
+                  data: JSON.stringify({
+                    type: "server.connected",
+                    properties: {},
+                  }),
                 })
+              } catch {
+                return
+              }
+              let closed = false
+              const cleanup = () => {
+                if (closed) return
+                closed = true
+                unsub()
+                clearInterval(heartbeat)
+              }
+              const unsub = Bus.subscribeAll(async (event) => {
+                try {
+                  await stream.writeSSE({
+                    data: JSON.stringify(event),
+                  })
+                } catch {
+                  cleanup()
+                  return
+                }
                 if (event.type === Bus.InstanceDisposed.type) {
+                  cleanup()
                   stream.close()
                 }
               })
@@ -539,20 +556,16 @@ export namespace Server {
                     type: "server.heartbeat",
                     properties: {},
                   }),
-                })
+                }).catch(() => cleanup())
               }, 30000)
 
-              try {
-                await new Promise<void>((resolve) => {
-                  stream.onAbort(() => {
-                    unsub()
-                    resolve()
-                    log.info("event disconnected")
-                  })
+              await new Promise<void>((resolve) => {
+                stream.onAbort(() => {
+                  cleanup()
+                  resolve()
+                  log.info("event disconnected")
                 })
-              } finally {
-                clearInterval(heartbeat)
-              }
+              })
             })
           },
         )
@@ -636,7 +649,7 @@ export namespace Server {
 
     const isExternal = opts.hostname !== "127.0.0.1" && opts.hostname !== "localhost" && opts.hostname !== "::1"
     if (isExternal && !Flag.LOBSTER_SERVER_PASSWORD) {
-      log.warn("Server is binding to a non-localhost interface without authentication. Set LOBSTER_SERVER_PASSWORD to enable auth.")
+      throw new Error("Refusing to bind to non-localhost interface without authentication. Set LOBSTER_SERVER_PASSWORD to enable auth.")
     }
 
     const args = {

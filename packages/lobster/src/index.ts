@@ -110,12 +110,8 @@ const cli = yargs(hideBin(process.argv))
   .command(ReportCommand)
   .command(BenchmarkCommand)
   .fail((msg, err) => {
-    if (
-      msg?.startsWith("Unknown argument") ||
-      msg?.startsWith("Not enough non-option arguments") ||
-      msg?.startsWith("Invalid values:")
-    ) {
-      if (err) throw err
+    if (msg) {
+      console.error(msg)
       cli.showHelp("log")
     }
     if (err) throw err
