@@ -26,6 +26,12 @@ import { EOL } from "os"
 import { WebCommand } from "./cli/cmd/web"
 import { PrCommand } from "./cli/cmd/pr"
 import { SessionCommand } from "./cli/cmd/session"
+import { VoiceCommand } from "./cli/cmd/voice"
+import { WatchCommand } from "./cli/cmd/watch"
+import { InitCommand } from "./cli/cmd/init"
+import { PluginCommand } from "./cli/cmd/plugin"
+import { ReportCommand } from "./cli/cmd/report"
+import { BenchmarkCommand } from "./cli/cmd/benchmark"
 
 process.on("unhandledRejection", (e) => {
   Log.Default.error("rejection", {
@@ -97,6 +103,12 @@ const cli = yargs(hideBin(process.argv))
   .command(GithubCommand)
   .command(PrCommand)
   .command(SessionCommand)
+  .command(VoiceCommand)
+  .command(WatchCommand)
+  .command(InitCommand)
+  .command(PluginCommand)
+  .command(ReportCommand)
+  .command(BenchmarkCommand)
   .fail((msg, err) => {
     if (
       msg?.startsWith("Unknown argument") ||

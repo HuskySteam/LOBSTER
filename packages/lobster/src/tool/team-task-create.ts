@@ -17,6 +17,12 @@ export const TeamTaskCreateTool = Tool.define("taskcreate", {
         'Present continuous form shown in spinner when in_progress (e.g., "Running tests")',
       )
       .optional(),
+    model: z
+      .string()
+      .describe(
+        'Optional model hint for the agent that picks up this task (e.g., "anthropic/claude-sonnet-4-5-20250929" for research, "anthropic/claude-opus-4-6" for code generation)',
+      )
+      .optional(),
   }),
   async execute(params, ctx) {
     const teamName = ctx.team?.teamName ?? ctx.extra?.team?.teamName
@@ -41,6 +47,7 @@ export const TeamTaskCreateTool = Tool.define("taskcreate", {
       subject: params.subject,
       description: params.description,
       activeForm: params.activeForm,
+      model_hint: params.model,
     })
 
     return {

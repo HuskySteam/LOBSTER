@@ -676,6 +676,13 @@ function App() {
     }
   })
 
+  // Ctrl+? (Ctrl+Shift+/): Show keyboard shortcuts help overlay
+  useKeyboard((evt) => {
+    if (evt.ctrl && evt.name === "?") {
+      dialog.replace(() => <DialogKeybinds />)
+    }
+  })
+
   sdk.event.on(TuiEvent.CommandExecute.type, (evt) => {
     command.trigger(evt.properties.command)
   })

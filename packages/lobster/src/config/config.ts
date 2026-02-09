@@ -1183,6 +1183,19 @@ export namespace Config {
           url: z.string().optional().describe("Enterprise URL"),
         })
         .optional(),
+      voice: z
+        .object({
+          provider: z
+            .enum(["whisper"])
+            .optional()
+            .describe("Voice transcription provider (default: whisper)"),
+          model: z.string().optional().describe("Whisper model to use (default: whisper-1)"),
+          apiKey: z.string().optional().describe("API key for voice transcription (falls back to OpenAI provider key)"),
+          duration: z.number().optional().describe("Default recording duration in seconds (default: 10)"),
+          language: z.string().optional().describe("Language code for transcription (e.g., en, es, fr)"),
+        })
+        .optional()
+        .describe("Voice input configuration"),
       compaction: z
         .object({
           auto: z.boolean().optional().describe("Enable automatic compaction when context is full (default: true)"),
@@ -1208,6 +1221,10 @@ export namespace Config {
             .positive()
             .optional()
             .describe("Timeout in milliseconds for model context protocol (MCP) requests"),
+          smart_context: z
+            .boolean()
+            .optional()
+            .describe("Automatically find and attach relevant files based on user query"),
         })
         .optional(),
     })

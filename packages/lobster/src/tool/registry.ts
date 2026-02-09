@@ -34,6 +34,8 @@ import { TeamTaskUpdateTool } from "./team-task-update"
 import { TeamTaskGetTool } from "./team-task-get"
 import { TeamTaskListTool } from "./team-task-list"
 import { TeamSendMessageTool } from "./team-send-message"
+import { MemorySaveTool } from "./memory-save"
+import { MemoryRecallTool } from "./memory-recall"
 
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })
@@ -134,6 +136,7 @@ export namespace ToolRegistry {
             TeamSendMessageTool,
           ]
         : []),
+      ...(Flag.LOBSTER_EXPERIMENTAL_MEMORY ? [MemorySaveTool, MemoryRecallTool] : []),
       ...custom,
     ]
   }

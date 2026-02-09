@@ -11,6 +11,8 @@ const KEYBIND_GROUPS = [
     bindings: [
       { action: "New session", key: "session_new" },
       { action: "Switch session", key: "session_list" },
+      { action: "Cancel session", key: undefined, label: "Ctrl+K" },
+      { action: "Clear/restore chat", key: undefined, label: "Ctrl+L" },
     ],
   },
   {
@@ -36,6 +38,7 @@ const KEYBIND_GROUPS = [
     bindings: [
       { action: "Switch theme", key: "theme_list" },
       { action: "Suspend terminal", key: "terminal_suspend" },
+      { action: "Show shortcuts", key: undefined, label: "Ctrl+?" },
     ],
   },
 ]
@@ -78,11 +81,11 @@ export function DialogKeybinds() {
               </text>
               <For each={group.bindings}>
                 {(binding) => {
-                  const key = keybind.print(binding.key as any)
+                  const key = binding.label ?? (binding.key ? keybind.print(binding.key as any) : "")
                   return (
                     <box flexDirection="row" justifyContent="space-between" paddingLeft={1}>
                       <text fg={theme.textMuted}>{binding.action}</text>
-                      <text fg={theme.text}>{key || "—"}</text>
+                      <text fg={theme.text}>{key || "\u2014"}</text>
                     </box>
                   )
                 }}

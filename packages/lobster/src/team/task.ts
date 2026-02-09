@@ -15,6 +15,7 @@ export namespace TeamTask {
     owner: z.string().optional(),
     blocks: z.array(z.string()).default([]),
     blockedBy: z.array(z.string()).default([]),
+    model_hint: z.string().optional(),
     metadata: z.record(z.string(), z.any()).default({}),
     time: z.object({
       created: z.number(),

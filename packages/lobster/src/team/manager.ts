@@ -129,6 +129,7 @@ export namespace TeamManager {
     subject: string
     description: string
     activeForm?: string
+    model_hint?: string
   }): Promise<TeamTask.Info> {
     const id = await nextTaskId(input.teamName)
     const task: TeamTask.Info = {
@@ -137,6 +138,7 @@ export namespace TeamManager {
       subject: input.subject,
       description: input.description,
       activeForm: input.activeForm,
+      model_hint: input.model_hint,
       status: "pending",
       blocks: [],
       blockedBy: [],

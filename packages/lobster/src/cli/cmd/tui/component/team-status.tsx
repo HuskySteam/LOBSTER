@@ -11,13 +11,22 @@ export function TeamStatus(props: { teamName: string }) {
   const tasks = createMemo(() => sync.data.team_tasks[props.teamName] ?? [])
 
   const taskSummary = createMemo(() => {
-    const all = tasks()
+    const all = tasks().filter((t) => t.status !== "deleted")
     return {
       total: all.length,
       in_progress: all.filter((t) => t.status === "in_progress").length,
       completed: all.filter((t) => t.status === "completed").length,
       blocked: all.filter((t) => t.blockedBy.length > 0).length,
     }
+  })
+
+  const progress = createMemo(() => {
+    const summary = taskSummary()
+    if (summary.total === 0) return { percent: 0, filled: 0, barWidth: 20 }
+    const percent = Math.round((summary.completed / summary.total) * 100)
+    const barWidth = 20
+    const filled = Math.round((percent / 100) * barWidth)
+    return { percent, filled, barWidth }
   })
 
   const statusColor = (status: string) => {
@@ -73,6 +82,16 @@ export function TeamStatus(props: { teamName: string }) {
                 <text fg={theme.error}>{taskSummary().blocked} blocked</text>
               </Show>
             </box>
+            <text fg={theme.textMuted}>
+              Progress: [
+              <span style={{ fg: theme.success }}>
+                {"=".repeat(progress().filled)}{progress().filled < progress().barWidth ? ">" : ""}
+              </span>
+              <span style={{ fg: theme.textMuted }}>
+                {" ".repeat(Math.max(0, progress().barWidth - progress().filled - (progress().filled < progress().barWidth ? 1 : 0)))}
+              </span>
+              ] {progress().percent}% ({taskSummary().completed}/{taskSummary().total})
+            </text>
           </box>
         </Show>
       </box>

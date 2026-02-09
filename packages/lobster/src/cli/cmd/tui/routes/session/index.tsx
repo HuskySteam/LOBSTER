@@ -244,6 +244,33 @@ export function Session() {
     }
   })
 
+  // Ctrl+K: Cancel/abort current session immediately
+  useKeyboard((evt) => {
+    if (evt.ctrl && evt.name === "k") {
+      const status = sync.data.session_status?.[route.sessionID]
+      if (status?.type !== "idle") {
+        sdk.client.session.abort({ sessionID: route.sessionID }).catch(() => {})
+        toast.show({ message: "Session cancelled", variant: "info" })
+      }
+    }
+  })
+
+  // Ctrl+L: Clear visible chat (resets scroll to top)
+  const [cleared, setCleared] = createSignal(false)
+  useKeyboard((evt) => {
+    if (evt.ctrl && evt.name === "l") {
+      if (cleared()) {
+        setCleared(false)
+        toBottom()
+        toast.show({ message: "Chat restored", variant: "info" })
+      } else {
+        setCleared(true)
+        if (scroll) scroll.scrollTo(0)
+        toast.show({ message: "Chat cleared (Ctrl+L again to restore)", variant: "info" })
+      }
+    }
+  })
+
   // Helper: Find next visible message boundary in direction
   const findNextVisibleMessage = (direction: "next" | "prev"): string | null => {
     const children = scroll.getChildren()

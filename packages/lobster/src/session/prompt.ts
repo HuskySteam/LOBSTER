@@ -48,6 +48,10 @@ import { Shell } from "@/shell/shell"
 import { Truncate } from "@/tool/truncation"
 import { filterEnv } from "@/tool/bash"
 import { TeamManager } from "../team/manager"
+import { MemoryManager } from "../memory/manager"
+import { Memory } from "../memory/memory"
+import { SmartContext } from "../context/smart"
+import { Config } from "../config/config"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -563,6 +567,35 @@ export namespace SessionPrompt {
 
       // normal processing
       const agent = await Agent.get(lastUser.agent)
+
+      // Smart context: auto-find relevant files if enabled
+      if (step === 1) {
+        const config = await Config.get()
+        if (config.experimental?.smart_context) {
+          const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
+          const hasUserFiles = lastUserMsg?.parts.some((p) => p.type === "file") ?? false
+          if (lastUserMsg && !hasUserFiles) {
+            const userText = lastUserMsg.parts
+              .filter((p): p is MessageV2.TextPart => p.type === "text" && !p.synthetic)
+              .map((p) => p.text)
+              .join(" ")
+            if (userText.trim().length > 0) {
+              const relevantFiles = await SmartContext.findRelevant(userText).catch(() => [] as string[])
+              if (relevantFiles.length > 0) {
+                lastUserMsg.parts.push({
+                  id: Identifier.ascending("part"),
+                  messageID: lastUserMsg.info.id,
+                  sessionID: lastUserMsg.info.sessionID,
+                  type: "text",
+                  text: `<system-reminder>\nRelevant files detected:\n${relevantFiles.map((f) => `- ${f}`).join("\n")}\n</system-reminder>`,
+                  synthetic: true,
+                })
+              }
+            }
+          }
+        }
+      }
+
       const maxSteps = agent.steps ?? Infinity
       const isLastStep = step >= maxSteps
       msgs = await insertReminders({
@@ -1272,6 +1305,30 @@ export namespace SessionPrompt {
   async function insertReminders(input: { messages: MessageV2.WithParts[]; agent: Agent.Info; session: Session.Info }) {
     const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
     if (!userMessage) return input.messages
+
+    // Inject relevant memories if memory feature is enabled
+    if (Flag.LOBSTER_EXPERIMENTAL_MEMORY) {
+      const userText = userMessage.parts
+        .filter((p) => p.type === "text" && !p.synthetic)
+        .map((p) => (p as MessageV2.TextPart).text)
+        .join(" ")
+      if (userText.trim()) {
+        const memories = await MemoryManager.relevant(userText).catch(() => [] as Memory.Entry[])
+        if (memories.length > 0) {
+          const memoryText = memories
+            .map((m) => `- [${m.category}] ${m.content}` + (m.tags.length ? ` (tags: ${m.tags.join(", ")})` : ""))
+            .join("\n")
+          userMessage.parts.push({
+            id: Identifier.ascending("part"),
+            messageID: userMessage.info.id,
+            sessionID: userMessage.info.sessionID,
+            type: "text",
+            text: `<system-reminder>\nRelevant memories from previous sessions:\n${memoryText}\n</system-reminder>`,
+            synthetic: true,
+          })
+        }
+      }
+    }
 
     // Original logic when experimental plan mode is disabled
     if (!Flag.LOBSTER_EXPERIMENTAL_PLAN_MODE) {

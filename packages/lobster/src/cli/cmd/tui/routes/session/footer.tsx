@@ -6,6 +6,7 @@ import { useConnected } from "../../component/dialog-model"
 import { createStore } from "solid-js/store"
 import { useRoute } from "../../context/route"
 import { useLobster } from "../../context/lobster"
+import { CostTracker } from "../../component/cost-tracker"
 
 export function Footer() {
   const { theme } = useTheme()
@@ -26,6 +27,7 @@ export function Footer() {
     if (total <= 0) return null
     return "$" + total.toFixed(2)
   })
+  const sessionID = createMemo(() => route.data.type === "session" ? route.data.sessionID : undefined)
 
   const [store, setStore] = createStore({
     welcome: false,
@@ -78,7 +80,10 @@ export function Footer() {
               <text fg={mcpError() ? theme.error : theme.textMuted}>{mcp()} MCP</text>
             </Show>
             <text fg={theme.textMuted}>/status</text>
-            <Show when={sessionCost()}>
+            <Show when={sessionID()}>
+              <CostTracker sessionID={sessionID()!} />
+            </Show>
+            <Show when={!sessionID() && sessionCost()}>
               <text fg={theme.textMuted}>{sessionCost()}</text>
             </Show>
           </Match>

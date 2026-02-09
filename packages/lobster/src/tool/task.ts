@@ -14,6 +14,7 @@ import { PermissionNext } from "@/permission/next"
 import { TeamManager } from "../team/manager"
 import { Log } from "../util/log"
 import { Instance } from "../project/instance"
+import { Provider } from "../provider/provider"
 
 const log = Log.create({ service: "tool.task" })
 
@@ -35,6 +36,10 @@ const parameters = z.object({
   name: z
     .string()
     .describe("Agent name within the team. Required when team_name is set.")
+    .optional(),
+  model_hint: z
+    .string()
+    .describe("Optional model to use for this task (e.g., 'anthropic/claude-sonnet-4-5-20250929'). Overrides the agent's default model.")
     .optional(),
 })
 
@@ -169,10 +174,12 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       const msg = await MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID })
       if (msg.info.role !== "assistant") throw new Error("Not an assistant message")
 
-      const model = agent.model ?? {
-        modelID: msg.info.modelID,
-        providerID: msg.info.providerID,
-      }
+      const model = params.model_hint
+        ? Provider.parseModel(params.model_hint)
+        : agent.model ?? {
+            modelID: msg.info.modelID,
+            providerID: msg.info.providerID,
+          }
 
       ctx.metadata({
         title: params.description,
