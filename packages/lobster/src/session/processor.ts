@@ -21,6 +21,15 @@ export namespace SessionProcessor {
   const MAX_RETRIES = 10
   const log = Log.create({ service: "session.processor" })
 
+  // djb2 hash for fast doom loop detection
+  function djb2Hash(str: string): number {
+    let hash = 5381
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0
+    }
+    return hash
+  }
+
   export type Info = Awaited<ReturnType<typeof create>>
   export type Result = Awaited<ReturnType<Info["process"]>>
 
@@ -35,6 +44,8 @@ export namespace SessionProcessor {
     let blocked = false
     let attempt = 0
     let needsCompaction = false
+    const WRITE_CAPABLE_TOOLS = new Set(["edit", "write", "multiedit", "bash", "apply_patch"])
+    let hasWriteTools = false
 
     const result = {
       get message() {
@@ -133,6 +144,9 @@ export namespace SessionProcessor {
                 case "tool-call": {
                   const match = toolcalls[value.toolCallId]
                   if (match) {
+                    if (WRITE_CAPABLE_TOOLS.has(value.toolName)) {
+                      hasWriteTools = true
+                    }
                     const part = await Session.updatePart({
                       ...match,
                       tool: value.toolName,
@@ -149,6 +163,7 @@ export namespace SessionProcessor {
 
                     const parts = await MessageV2.parts(input.assistantMessage.id)
                     const lastThree = parts.slice(-DOOM_LOOP_THRESHOLD)
+                    const currentInputHash = djb2Hash(JSON.stringify(value.input))
 
                     if (
                       lastThree.length === DOOM_LOOP_THRESHOLD &&
@@ -157,7 +172,7 @@ export namespace SessionProcessor {
                           p.type === "tool" &&
                           p.tool === value.toolName &&
                           p.state.status !== "pending" &&
-                          JSON.stringify(p.state.input) === JSON.stringify(value.input),
+                          djb2Hash(JSON.stringify(p.state.input)) === currentInputHash,
                       )
                     ) {
                       const agent = await Agent.get(input.assistantMessage.agent)
@@ -230,6 +245,7 @@ export namespace SessionProcessor {
                   throw value.error
 
                 case "start-step":
+                  hasWriteTools = false
                   snapshot = await Snapshot.track()
                   await Session.updatePart({
                     id: Identifier.ascending("part"),
@@ -260,7 +276,7 @@ export namespace SessionProcessor {
                   await Session.updatePart({
                     id: Identifier.ascending("part"),
                     reason: value.finishReason,
-                    snapshot: await Snapshot.track(),
+                    snapshot: hasWriteTools ? await Snapshot.track() : snapshot,
                     messageID: input.assistantMessage.id,
                     sessionID: input.assistantMessage.sessionID,
                     type: "step-finish",
@@ -268,7 +284,7 @@ export namespace SessionProcessor {
                     cost: usage.cost,
                   })
                   await Session.updateMessage(input.assistantMessage)
-                  if (snapshot) {
+                  if (snapshot && hasWriteTools) {
                     const patch = await Snapshot.patch(snapshot)
                     if (patch.files.length) {
                       await Session.updatePart({
