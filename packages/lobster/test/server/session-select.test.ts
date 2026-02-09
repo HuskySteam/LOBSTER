@@ -20,7 +20,7 @@ describe("tui.selectSession endpoint", () => {
         const app = Server.App()
         const response = await app.request("/tui/select-session", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Lobster-CSRF": "1" },
           body: JSON.stringify({ sessionID: session.id }),
         })
 
@@ -45,7 +45,7 @@ describe("tui.selectSession endpoint", () => {
         const app = Server.App()
         const response = await app.request("/tui/select-session", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Lobster-CSRF": "1" },
           body: JSON.stringify({ sessionID: nonExistentSessionID }),
         })
 
@@ -66,7 +66,7 @@ describe("tui.selectSession endpoint", () => {
         const app = Server.App()
         const response = await app.request("/tui/select-session", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Lobster-CSRF": "1" },
           body: JSON.stringify({ sessionID: invalidSessionID }),
         })
 

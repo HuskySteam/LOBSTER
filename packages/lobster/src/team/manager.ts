@@ -116,7 +116,11 @@ export namespace TeamManager {
       (draft) => {
         draft.next++
       },
-    )
+    ).catch(async () => {
+      // Counter may not exist yet if team creation was interrupted; initialize and retry
+      await Storage.write(["team_counter", teamName], { next: 2 })
+      return { next: 2 }
+    })
     return String(counter.next - 1)
   }
 
@@ -157,6 +161,28 @@ export namespace TeamManager {
     )
   }
 
+  async function detectCycle(
+    teamName: string,
+    fromId: string,
+    toId: string,
+  ): Promise<boolean> {
+    if (fromId === toId) return true
+    const visited = new Set<string>()
+    const stack = [toId]
+    while (stack.length > 0) {
+      const current = stack.pop()!
+      if (current === fromId) return true
+      if (visited.has(current)) continue
+      visited.add(current)
+      const task = await Storage.read<TeamTask.Info>(["team_task", teamName, current]).catch(() => undefined)
+      if (!task) continue
+      for (const dep of task.blocks) {
+        if (!visited.has(dep)) stack.push(dep)
+      }
+    }
+    return false
+  }
+
   export async function updateTask(
     teamName: string,
     taskId: string,
@@ -171,6 +197,22 @@ export namespace TeamManager {
       addBlockedBy?: string[]
     },
   ): Promise<TeamTask.Info> {
+    // Circular dependency detection
+    if (updates.addBlocks) {
+      for (const targetId of updates.addBlocks) {
+        if (await detectCycle(teamName, taskId, targetId)) {
+          throw new Error(`Circular dependency detected: task ${taskId} cannot block task ${targetId}`)
+        }
+      }
+    }
+    if (updates.addBlockedBy) {
+      for (const targetId of updates.addBlockedBy) {
+        if (await detectCycle(teamName, targetId, taskId)) {
+          throw new Error(`Circular dependency detected: task ${taskId} cannot be blocked by task ${targetId}`)
+        }
+      }
+    }
+
     const task = await Storage.update<TeamTask.Info>(
       ["team_task", teamName, taskId],
       (draft) => {
@@ -278,6 +320,15 @@ export namespace TeamManager {
   // Message operations
 
   export async function sendMessage(message: TeamMessage.Info) {
+    // Idempotency check: skip if already sent
+    const existing = await Storage.read<TeamMessage.Info>(
+      ["team_msglog", message.teamName, message.id],
+    ).catch(() => undefined)
+    if (existing) {
+      log.warn("message already sent, skipping duplicate", { messageId: message.id })
+      return
+    }
+
     // Store in message log
     await Storage.write(["team_msglog", message.teamName, message.id], message)
 
@@ -343,6 +394,7 @@ export namespace TeamManager {
   ): Promise<TeamMessage.Info[]> {
     const keys = await Storage.list(["team_inbox", teamName, agentName])
     const messages: TeamMessage.Info[] = []
+    const deliveredKeys: (readonly string[])[] = []
 
     for (const key of keys) {
       const msg = await Storage.read<TeamMessage.Info>(key).catch(
@@ -350,16 +402,23 @@ export namespace TeamManager {
       )
       if (msg) {
         messages.push(msg)
-        await Storage.remove(key)
-        Bus.publish(TeamMessage.Event.Delivered, {
-          teamName,
-          recipientName: agentName,
-          messageId: msg.id,
-        })
+        deliveredKeys.push(key)
       }
     }
 
-    return messages.sort((a, b) => a.time - b.time)
+    const sorted = messages.sort((a, b) => a.time - b.time)
+
+    // Remove from inbox only after all messages have been read successfully
+    for (let i = 0; i < deliveredKeys.length; i++) {
+      await Storage.remove([...deliveredKeys[i]])
+      Bus.publish(TeamMessage.Event.Delivered, {
+        teamName,
+        recipientName: agentName,
+        messageId: messages[i].id,
+      })
+    }
+
+    return sorted
   }
 
   export async function remove(teamName: string) {

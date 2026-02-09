@@ -141,6 +141,14 @@ export namespace Storage {
     },
   ]
 
+  function validateKey(key: string[]) {
+    for (const segment of key) {
+      if (segment.includes("..") || segment.includes("/") || segment.includes("\\") || segment === "") {
+        throw new Error(`Invalid storage key segment: "${segment}"`)
+      }
+    }
+  }
+
   const state = lazy(async () => {
     const dir = path.join(Global.Path.data, "storage")
     const migration = await Bun.file(path.join(dir, "migration"))
@@ -159,6 +167,7 @@ export namespace Storage {
   })
 
   export async function remove(key: string[]) {
+    validateKey(key)
     const dir = await state().then((x) => x.dir)
     const target = path.join(dir, ...key) + ".json"
     return withErrorHandling(async () => {
@@ -167,6 +176,7 @@ export namespace Storage {
   }
 
   export async function read<T>(key: string[]) {
+    validateKey(key)
     const dir = await state().then((x) => x.dir)
     const target = path.join(dir, ...key) + ".json"
     return withErrorHandling(async () => {
@@ -177,6 +187,7 @@ export namespace Storage {
   }
 
   export async function update<T>(key: string[], fn: (draft: T) => void) {
+    validateKey(key)
     const dir = await state().then((x) => x.dir)
     const target = path.join(dir, ...key) + ".json"
     return withErrorHandling(async () => {
@@ -189,6 +200,7 @@ export namespace Storage {
   }
 
   export async function write<T>(key: string[], content: T) {
+    validateKey(key)
     const dir = await state().then((x) => x.dir)
     const target = path.join(dir, ...key) + ".json"
     return withErrorHandling(async () => {
@@ -210,6 +222,7 @@ export namespace Storage {
 
   const glob = new Bun.Glob("**/*")
   export async function list(prefix: string[]) {
+    validateKey(prefix)
     const dir = await state().then((x) => x.dir)
     try {
       const result = await Array.fromAsync(

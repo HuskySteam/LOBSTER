@@ -243,7 +243,7 @@ describe("session.llm.stream", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "lobster.json"),
           JSON.stringify({
             $schema: "https://opencode.ai/config.json",
             enabled_providers: [providerID],
@@ -306,7 +306,7 @@ describe("session.llm.stream", () => {
         expect(url.pathname.startsWith("/v1/")).toBe(true)
         expect(url.pathname.endsWith("/chat/completions")).toBe(true)
         expect(headers.get("Authorization")).toBe("Bearer test-key")
-        expect(headers.get("User-Agent") ?? "").toMatch(/^opencode\//)
+        expect(headers.get("User-Agent") ?? "").toMatch(/^lobster\//)
 
         expect(body.model).toBe(resolved.api.id)
         expect(body.temperature).toBe(0.4)
@@ -372,7 +372,7 @@ describe("session.llm.stream", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "lobster.json"),
           JSON.stringify({
             $schema: "https://opencode.ai/config.json",
             enabled_providers: ["openai"],
@@ -506,7 +506,7 @@ describe("session.llm.stream", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "lobster.json"),
           JSON.stringify({
             $schema: "https://opencode.ai/config.json",
             enabled_providers: [providerID],
@@ -614,7 +614,7 @@ describe("session.llm.stream", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Bun.write(
-          path.join(dir, "opencode.json"),
+          path.join(dir, "lobster.json"),
           JSON.stringify({
             $schema: "https://opencode.ai/config.json",
             enabled_providers: [providerID],

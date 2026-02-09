@@ -124,7 +124,7 @@ export namespace Project {
           .nothrow()
           .cwd(sandbox)
           .text()
-          .then((x) => path.resolve(sandbox, x.trim()))
+          .then((x) => path.normalize(path.resolve(sandbox, x.trim())))
           .catch(() => undefined)
 
         if (!top) {
@@ -146,7 +146,7 @@ export namespace Project {
           .then((x) => {
             const dirname = path.dirname(x.trim())
             if (dirname === ".") return sandbox
-            return dirname
+            return path.normalize(dirname)
           })
           .catch(() => undefined)
 

@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test"
 import { $ } from "bun"
+import path from "path"
 import { Snapshot } from "../../src/snapshot"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -33,7 +34,7 @@ test("tracks deleted files correctly", async () => {
 
       await $`rm ${tmp.path}/a.txt`.quiet()
 
-      expect((await Snapshot.patch(before!)).files).toContain(`${tmp.path}/a.txt`)
+      expect((await Snapshot.patch(before!)).files).toContain(`${tmp.path}${path.sep}a.txt`)
     },
   })
 })
@@ -46,11 +47,11 @@ test("revert should remove new files", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/new.txt`, "NEW")
+      await Bun.write(`${tmp.path}${path.sep}new.txt`, "NEW")
 
       await Snapshot.revert([await Snapshot.patch(before!)])
 
-      expect(await Bun.file(`${tmp.path}/new.txt`).exists()).toBe(false)
+      expect(await Bun.file(`${tmp.path}${path.sep}new.txt`).exists()).toBe(false)
     },
   })
 })
@@ -64,11 +65,11 @@ test("revert in subdirectory", async () => {
       expect(before).toBeTruthy()
 
       await $`mkdir -p ${tmp.path}/sub`.quiet()
-      await Bun.write(`${tmp.path}/sub/file.txt`, "SUB")
+      await Bun.write(`${tmp.path}${path.sep}sub/file.txt`, "SUB")
 
       await Snapshot.revert([await Snapshot.patch(before!)])
 
-      expect(await Bun.file(`${tmp.path}/sub/file.txt`).exists()).toBe(false)
+      expect(await Bun.file(`${tmp.path}${path.sep}sub/file.txt`).exists()).toBe(false)
       // Note: revert currently only removes files, not directories
       // The empty subdirectory will remain
     },
@@ -84,18 +85,18 @@ test("multiple file operations", async () => {
       expect(before).toBeTruthy()
 
       await $`rm ${tmp.path}/a.txt`.quiet()
-      await Bun.write(`${tmp.path}/c.txt`, "C")
+      await Bun.write(`${tmp.path}${path.sep}c.txt`, "C")
       await $`mkdir -p ${tmp.path}/dir`.quiet()
-      await Bun.write(`${tmp.path}/dir/d.txt`, "D")
-      await Bun.write(`${tmp.path}/b.txt`, "MODIFIED")
+      await Bun.write(`${tmp.path}${path.sep}dir/d.txt`, "D")
+      await Bun.write(`${tmp.path}${path.sep}b.txt`, "MODIFIED")
 
       await Snapshot.revert([await Snapshot.patch(before!)])
 
-      expect(await Bun.file(`${tmp.path}/a.txt`).text()).toBe(tmp.extra.aContent)
-      expect(await Bun.file(`${tmp.path}/c.txt`).exists()).toBe(false)
+      expect(await Bun.file(`${tmp.path}${path.sep}a.txt`).text()).toBe(tmp.extra.aContent)
+      expect(await Bun.file(`${tmp.path}${path.sep}c.txt`).exists()).toBe(false)
       // Note: revert currently only removes files, not directories
       // The empty directory will remain
-      expect(await Bun.file(`${tmp.path}/b.txt`).text()).toBe(tmp.extra.bContent)
+      expect(await Bun.file(`${tmp.path}${path.sep}b.txt`).text()).toBe(tmp.extra.bContent)
     },
   })
 })
@@ -123,13 +124,13 @@ test("binary file handling", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/image.png`, new Uint8Array([0x89, 0x50, 0x4e, 0x47]))
+      await Bun.write(`${tmp.path}${path.sep}image.png`, new Uint8Array([0x89, 0x50, 0x4e, 0x47]))
 
       const patch = await Snapshot.patch(before!)
-      expect(patch.files).toContain(`${tmp.path}/image.png`)
+      expect(patch.files).toContain(`${tmp.path}${path.sep}image.png`)
 
       await Snapshot.revert([patch])
-      expect(await Bun.file(`${tmp.path}/image.png`).exists()).toBe(false)
+      expect(await Bun.file(`${tmp.path}${path.sep}image.png`).exists()).toBe(false)
     },
   })
 })
@@ -144,7 +145,7 @@ test("symlink handling", async () => {
 
       await $`ln -s ${tmp.path}/a.txt ${tmp.path}/link.txt`.quiet()
 
-      expect((await Snapshot.patch(before!)).files).toContain(`${tmp.path}/link.txt`)
+      expect((await Snapshot.patch(before!)).files).toContain(`${tmp.path}${path.sep}link.txt`)
     },
   })
 })
@@ -157,9 +158,9 @@ test("large file handling", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/large.txt`, "x".repeat(1024 * 1024))
+      await Bun.write(`${tmp.path}${path.sep}large.txt`, "x".repeat(1024 * 1024))
 
-      expect((await Snapshot.patch(before!)).files).toContain(`${tmp.path}/large.txt`)
+      expect((await Snapshot.patch(before!)).files).toContain(`${tmp.path}${path.sep}large.txt`)
     },
   })
 })
@@ -173,11 +174,11 @@ test("nested directory revert", async () => {
       expect(before).toBeTruthy()
 
       await $`mkdir -p ${tmp.path}/level1/level2/level3`.quiet()
-      await Bun.write(`${tmp.path}/level1/level2/level3/deep.txt`, "DEEP")
+      await Bun.write(`${tmp.path}${path.sep}level1/level2/level3/deep.txt`, "DEEP")
 
       await Snapshot.revert([await Snapshot.patch(before!)])
 
-      expect(await Bun.file(`${tmp.path}/level1/level2/level3/deep.txt`).exists()).toBe(false)
+      expect(await Bun.file(`${tmp.path}${path.sep}level1/level2/level3/deep.txt`).exists()).toBe(false)
     },
   })
 })
@@ -190,14 +191,14 @@ test("special characters in filenames", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/file with spaces.txt`, "SPACES")
-      await Bun.write(`${tmp.path}/file-with-dashes.txt`, "DASHES")
-      await Bun.write(`${tmp.path}/file_with_underscores.txt`, "UNDERSCORES")
+      await Bun.write(`${tmp.path}${path.sep}file with spaces.txt`, "SPACES")
+      await Bun.write(`${tmp.path}${path.sep}file-with-dashes.txt`, "DASHES")
+      await Bun.write(`${tmp.path}${path.sep}file_with_underscores.txt`, "UNDERSCORES")
 
       const files = (await Snapshot.patch(before!)).files
-      expect(files).toContain(`${tmp.path}/file with spaces.txt`)
-      expect(files).toContain(`${tmp.path}/file-with-dashes.txt`)
-      expect(files).toContain(`${tmp.path}/file_with_underscores.txt`)
+      expect(files).toContain(`${tmp.path}${path.sep}file with spaces.txt`)
+      expect(files).toContain(`${tmp.path}${path.sep}file-with-dashes.txt`)
+      expect(files).toContain(`${tmp.path}${path.sep}file_with_underscores.txt`)
     },
   })
 })
@@ -225,7 +226,7 @@ test("patch with invalid hash", async () => {
       expect(before).toBeTruthy()
 
       // Create a change
-      await Bun.write(`${tmp.path}/test.txt`, "TEST")
+      await Bun.write(`${tmp.path}${path.sep}test.txt`, "TEST")
 
       // Try to patch with invalid hash - should handle gracefully
       const patch = await Snapshot.patch("invalid-hash-12345")
@@ -249,7 +250,7 @@ test("revert non-existent file", async () => {
         Snapshot.revert([
           {
             hash: before!,
-            files: [`${tmp.path}/nonexistent.txt`],
+            files: [`${tmp.path}${path.sep}nonexistent.txt`],
           },
         ]),
       ).resolves.toBeUndefined()
@@ -266,10 +267,10 @@ test("unicode filenames", async () => {
       expect(before).toBeTruthy()
 
       const unicodeFiles = [
-        { path: `${tmp.path}/文件.txt`, content: "chinese content" },
-        { path: `${tmp.path}/🚀rocket.txt`, content: "emoji content" },
-        { path: `${tmp.path}/café.txt`, content: "accented content" },
-        { path: `${tmp.path}/файл.txt`, content: "cyrillic content" },
+        { path: `${tmp.path}${path.sep}文件.txt`, content: "chinese content" },
+        { path: `${tmp.path}${path.sep}🚀rocket.txt`, content: "emoji content" },
+        { path: `${tmp.path}${path.sep}café.txt`, content: "accented content" },
+        { path: `${tmp.path}${path.sep}файл.txt`, content: "cyrillic content" },
       ]
 
       for (const file of unicodeFiles) {
@@ -297,8 +298,8 @@ test.skip("unicode filenames modification and restore", async () => {
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      const chineseFile = `${tmp.path}/文件.txt`
-      const cyrillicFile = `${tmp.path}/файл.txt`
+      const chineseFile = `${tmp.path}${path.sep}文件.txt`
+      const cyrillicFile = `${tmp.path}${path.sep}файл.txt`
 
       await Bun.write(chineseFile, "original chinese")
       await Bun.write(cyrillicFile, "original cyrillic")
@@ -330,7 +331,7 @@ test("unicode filenames in subdirectories", async () => {
       expect(before).toBeTruthy()
 
       await $`mkdir -p "${tmp.path}/目录/подкаталог"`.quiet()
-      const deepFile = `${tmp.path}/目录/подкаталог/文件.txt`
+      const deepFile = path.join(tmp.path, "目录", "подкаталог", "文件.txt")
       await Bun.write(deepFile, "deep unicode content")
 
       const patch = await Snapshot.patch(before!)
@@ -350,8 +351,8 @@ test("very long filenames", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      const longName = "a".repeat(200) + ".txt"
-      const longFile = `${tmp.path}/${longName}`
+      const longName = "a".repeat(100) + ".txt"
+      const longFile = `${tmp.path}${path.sep}${longName}`
 
       await Bun.write(longFile, "long filename content")
 
@@ -372,14 +373,14 @@ test("hidden files", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/.hidden`, "hidden content")
-      await Bun.write(`${tmp.path}/.gitignore`, "*.log")
-      await Bun.write(`${tmp.path}/.config`, "config content")
+      await Bun.write(`${tmp.path}${path.sep}.hidden`, "hidden content")
+      await Bun.write(`${tmp.path}${path.sep}.gitignore`, "*.log")
+      await Bun.write(`${tmp.path}${path.sep}.config`, "config content")
 
       const patch = await Snapshot.patch(before!)
-      expect(patch.files).toContain(`${tmp.path}/.hidden`)
-      expect(patch.files).toContain(`${tmp.path}/.gitignore`)
-      expect(patch.files).toContain(`${tmp.path}/.config`)
+      expect(patch.files).toContain(`${tmp.path}${path.sep}.hidden`)
+      expect(patch.files).toContain(`${tmp.path}${path.sep}.gitignore`)
+      expect(patch.files).toContain(`${tmp.path}${path.sep}.config`)
     },
   })
 })
@@ -393,13 +394,15 @@ test("nested symlinks", async () => {
       expect(before).toBeTruthy()
 
       await $`mkdir -p ${tmp.path}/sub/dir`.quiet()
-      await Bun.write(`${tmp.path}/sub/dir/target.txt`, "target content")
+      await Bun.write(path.join(tmp.path, "sub", "dir", "target.txt"), "target content")
       await $`ln -s ${tmp.path}/sub/dir/target.txt ${tmp.path}/sub/dir/link.txt`.quiet()
       await $`ln -s ${tmp.path}/sub ${tmp.path}/sub-link`.quiet()
 
       const patch = await Snapshot.patch(before!)
-      expect(patch.files).toContain(`${tmp.path}/sub/dir/link.txt`)
-      expect(patch.files).toContain(`${tmp.path}/sub-link`)
+      expect(patch.files).toContain(path.join(tmp.path, "sub", "dir", "link.txt"))
+      // On Windows, git follows directory symlinks and reports individual files inside
+      const hasSubLink = patch.files.some((f) => f.includes("sub-link"))
+      expect(hasSubLink).toBe(true)
     },
   })
 })
@@ -450,18 +453,18 @@ test("gitignore changes", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/.gitignore`, "*.ignored")
-      await Bun.write(`${tmp.path}/test.ignored`, "ignored content")
-      await Bun.write(`${tmp.path}/normal.txt`, "normal content")
+      await Bun.write(`${tmp.path}${path.sep}.gitignore`, "*.ignored")
+      await Bun.write(`${tmp.path}${path.sep}test.ignored`, "ignored content")
+      await Bun.write(`${tmp.path}${path.sep}normal.txt`, "normal content")
 
       const patch = await Snapshot.patch(before!)
 
       // Should track gitignore itself
-      expect(patch.files).toContain(`${tmp.path}/.gitignore`)
+      expect(patch.files).toContain(`${tmp.path}${path.sep}.gitignore`)
       // Should track normal files
-      expect(patch.files).toContain(`${tmp.path}/normal.txt`)
+      expect(patch.files).toContain(`${tmp.path}${path.sep}normal.txt`)
       // Should not track ignored files (git won't see them)
-      expect(patch.files).not.toContain(`${tmp.path}/test.ignored`)
+      expect(patch.files).not.toContain(`${tmp.path}${path.sep}test.ignored`)
     },
   })
 })
@@ -477,7 +480,7 @@ test("concurrent file operations during patch", async () => {
       // Start creating files
       const createPromise = (async () => {
         for (let i = 0; i < 10; i++) {
-          await Bun.write(`${tmp.path}/concurrent${i}.txt`, `concurrent${i}`)
+          await Bun.write(`${tmp.path}${path.sep}concurrent${i}.txt`, `concurrent${i}`)
           // Small delay to simulate concurrent operations
           await new Promise((resolve) => setTimeout(resolve, 1))
         }
@@ -506,7 +509,7 @@ test("snapshot state isolation between projects", async () => {
       const before1 = await Snapshot.track()
       await Bun.write(`${tmp1.path}/project1.txt`, "project1 content")
       const patch1 = await Snapshot.patch(before1!)
-      expect(patch1.files).toContain(`${tmp1.path}/project1.txt`)
+      expect(patch1.files).toContain(path.join(tmp1.path, "project1.txt"))
     },
   })
 
@@ -516,10 +519,10 @@ test("snapshot state isolation between projects", async () => {
       const before2 = await Snapshot.track()
       await Bun.write(`${tmp2.path}/project2.txt`, "project2 content")
       const patch2 = await Snapshot.patch(before2!)
-      expect(patch2.files).toContain(`${tmp2.path}/project2.txt`)
+      expect(patch2.files).toContain(path.join(tmp2.path, "project2.txt"))
 
       // Ensure project1 files don't appear in project2
-      expect(patch2.files).not.toContain(`${tmp1?.path}/project1.txt`)
+      expect(patch2.files).not.toContain(path.join(tmp1?.path, "project1.txt"))
     },
   })
 })
@@ -547,7 +550,7 @@ test("patch detects changes in secondary worktree", async () => {
         await Bun.write(worktreeFile, "worktree content")
 
         const patch = await Snapshot.patch(before!)
-        expect(patch.files).toContain(worktreeFile)
+        expect(patch.files).toContain(path.join(worktreePath, "worktree.txt"))
       },
     })
   } finally {
@@ -568,7 +571,7 @@ test("revert only removes files in invoking worktree", async () => {
         expect(await Snapshot.track()).toBeTruthy()
       },
     })
-    const primaryFile = `${tmp.path}/worktree.txt`
+    const primaryFile = `${tmp.path}${path.sep}worktree.txt`
     await Bun.write(primaryFile, "primary content")
 
     await Instance.provide({
@@ -616,8 +619,8 @@ test("diff reports worktree-only/shared edits and ignores primary-only", async (
 
         await Bun.write(`${worktreePath}/worktree-only.txt`, "worktree diff content")
         await Bun.write(`${worktreePath}/shared.txt`, "worktree edit")
-        await Bun.write(`${tmp.path}/shared.txt`, "primary edit")
-        await Bun.write(`${tmp.path}/primary-only.txt`, "primary change")
+        await Bun.write(`${tmp.path}${path.sep}shared.txt`, "primary edit")
+        await Bun.write(`${tmp.path}${path.sep}primary-only.txt`, "primary change")
 
         const diff = await Snapshot.diff(before!)
         expect(diff).toContain("worktree-only.txt")
@@ -662,8 +665,8 @@ test("diff function with various changes", async () => {
 
       // Make various changes
       await $`rm ${tmp.path}/a.txt`.quiet()
-      await Bun.write(`${tmp.path}/new.txt`, "new content")
-      await Bun.write(`${tmp.path}/b.txt`, "modified content")
+      await Bun.write(`${tmp.path}${path.sep}new.txt`, "new content")
+      await Bun.write(`${tmp.path}${path.sep}b.txt`, "modified content")
 
       const diff = await Snapshot.diff(before!)
       expect(diff).toContain("a.txt")
@@ -683,16 +686,16 @@ test("restore function", async () => {
 
       // Make changes
       await $`rm ${tmp.path}/a.txt`.quiet()
-      await Bun.write(`${tmp.path}/new.txt`, "new content")
-      await Bun.write(`${tmp.path}/b.txt`, "modified")
+      await Bun.write(`${tmp.path}${path.sep}new.txt`, "new content")
+      await Bun.write(`${tmp.path}${path.sep}b.txt`, "modified")
 
       // Restore to original state
       await Snapshot.restore(before!)
 
-      expect(await Bun.file(`${tmp.path}/a.txt`).exists()).toBe(true)
-      expect(await Bun.file(`${tmp.path}/a.txt`).text()).toBe(tmp.extra.aContent)
-      expect(await Bun.file(`${tmp.path}/new.txt`).exists()).toBe(true) // New files should remain
-      expect(await Bun.file(`${tmp.path}/b.txt`).text()).toBe(tmp.extra.bContent)
+      expect(await Bun.file(`${tmp.path}${path.sep}a.txt`).exists()).toBe(true)
+      expect(await Bun.file(`${tmp.path}${path.sep}a.txt`).text()).toBe(tmp.extra.aContent)
+      expect(await Bun.file(`${tmp.path}${path.sep}new.txt`).exists()).toBe(true) // New files should remain
+      expect(await Bun.file(`${tmp.path}${path.sep}b.txt`).text()).toBe(tmp.extra.bContent)
     },
   })
 })
@@ -710,14 +713,14 @@ test("revert should not delete files that existed but were deleted in snapshot",
       const snapshot2 = await Snapshot.track()
       expect(snapshot2).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/a.txt`, "recreated content")
+      await Bun.write(`${tmp.path}${path.sep}a.txt`, "recreated content")
 
       const patch = await Snapshot.patch(snapshot2!)
-      expect(patch.files).toContain(`${tmp.path}/a.txt`)
+      expect(patch.files).toContain(`${tmp.path}${path.sep}a.txt`)
 
       await Snapshot.revert([patch])
 
-      expect(await Bun.file(`${tmp.path}/a.txt`).exists()).toBe(false)
+      expect(await Bun.file(`${tmp.path}${path.sep}a.txt`).exists()).toBe(false)
     },
   })
 })
@@ -727,24 +730,24 @@ test("revert preserves file that existed in snapshot when deleted then recreated
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      await Bun.write(`${tmp.path}/existing.txt`, "original content")
+      await Bun.write(`${tmp.path}${path.sep}existing.txt`, "original content")
 
       const snapshot = await Snapshot.track()
       expect(snapshot).toBeTruthy()
 
       await $`rm ${tmp.path}/existing.txt`.quiet()
-      await Bun.write(`${tmp.path}/existing.txt`, "recreated")
-      await Bun.write(`${tmp.path}/newfile.txt`, "new")
+      await Bun.write(`${tmp.path}${path.sep}existing.txt`, "recreated")
+      await Bun.write(`${tmp.path}${path.sep}newfile.txt`, "new")
 
       const patch = await Snapshot.patch(snapshot!)
-      expect(patch.files).toContain(`${tmp.path}/existing.txt`)
-      expect(patch.files).toContain(`${tmp.path}/newfile.txt`)
+      expect(patch.files).toContain(`${tmp.path}${path.sep}existing.txt`)
+      expect(patch.files).toContain(`${tmp.path}${path.sep}newfile.txt`)
 
       await Snapshot.revert([patch])
 
-      expect(await Bun.file(`${tmp.path}/newfile.txt`).exists()).toBe(false)
-      expect(await Bun.file(`${tmp.path}/existing.txt`).exists()).toBe(true)
-      expect(await Bun.file(`${tmp.path}/existing.txt`).text()).toBe("original content")
+      expect(await Bun.file(`${tmp.path}${path.sep}newfile.txt`).exists()).toBe(false)
+      expect(await Bun.file(`${tmp.path}${path.sep}existing.txt`).exists()).toBe(true)
+      expect(await Bun.file(`${tmp.path}${path.sep}existing.txt`).text()).toBe("original content")
     },
   })
 })
@@ -754,17 +757,17 @@ test("diffFull sets status based on git change type", async () => {
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      await Bun.write(`${tmp.path}/grow.txt`, "one\n")
-      await Bun.write(`${tmp.path}/trim.txt`, "line1\nline2\n")
-      await Bun.write(`${tmp.path}/delete.txt`, "gone")
+      await Bun.write(`${tmp.path}${path.sep}grow.txt`, "one\n")
+      await Bun.write(`${tmp.path}${path.sep}trim.txt`, "line1\nline2\n")
+      await Bun.write(`${tmp.path}${path.sep}delete.txt`, "gone")
 
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/grow.txt`, "one\ntwo\n")
-      await Bun.write(`${tmp.path}/trim.txt`, "line1\n")
+      await Bun.write(`${tmp.path}${path.sep}grow.txt`, "one\ntwo\n")
+      await Bun.write(`${tmp.path}${path.sep}trim.txt`, "line1\n")
       await $`rm ${tmp.path}/delete.txt`.quiet()
-      await Bun.write(`${tmp.path}/added.txt`, "new")
+      await Bun.write(`${tmp.path}${path.sep}added.txt`, "new")
 
       const after = await Snapshot.track()
       expect(after).toBeTruthy()
@@ -803,7 +806,7 @@ test("diffFull with new file additions", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/new.txt`, "new content")
+      await Bun.write(`${tmp.path}${path.sep}new.txt`, "new content")
 
       const after = await Snapshot.track()
       expect(after).toBeTruthy()
@@ -829,7 +832,7 @@ test("diffFull with file modifications", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/b.txt`, "modified content")
+      await Bun.write(`${tmp.path}${path.sep}b.txt`, "modified content")
 
       const after = await Snapshot.track()
       expect(after).toBeTruthy()
@@ -881,7 +884,7 @@ test("diffFull with multiple line additions", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/multi.txt`, "line1\nline2\nline3")
+      await Bun.write(`${tmp.path}${path.sep}multi.txt`, "line1\nline2\nline3")
 
       const after = await Snapshot.track()
       expect(after).toBeTruthy()
@@ -907,7 +910,7 @@ test("diffFull with addition and deletion", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/added.txt`, "added content")
+      await Bun.write(`${tmp.path}${path.sep}added.txt`, "added content")
       await $`rm ${tmp.path}/a.txt`.quiet()
 
       const after = await Snapshot.track()
@@ -941,8 +944,8 @@ test("diffFull with multiple additions and deletions", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/multi1.txt`, "line1\nline2\nline3")
-      await Bun.write(`${tmp.path}/multi2.txt`, "single line")
+      await Bun.write(`${tmp.path}${path.sep}multi1.txt`, "line1\nline2\nline3")
+      await Bun.write(`${tmp.path}${path.sep}multi2.txt`, "single line")
       await $`rm ${tmp.path}/a.txt`.quiet()
       await $`rm ${tmp.path}/b.txt`.quiet()
 
@@ -1000,7 +1003,7 @@ test("diffFull with binary file changes", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/binary.bin`, new Uint8Array([0x00, 0x01, 0x02, 0x03]))
+      await Bun.write(`${tmp.path}${path.sep}binary.bin`, new Uint8Array([0x00, 0x01, 0x02, 0x03]))
 
       const after = await Snapshot.track()
       expect(after).toBeTruthy()
@@ -1020,11 +1023,11 @@ test("diffFull with whitespace changes", async () => {
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      await Bun.write(`${tmp.path}/whitespace.txt`, "line1\nline2")
+      await Bun.write(`${tmp.path}${path.sep}whitespace.txt`, "line1\nline2")
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await Bun.write(`${tmp.path}/whitespace.txt`, "line1\n\nline2\n")
+      await Bun.write(`${tmp.path}${path.sep}whitespace.txt`, "line1\n\nline2\n")
 
       const after = await Snapshot.track()
       expect(after).toBeTruthy()

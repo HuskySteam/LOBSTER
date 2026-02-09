@@ -40,6 +40,8 @@ import { QuestionRoutes } from "./routes/question"
 import { PermissionRoutes } from "./routes/permission"
 import { GlobalRoutes } from "./routes/global"
 import { MDNS } from "./mdns"
+import { csrf } from "./middleware/csrf"
+import { rateLimit } from "./middleware/rate-limit"
 
 // @ts-ignore This global is needed to prevent ai-sdk from logging warnings to stdout https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -72,7 +74,7 @@ export namespace Server {
             return c.json(err.toObject(), { status })
           }
           if (err instanceof HTTPException) return err.getResponse()
-          const message = err instanceof Error && err.stack ? err.stack : err.toString()
+          const message = err instanceof Error ? err.message : String(err)
           return c.json(new NamedError.Unknown({ message }).toObject(), {
             status: 500,
           })
@@ -125,6 +127,8 @@ export namespace Server {
             },
           }),
         )
+        .use(csrf())
+        .use(rateLimit())
         .route("/global", GlobalRoutes())
         .put(
           "/auth/:providerID",
@@ -523,21 +527,34 @@ export namespace Server {
                 })
               }, 30000)
 
-              await new Promise<void>((resolve) => {
-                stream.onAbort(() => {
-                  clearInterval(heartbeat)
-                  unsub()
-                  resolve()
-                  log.info("event disconnected")
+              try {
+                await new Promise<void>((resolve) => {
+                  stream.onAbort(() => {
+                    unsub()
+                    resolve()
+                    log.info("event disconnected")
+                  })
                 })
-              })
+              } finally {
+                clearInterval(heartbeat)
+              }
             })
           },
         )
         .all("/*", async (c) => {
-          const path = c.req.path
+          const reqPath = c.req.path
 
-          const response = await proxy(`https://app.opencode.ai${path}`, {
+          // Only proxy known web UI asset paths to prevent SSRF
+          const allowedPrefixes = ["/assets/", "/favicon"]
+          const allowedExact = ["/", "/index.html"]
+          const isAllowed =
+            allowedExact.includes(reqPath) ||
+            allowedPrefixes.some((prefix) => reqPath.startsWith(prefix))
+          if (!isAllowed) {
+            return c.json({ error: "Not found" }, { status: 404 })
+          }
+
+          const response = await proxy(`https://app.opencode.ai${reqPath}`, {
             ...c.req,
             headers: {
               ...c.req.raw.headers,

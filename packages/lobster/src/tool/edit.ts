@@ -168,6 +168,11 @@ function levenshtein(a: string, b: string): number {
   if (a === "" || b === "") {
     return Math.max(a.length, b.length)
   }
+  // Guard against unbounded memory usage — O(n*m) matrix
+  const MAX_LEN = 10_000
+  if (a.length > MAX_LEN || b.length > MAX_LEN) {
+    return a === b ? 0 : Math.max(a.length, b.length)
+  }
   const matrix = Array.from({ length: a.length + 1 }, (_, i) =>
     Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
   )

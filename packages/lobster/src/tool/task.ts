@@ -184,6 +184,17 @@ export const TaskTool = Tool.define("task", async (ctx) => {
 
       // Background execution path: fire-and-forget when team_name is set
       if (teamName && agentName) {
+        // Validate agent name before creating session to avoid orphaned sessions
+        if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(agentName)) {
+          throw new Error(
+            `Invalid agent name: "${agentName}". Must be 1-63 lowercase alphanumeric characters or hyphens, starting with alphanumeric.`,
+          )
+        }
+        const team = await TeamManager.get(teamName)
+        if (!team) {
+          throw new Error(`Team "${teamName}" does not exist.`)
+        }
+
         await TeamManager.addMember({
           teamName,
           name: agentName,

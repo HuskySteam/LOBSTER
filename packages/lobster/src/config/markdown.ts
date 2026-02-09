@@ -24,7 +24,10 @@ export namespace ConfigMarkdown {
     const lines = frontmatter.split("\n")
     const result: string[] = []
 
-    for (const line of lines) {
+    for (const rawLine of lines) {
+      // strip trailing \r for consistent matching on Windows
+      const line = rawLine.replace(/\r$/, "")
+
       // skip comments and empty lines
       if (line.trim().startsWith("#") || line.trim() === "") {
         result.push(line)

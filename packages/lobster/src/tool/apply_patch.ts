@@ -13,6 +13,7 @@ import { LSP } from "../lsp"
 import { Filesystem } from "../util/filesystem"
 import DESCRIPTION from "./apply_patch.txt"
 import { File } from "../file"
+import { FileTime } from "../file/time"
 
 const PatchParams = z.object({
   patchText: z.string().describe("The full patch text that describes all changes to be made"),
@@ -95,6 +96,9 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
           if (!stats || stats.isDirectory()) {
             throw new Error(`apply_patch verification failed: Failed to read file to update: ${filePath}`)
           }
+
+          // Ensure the file was recently read before allowing modification
+          await FileTime.assert(ctx.sessionID, filePath)
 
           const oldContent = await fs.readFile(filePath, "utf-8")
           let newContent = oldContent

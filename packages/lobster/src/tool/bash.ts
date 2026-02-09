@@ -24,25 +24,68 @@ const DEFAULT_TIMEOUT = Flag.LOBSTER_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 *
 export const log = Log.create({ service: "bash-tool" })
 
 const ENV_BLOCKLIST_PATTERNS = [
+  // Generic sensitive suffixes/patterns
   /KEY$/i,
   /TOKEN$/i,
   /SECRET$/i,
   /PASSWORD$/i,
   /CREDENTIAL$/i,
-  /^AWS_/i,
-  /^GITHUB_TOKEN$/i,
-  /^LOBSTER_SERVER_PASSWORD$/i,
-  /^LOBSTER_SERVER_USERNAME$/i,
-  /^ANTHROPIC_API_KEY$/i,
-  /^OPENAI_API_KEY$/i,
-  /^AZURE_/i,
-  /^GCP_/i,
-  /^GOOGLE_/i,
   /_AUTH$/i,
   /PRIVATE_KEY/i,
   /DATABASE_URL/i,
   /CONNECTION_STRING/i,
   /DSN$/i,
+  /WEBHOOK/i,
+
+  // Lobster-specific
+  /^LOBSTER_SERVER_PASSWORD$/i,
+  /^LOBSTER_SERVER_USERNAME$/i,
+
+  // AI providers
+  /^ANTHROPIC_/i,
+  /^OPENAI_/i,
+
+  // Cloud providers
+  /^AWS_/i,
+  /^AZURE_/i,
+  /^GCP_/i,
+  /^GOOGLE_/i,
+  /^CLOUDFLARE_/i,
+  /^DIGITALOCEAN_/i,
+  /^LINODE_/i,
+
+  // PaaS / hosting
+  /^HEROKU_/i,
+  /^NETLIFY_/i,
+  /^VERCEL_/i,
+  /^FIREBASE_/i,
+  /^SUPABASE_/i,
+
+  // Git / CI/CD
+  /^GITHUB_TOKEN$/i,
+  /^GITLAB_/i,
+  /^CI_/i,
+
+  // Package registries
+  /NPM_TOKEN/i,
+  /NPM_AUTH/i,
+  /PYPI_TOKEN/i,
+
+  // Security & code quality
+  /^SNYK_/i,
+  /^SONAR_/i,
+  /^CODECOV_/i,
+  /^COVERALLS_/i,
+
+  // Secrets management
+  /^DOPPLER_/i,
+  /^VAULT_/i,
+
+  // Communication / SaaS
+  /^SLACK_/i,
+  /^TWILIO_/i,
+  /^SENDGRID_/i,
+  /^STRIPE_/i,
 ]
 
 const ENV_ALLOWLIST = new Set([

@@ -11,6 +11,8 @@ import { useLocal } from "../../context/local"
 import { useLobster } from "../../context/lobster"
 import { useSessionCost } from "../../hooks/use-session-cost"
 import { useContextTokens } from "../../hooks/use-context-tokens"
+import { TeamStatus } from "../../component/team-status"
+import { TeamTasks } from "../../component/team-tasks"
 
 export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const sync = useSync()
@@ -23,6 +25,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   const local = useLocal()
   const lobster = useLobster()
   const agents = createMemo(() => sync.data.agent.filter((x) => !x.hidden))
+  const teamNames = createMemo(() => Object.keys(sync.data.teams))
 
   const [expanded, setExpanded] = createStore({
     mcp: true,
@@ -32,6 +35,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
     reviewLoop: true,
     costTracker: true,
     agentStatus: true,
+    teams: true,
   })
 
   // Sort MCP servers alphabetically for consistent display order
@@ -232,6 +236,35 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                         <text fg={theme.textMuted}>
                           {agent.name === local.agent.current().name ? "active" : ""}
                         </text>
+                      </box>
+                    )}
+                  </For>
+                </Show>
+              </box>
+            </Show>
+            <Show when={teamNames().length > 0}>
+              <box>
+                <box
+                  flexDirection="row"
+                  gap={1}
+                  onMouseDown={() => setExpanded("teams", !expanded.teams)}
+                >
+                  <text fg={theme.text}>{expanded.teams ? "\u25BC" : "\u25B6"}</text>
+                  <text fg={theme.text}>
+                    <b>Teams</b>
+                    <Show when={!expanded.teams}>
+                      <span style={{ fg: theme.textMuted }}>
+                        {" "}({teamNames().length})
+                      </span>
+                    </Show>
+                  </text>
+                </box>
+                <Show when={expanded.teams}>
+                  <For each={teamNames()}>
+                    {(name) => (
+                      <box paddingLeft={1} gap={1}>
+                        <TeamStatus teamName={name} />
+                        <TeamTasks teamName={name} />
                       </box>
                     )}
                   </For>

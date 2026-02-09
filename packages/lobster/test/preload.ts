@@ -15,20 +15,22 @@ afterAll(() => {
 // This prevents tests from picking up real user configs/skills from ~/.claude/skills
 const testHome = path.join(dir, "home")
 await fs.mkdir(testHome, { recursive: true })
-process.env["OPENCODE_TEST_HOME"] = testHome
+process.env["LOBSTER_TEST_HOME"] = testHome
 
 // Set test managed config directory to isolate tests from system managed settings
 const testManagedConfigDir = path.join(dir, "managed")
-process.env["OPENCODE_TEST_MANAGED_CONFIG_DIR"] = testManagedConfigDir
+process.env["LOBSTER_TEST_MANAGED_CONFIG_DIR"] = testManagedConfigDir
 
 process.env["XDG_DATA_HOME"] = path.join(dir, "share")
 process.env["XDG_CACHE_HOME"] = path.join(dir, "cache")
 process.env["XDG_CONFIG_HOME"] = path.join(dir, "config")
 process.env["XDG_STATE_HOME"] = path.join(dir, "state")
-process.env["OPENCODE_MODELS_PATH"] = path.join(import.meta.dir, "tool", "fixtures", "models-api.json")
+process.env["LOBSTER_MODELS_PATH"] = path.join(import.meta.dir, "tool", "fixtures", "models-api.json")
+// Disable file time checks in tests (files are created then patched without reading)
+process.env["LOBSTER_DISABLE_FILETIME_CHECK"] = "true"
 
 // Write the cache version file to prevent global/index.ts from clearing the cache
-const cacheDir = path.join(dir, "cache", "opencode")
+const cacheDir = path.join(dir, "cache", "lobster")
 await fs.mkdir(cacheDir, { recursive: true })
 await fs.writeFile(path.join(cacheDir, "version"), "14")
 

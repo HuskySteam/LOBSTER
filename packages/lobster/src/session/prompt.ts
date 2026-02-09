@@ -250,7 +250,11 @@ export namespace SessionPrompt {
       return
     }
     match.abort.abort()
+    const callbacks = match.callbacks
     delete s[sessionID]
+    for (const cb of callbacks) {
+      cb.reject(new Error("Session cancelled"))
+    }
     SessionStatus.set(sessionID, { type: "idle" })
     return
   }
@@ -361,6 +365,7 @@ export namespace SessionPrompt {
       // pending subtask
       // TODO: centralize "invoke tool" logic
       if (task?.type === "subtask") {
+        if (abort.aborted) break
         const taskTool = await TaskTool.init()
         const taskModel = task.model ? await Provider.getModel(task.model.providerID, task.model.modelID) : model
         const assistantMessage = (await Session.updateMessage({
