@@ -9,6 +9,14 @@ export function csrf(): MiddlewareHandler {
     if (c.req.path.match(/^\/provider\/[^/]+\/oauth\/callback$/) || c.req.path.match(/^\/mcp\/[^/]+\/auth\/callback$/))
       return next()
 
+    // Skip CSRF for internal App().fetch() requests (no real HTTP origin)
+    try {
+      const url = new URL(c.req.url)
+      if (url.hostname === "lobster.internal") return next()
+    } catch {
+      // URL parsing failed — proceed with CSRF check
+    }
+
     const hasCSRFHeader = c.req.header("x-lobster-csrf") === "1"
     const hasXHRHeader = c.req.header("x-requested-with") === "XMLHttpRequest"
     if (!hasCSRFHeader && !hasXHRHeader) {

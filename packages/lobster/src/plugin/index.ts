@@ -29,7 +29,7 @@ export namespace Plugin {
 
   const state = Instance.state(async () => {
     const client = createLobsterClient({
-      baseUrl: "http://localhost:4096",
+      baseUrl: "http://lobster.internal",
       // @ts-ignore - fetch type incompatibility
       fetch: async (...args) => Server.App().fetch(...args),
     })
