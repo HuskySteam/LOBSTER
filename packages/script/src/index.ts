@@ -28,11 +28,17 @@ const CHANNEL = await (async () => {
   if (env.OPENCODE_VERSION && !env.OPENCODE_VERSION.startsWith("0.0.0-")) return "latest"
   return await $`git branch --show-current`.text().then((x) => x.trim())
 })()
-const IS_PREVIEW = CHANNEL !== "latest"
+const IS_PREVIEW = CHANNEL !== "latest" && CHANNEL !== "main"
+
+const lobsterPkgPath = path.resolve(import.meta.dir, "../../../packages/lobster/package.json")
+const lobsterPkg = await Bun.file(lobsterPkgPath).json()
 
 const VERSION = await (async () => {
   if (env.OPENCODE_VERSION) return env.OPENCODE_VERSION
   if (IS_PREVIEW) return `0.0.0-${CHANNEL}-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
+  // No OPENCODE_BUMP: local build — use package.json version
+  if (!env.OPENCODE_BUMP) return lobsterPkg.version
+  // CI build with OPENCODE_BUMP: bump from latest GitHub release
   const version = await fetch("https://api.github.com/repos/HuskySteam/LOBSTER/releases/latest")
     .then((res) => {
       if (!res.ok) throw new Error(res.statusText)
@@ -40,7 +46,7 @@ const VERSION = await (async () => {
     })
     .then((data: any) => data.tag_name.replace(/^v/, ""))
   const [major, minor, patch] = version.split(".").map((x: string) => Number(x) || 0)
-  const t = env.OPENCODE_BUMP?.toLowerCase()
+  const t = env.OPENCODE_BUMP.toLowerCase()
   if (t === "major") return `${major + 1}.0.0`
   if (t === "minor") return `${major}.${minor + 1}.0`
   return `${major}.${minor}.${patch + 1}`
