@@ -975,14 +975,13 @@ export namespace Provider {
         const opts = init ?? {}
 
         {
-          const timeout = options["timeout"] ?? 120_000
-          const signals: AbortSignal[] = []
-          if (opts.signal) signals.push(opts.signal)
-          if (timeout !== false) signals.push(AbortSignal.timeout(timeout))
-
-          const combined = signals.length > 1 ? AbortSignal.any(signals) : signals[0]
-
-          opts.signal = combined
+          // Only forward the caller's abort signal (user cancel).
+          // Do NOT add AbortSignal.timeout() here — it is a hard deadline
+          // that kills long-running streams even while data is flowing.
+          // Bun's idle timeout (below) handles hung connections instead.
+          if (opts.signal) {
+            opts.signal = opts.signal
+          }
         }
 
         // Strip openai itemId metadata following what codex does
@@ -1008,8 +1007,10 @@ export namespace Provider {
 
         return fetchFn(input, {
           ...opts,
+          // Bun idle timeout: resets whenever data is received.
+          // Long-streaming responses survive; hung connections die after 120s of silence.
           // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
-          timeout: false,
+          timeout: options["timeout"] ?? 120_000,
         })
       }
 
