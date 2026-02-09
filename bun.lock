@@ -36,7 +36,7 @@
     },
     "packages/lobster": {
       "name": "lobster",
-      "version": "1.4.2",
+      "version": "1.5.5",
       "bin": {
         "lobster": "./bin/lobster",
       },
@@ -139,7 +139,7 @@
     },
     "packages/plugin": {
       "name": "@lobster-ai/plugin",
-      "version": "1.4.2",
+      "version": "1.5.5",
       "dependencies": {
         "@lobster-ai/sdk": "workspace:*",
         "zod": "catalog:",
@@ -153,14 +153,14 @@
     },
     "packages/script": {
       "name": "@lobster-ai/script",
-      "version": "1.4.2",
+      "version": "1.5.5",
       "devDependencies": {
         "@types/bun": "catalog:",
       },
     },
     "packages/sdk/js": {
       "name": "@lobster-ai/sdk",
-      "version": "1.4.2",
+      "version": "1.5.5",
       "devDependencies": {
         "@hey-api/openapi-ts": "0.90.10",
         "@tsconfig/node22": "catalog:",
@@ -171,7 +171,7 @@
     },
     "packages/slack": {
       "name": "@lobster-ai/slack",
-      "version": "1.4.2",
+      "version": "1.5.5",
       "dependencies": {
         "@lobster-ai/sdk": "workspace:*",
         "@slack/bolt": "^3.17.1",
@@ -184,7 +184,7 @@
     },
     "packages/util": {
       "name": "@lobster-ai/util",
-      "version": "1.4.2",
+      "version": "1.5.5",
       "dependencies": {
         "zod": "catalog:",
       },
