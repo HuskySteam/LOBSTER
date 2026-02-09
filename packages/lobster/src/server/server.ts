@@ -77,7 +77,8 @@ export namespace Server {
             return c.json(err.toObject(), { status })
           }
           if (err instanceof HTTPException) return err.getResponse()
-          return c.json(new NamedError.Unknown({ message: "Internal server error" }).toObject(), {
+          const message = err instanceof Error ? err.message : String(err)
+          return c.json(new NamedError.Unknown({ message }).toObject(), {
             status: 500,
           })
         })

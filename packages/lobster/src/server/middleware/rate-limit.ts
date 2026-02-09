@@ -45,8 +45,14 @@ const trustedProxies = new Set(
 
 function getClientIP(c: Context): string {
   // Prefer the actual socket remote address from Bun's ConnInfo
-  const info = getConnInfo(c)
-  const socketIP = info.remote.address
+  // getConnInfo may fail for internal fetch() calls that lack c.env.server
+  let socketIP: string | undefined
+  try {
+    const info = getConnInfo(c)
+    socketIP = info.remote.address
+  } catch {
+    // Internal request (e.g. App().fetch()) — no socket context
+  }
 
   // Only trust X-Forwarded-For if the direct connection is from a known proxy
   if (socketIP && trustedProxies.has(socketIP)) {
