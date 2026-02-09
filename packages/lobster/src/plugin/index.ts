@@ -1,5 +1,6 @@
 import type { Hooks, PluginInput, Plugin as PluginInstance } from "@lobster-ai/plugin"
 import path from "path"
+import { fileURLToPath } from "url"
 import { Config } from "../config/config"
 import { Bus } from "../bus"
 import { Log } from "../util/log"
@@ -108,7 +109,7 @@ export namespace Plugin {
       }
 
       // Check if the resolved path is a Claude Code plugin directory
-      const resolvedPath = plugin.startsWith("file://") ? new URL(plugin).pathname : plugin
+      const resolvedPath = plugin.startsWith("file://") ? fileURLToPath(new URL(plugin)) : plugin
 
       // Validate file:// paths resolve within the project or global plugin directory
       if (plugin.startsWith("file://")) {
