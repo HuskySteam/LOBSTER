@@ -63,12 +63,13 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
   )
   const gettingStartedDismissed = createMemo(() => kv.get("dismissed_getting_started", false))
 
-  const mcpStatusColors: Record<string, RGBA> = {
-    connected: theme.success,
-    failed: theme.error,
-    disabled: theme.textMuted,
-    needs_auth: theme.warning,
-    needs_client_registration: theme.error,
+  const mcpStatusColor = (status: string): RGBA => {
+    if (status === "connected") return theme.success
+    if (status === "failed") return theme.error
+    if (status === "disabled") return theme.textMuted
+    if (status === "needs_auth") return theme.warning
+    if (status === "needs_client_registration") return theme.error
+    return theme.textMuted
   }
 
   return (
@@ -299,7 +300,7 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
                         <text
                           flexShrink={0}
                           style={{
-                            fg: mcpStatusColors[item.status],
+                            fg: mcpStatusColor(item.status),
                           }}
                         >
                           •

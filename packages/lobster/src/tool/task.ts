@@ -202,17 +202,41 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           throw new Error(`Team "${teamName}" does not exist.`)
         }
 
+        // Register as "starting" initially; transition to "active" once prompt begins
         await TeamManager.addMember({
           teamName,
           name: agentName,
           agentId: session.id,
           agentType: params.subagent_type,
         })
+        await TeamManager.setMemberStatus(teamName, agentName, "starting")
 
-        const promptParts = await SessionPrompt.resolvePromptParts(params.prompt)
+        let promptParts: Awaited<ReturnType<typeof SessionPrompt.resolvePromptParts>>
+        try {
+          promptParts = await SessionPrompt.resolvePromptParts(params.prompt)
+        } catch (err) {
+          // Roll back member registration on failure
+          await TeamManager.removeMember(teamName, agentName)
+          throw err
+        }
         const messageID = Identifier.ascending("message")
 
-        // Fire-and-forget: start prompt in background
+        // Transition to active now that prompt is about to start
+        await TeamManager.setMemberStatus(teamName, agentName, "active")
+
+        // Fire-and-forget: start prompt in background with configurable timeout
+        const maxLifetimeMs = (config.experimental?.team_agent_timeout_minutes ?? 30) * 60 * 1000
+        const timeoutController = new AbortController()
+        const timeoutId = setTimeout(() => {
+          log.warn("team agent exceeded max lifetime, terminating", {
+            teamName,
+            agentName,
+            maxLifetimeMs,
+          })
+          SessionPrompt.cancel(session.id)
+          timeoutController.abort()
+        }, maxLifetimeMs)
+
         SessionPrompt.prompt({
           messageID,
           sessionID: session.id,
@@ -230,10 +254,12 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           parts: promptParts,
         })
           .then(() => {
+            clearTimeout(timeoutId)
             TeamManager.setMemberStatus(teamName, agentName, "idle").catch(() => {})
             log.info("team agent completed", { teamName, agentName, sessionId: session.id })
           })
           .catch((err) => {
+            clearTimeout(timeoutId)
             log.error("team agent failed", { teamName, agentName, error: err })
             TeamManager.setMemberStatus(teamName, agentName, "idle").catch(() => {})
           })

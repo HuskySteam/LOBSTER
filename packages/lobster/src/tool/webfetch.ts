@@ -25,7 +25,11 @@ const PRIVATE_IP_RANGES: IPRange[] = [
   { value: "[::1]", exact: true },
   { prefix: "fe80:", exact: false },         // link-local
   { prefix: "fc00:", exact: false },         // unique local
-  { prefix: "fd", exact: false },            // unique local
+  { prefix: "fd00:", exact: false },           // unique local
+  // Additional ranges
+  { prefix: "198.18.", exact: false },        // 198.18.0.0/15 benchmark
+  { prefix: "198.19.", exact: false },        // 198.18.0.0/15 benchmark
+  { prefix: "240.", exact: false },           // 240.0.0.0/4 reserved
 ]
 
 function isPrivateIP(ip: string): boolean {
@@ -35,6 +39,12 @@ function isPrivateIP(ip: string): boolean {
   if (normalized.startsWith("172.")) {
     const second = parseInt(normalized.split(".")[1], 10)
     if (second >= 16 && second <= 31) return true
+  }
+
+  // 100.64.0.0/10 (CGNAT) — 100.64.0.0 to 100.127.255.255
+  if (normalized.startsWith("100.")) {
+    const second = parseInt(normalized.split(".")[1], 10)
+    if (second >= 64 && second <= 127) return true
   }
 
   for (const range of PRIVATE_IP_RANGES) {
@@ -67,7 +77,8 @@ async function checkSSRF(urlString: string): Promise<void> {
     }
   } catch (e: any) {
     if (e?.message?.includes("Cannot fetch")) throw e
-    // DNS resolution failed - allow the fetch to fail naturally
+    // DNS resolution failed - block to prevent SSRF
+    throw new Error(`DNS resolution failed for ${hostname}. Request blocked for security.`)
   }
 }
 

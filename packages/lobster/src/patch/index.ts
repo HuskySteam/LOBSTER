@@ -514,12 +514,23 @@ export namespace Patch {
     return hasChanges ? diff : ""
   }
 
+  function validatePathWithinBoundary(filePath: string, cwd: string) {
+    const resolved = path.resolve(cwd, filePath)
+    const normalizedCwd = path.resolve(cwd)
+    const relative = path.relative(normalizedCwd, resolved)
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      throw new Error(`Path traversal detected: '${filePath}' resolves outside project boundary '${normalizedCwd}'`)
+    }
+    return resolved
+  }
+
   // Apply hunks to filesystem
-  export async function applyHunksToFiles(hunks: Hunk[]): Promise<AffectedPaths> {
+  export async function applyHunksToFiles(hunks: Hunk[], cwd?: string): Promise<AffectedPaths> {
     if (hunks.length === 0) {
       throw new Error("No files were modified.")
     }
 
+    const boundary = cwd ?? process.cwd()
     const added: string[] = []
     const modified: string[] = []
     const deleted: string[] = []
@@ -527,42 +538,46 @@ export namespace Patch {
     for (const hunk of hunks) {
       switch (hunk.type) {
         case "add":
+          const resolvedAdd = validatePathWithinBoundary(hunk.path, boundary)
           // Create parent directories
-          const addDir = path.dirname(hunk.path)
+          const addDir = path.dirname(resolvedAdd)
           if (addDir !== "." && addDir !== "/") {
             await fs.mkdir(addDir, { recursive: true })
           }
 
-          await fs.writeFile(hunk.path, hunk.contents, "utf-8")
-          added.push(hunk.path)
-          log.info(`Added file: ${hunk.path}`)
+          await fs.writeFile(resolvedAdd, hunk.contents, "utf-8")
+          added.push(resolvedAdd)
+          log.info(`Added file: ${resolvedAdd}`)
           break
 
         case "delete":
-          await fs.unlink(hunk.path)
-          deleted.push(hunk.path)
-          log.info(`Deleted file: ${hunk.path}`)
+          const resolvedDelete = validatePathWithinBoundary(hunk.path, boundary)
+          await fs.unlink(resolvedDelete)
+          deleted.push(resolvedDelete)
+          log.info(`Deleted file: ${resolvedDelete}`)
           break
 
         case "update":
-          const fileUpdate = deriveNewContentsFromChunks(hunk.path, hunk.chunks)
+          const resolvedUpdate = validatePathWithinBoundary(hunk.path, boundary)
+          const fileUpdate = deriveNewContentsFromChunks(resolvedUpdate, hunk.chunks)
 
           if (hunk.move_path) {
+            const resolvedMove = validatePathWithinBoundary(hunk.move_path, boundary)
             // Handle file move
-            const moveDir = path.dirname(hunk.move_path)
+            const moveDir = path.dirname(resolvedMove)
             if (moveDir !== "." && moveDir !== "/") {
               await fs.mkdir(moveDir, { recursive: true })
             }
 
-            await fs.writeFile(hunk.move_path, fileUpdate.content, "utf-8")
-            await fs.unlink(hunk.path)
-            modified.push(hunk.move_path)
-            log.info(`Moved file: ${hunk.path} -> ${hunk.move_path}`)
+            await fs.writeFile(resolvedMove, fileUpdate.content, "utf-8")
+            await fs.unlink(resolvedUpdate)
+            modified.push(resolvedMove)
+            log.info(`Moved file: ${resolvedUpdate} -> ${resolvedMove}`)
           } else {
             // Regular update
-            await fs.writeFile(hunk.path, fileUpdate.content, "utf-8")
-            modified.push(hunk.path)
-            log.info(`Updated file: ${hunk.path}`)
+            await fs.writeFile(resolvedUpdate, fileUpdate.content, "utf-8")
+            modified.push(resolvedUpdate)
+            log.info(`Updated file: ${resolvedUpdate}`)
           }
           break
       }

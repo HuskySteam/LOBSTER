@@ -1,20 +1,11 @@
 export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timeout: NodeJS.Timeout
+  const signal = AbortSignal.timeout(ms)
   return Promise.race([
-    promise.then(
-      (result) => {
-        clearTimeout(timeout)
-        return result
-      },
-      (error) => {
-        clearTimeout(timeout)
-        throw error
-      },
-    ),
+    promise,
     new Promise<never>((_, reject) => {
-      timeout = setTimeout(() => {
+      signal.addEventListener("abort", () => {
         reject(new Error(`Operation timed out after ${ms}ms`))
-      }, ms)
+      })
     }),
   ])
 }

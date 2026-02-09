@@ -49,8 +49,9 @@ export function DialogKeybinds() {
   const keybind = useKeybind()
   const [hover, setHover] = createSignal(false)
 
+  // Escape is handled by the dialog system globally; only handle Return here
   useKeyboard((evt) => {
-    if (evt.name === "return" || evt.name === "escape") {
+    if (evt.name === "return") {
       dialog.clear()
     }
   })

@@ -1,3 +1,4 @@
+import fs from "fs/promises"
 import path from "path"
 import z from "zod"
 import { tool, type ToolDefinition } from "@lobster-ai/plugin"
@@ -5,6 +6,7 @@ import type { Hooks, PluginInput } from "@lobster-ai/plugin"
 import { ConfigMarkdown } from "../config/markdown"
 import { Log } from "../util/log"
 import { Filesystem } from "@/util/filesystem"
+import { filterEnv } from "../tool/bash"
 
 export namespace ClaudeCompat {
   const log = Log.create({ service: "claude-compat" })
@@ -53,6 +55,58 @@ export namespace ClaudeCompat {
 
   // Max regex length to prevent ReDoS from untrusted matcher patterns
   const MAX_MATCHER_LENGTH = 200
+
+  // Dangerous shell metacharacters that could enable command injection
+  const DANGEROUS_METACHARACTERS = /[;|&`$(){}!<>]/
+
+  /**
+   * Parse a hook command string into an argv array.
+   * Rejects commands containing dangerous shell metacharacters.
+   */
+  function parseCommand(command: string): string[] {
+    const trimmed = command.trim()
+    if (!trimmed) throw new Error("Empty hook command")
+    if (DANGEROUS_METACHARACTERS.test(trimmed)) {
+      throw new Error(`Hook command contains dangerous shell metacharacters: ${trimmed}`)
+    }
+    // Split on whitespace, respecting simple quoting
+    const args: string[] = []
+    let current = ""
+    let inQuote: string | null = null
+    for (const ch of trimmed) {
+      if (inQuote) {
+        if (ch === inQuote) {
+          inQuote = null
+        } else {
+          current += ch
+        }
+      } else if (ch === '"' || ch === "'") {
+        inQuote = ch
+      } else if (ch === " " || ch === "\t") {
+        if (current) {
+          args.push(current)
+          current = ""
+        }
+      } else {
+        current += ch
+      }
+    }
+    if (current) args.push(current)
+    if (args.length === 0) throw new Error("Empty hook command after parsing")
+    return args
+  }
+
+  /**
+   * Resolve a file path through symlinks and validate it stays within the plugin directory.
+   */
+  async function validateSymlink(filePath: string, pluginDir: string): Promise<boolean> {
+    try {
+      const resolved = await fs.realpath(filePath)
+      return Filesystem.contains(pluginDir, resolved)
+    } catch {
+      return false
+    }
+  }
 
   /**
    * Safely compile and test a regex matcher from untrusted plugin hooks.
@@ -174,17 +228,20 @@ export namespace ClaudeCompat {
         const mcp = (config as any).mcp as Record<string, any>
         for (const [name, server] of Object.entries(mcpConfig)) {
           if (mcp[name]) continue // don't override existing
+          // Filter env vars through the same blocklist used for bash tool
+          const rawEnv = Object.fromEntries(
+            Object.entries(server.env ?? {}).map(([k, v]) => [
+              k,
+              v.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, dir),
+            ]),
+          )
+          const sanitizedEnv = filterEnv(rawEnv as NodeJS.ProcessEnv)
           mcp[name] = {
             type: "local" as const,
             command: [server.command, ...(server.args ?? [])].map((s) =>
               s.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, dir),
             ),
-            environment: Object.fromEntries(
-              Object.entries(server.env ?? {}).map(([k, v]) => [
-                k,
-                v.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, dir),
-              ]),
-            ),
+            environment: sanitizedEnv,
           }
         }
       }
@@ -237,6 +294,10 @@ export namespace ClaudeCompat {
 
     for (const match of matches) {
       try {
+        if (!(await validateSymlink(match, dir))) {
+          log.warn("skill symlink points outside plugin directory, skipping", { path: match, dir })
+          continue
+        }
         const md = await ConfigMarkdown.parse(match)
         const name = md.data?.name as string | undefined
         const description = md.data?.description as string | undefined
@@ -290,6 +351,10 @@ export namespace ClaudeCompat {
 
     for (const match of matches) {
       try {
+        if (!(await validateSymlink(match, dir))) {
+          log.warn("command symlink points outside plugin directory, skipping", { path: match, dir })
+          continue
+        }
         const md = await ConfigMarkdown.parse(match)
         const name = md.data?.name as string | undefined
         const description = md.data?.description as string | undefined
@@ -343,6 +408,10 @@ export namespace ClaudeCompat {
 
     for (const match of matches) {
       try {
+        if (!(await validateSymlink(match, dir))) {
+          log.warn("agent symlink points outside plugin directory, skipping", { path: match, dir })
+          continue
+        }
         const md = await ConfigMarkdown.parse(match)
         const name = (md.data?.name as string) || path.basename(match, ".md")
         const description = (md.data?.description as string) || ""
@@ -394,12 +463,13 @@ export namespace ClaudeCompat {
     pluginDir: string,
     input: object,
   ): Promise<any> {
-    const proc = Bun.spawn(["sh", "-c", command], {
+    const argv = parseCommand(command)
+    const proc = Bun.spawn(argv, {
       stdin: new Blob([JSON.stringify(input)]),
       stdout: "pipe",
       stderr: "pipe",
       env: {
-        ...process.env,
+        ...filterEnv(process.env),
         CLAUDE_PLUGIN_ROOT: pluginDir,
       },
     })

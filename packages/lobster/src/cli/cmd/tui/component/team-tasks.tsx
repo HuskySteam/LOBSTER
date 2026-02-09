@@ -12,7 +12,7 @@ export function TeamTasks(props: { teamName: string }) {
   const sync = useSync()
   const { theme } = useTheme()
 
-  const tasks = createMemo(() => sync.data.team_tasks[props.teamName] ?? [])
+  const tasks = createMemo(() => (sync.data.team_tasks[props.teamName] ?? []).filter((t) => t.status !== "deleted"))
 
   const statusColor = (task: { status: string; blockedBy: string[] }) => {
     if (task.blockedBy.length > 0) return theme.error

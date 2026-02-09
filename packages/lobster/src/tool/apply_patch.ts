@@ -60,6 +60,10 @@ export const ApplyPatchTool = Tool.define("apply_patch", {
 
     for (const hunk of hunks) {
       const filePath = path.resolve(Instance.directory, hunk.path)
+      // Validate resolved path is within project boundary to prevent path traversal
+      if (!filePath.startsWith(path.resolve(Instance.directory))) {
+        throw new Error(`Path traversal detected: ${hunk.path} resolves outside project directory`)
+      }
       await assertExternalDirectory(ctx, filePath)
 
       switch (hunk.type) {

@@ -106,7 +106,7 @@ async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
 
 import type { EventSource } from "./context/sdk"
 
-export function tui(input: {
+export async function tui(input: {
   url: string
   args: Args
   directory?: string
@@ -115,81 +115,87 @@ export function tui(input: {
   events?: EventSource
   onExit?: () => Promise<void>
 }) {
-  // promise to prevent immediate exit
-  return new Promise<void>(async (resolve) => {
-    const mode = await getTerminalBackgroundColor()
-    const onExit = async () => {
-      await input.onExit?.()
-      resolve()
-    }
+  const mode = await getTerminalBackgroundColor()
 
-    render(
-      () => {
-        return (
-          <ErrorBoundary
-            fallback={(error, reset) => <ErrorComponent error={error} reset={reset} onExit={onExit} mode={mode} />}
-          >
-            <ArgsProvider {...input.args}>
-              <ExitProvider onExit={onExit}>
-                <KVProvider>
-                  <ToastProvider>
-                    <RouteProvider>
-                      <SDKProvider
-                        url={input.url}
-                        directory={input.directory}
-                        fetch={input.fetch}
-                        headers={input.headers}
-                        events={input.events}
-                      >
-                        <SyncProvider>
-                          <LobsterProvider>
-                          <ThemeProvider mode={mode}>
-                            <LocalProvider>
-                              <KeybindProvider>
-                                <PromptStashProvider>
-                                  <DialogProvider>
-                                    <CommandProvider>
-                                      <FrecencyProvider>
-                                        <PromptHistoryProvider>
-                                          <PromptRefProvider>
-                                            <App />
-                                          </PromptRefProvider>
-                                        </PromptHistoryProvider>
-                                      </FrecencyProvider>
-                                    </CommandProvider>
-                                  </DialogProvider>
-                                </PromptStashProvider>
-                              </KeybindProvider>
-                            </LocalProvider>
-                          </ThemeProvider>
-                          </LobsterProvider>
-                        </SyncProvider>
-                      </SDKProvider>
-                    </RouteProvider>
-                  </ToastProvider>
-                </KVProvider>
-              </ExitProvider>
-            </ArgsProvider>
-          </ErrorBoundary>
-        )
-      },
-      {
-        targetFps: 60,
-        gatherStats: false,
-        exitOnCtrlC: false,
-        useKittyKeyboard: {},
-        autoFocus: false,
-        consoleOptions: {
-          keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
-          onCopySelection: (text) => {
-            Clipboard.copy(text).catch((error) => {
-              console.error(`Failed to copy console selection to clipboard: ${error}`)
-            })
-          },
+  // Use a separate promise + resolver to keep the process alive until exit
+  let resolveExit: () => void
+  const exitPromise = new Promise<void>((resolve) => {
+    resolveExit = resolve
+  })
+
+  const onExit = async () => {
+    await input.onExit?.()
+    resolveExit()
+  }
+
+  render(
+    () => {
+      return (
+        <ErrorBoundary
+          fallback={(error, reset) => <ErrorComponent error={error} reset={reset} onExit={onExit} mode={mode} />}
+        >
+          <ArgsProvider {...input.args}>
+            <ExitProvider onExit={onExit}>
+              <KVProvider>
+                <ToastProvider>
+                  <RouteProvider>
+                    <SDKProvider
+                      url={input.url}
+                      directory={input.directory}
+                      fetch={input.fetch}
+                      headers={input.headers}
+                      events={input.events}
+                    >
+                      <SyncProvider>
+                        <LobsterProvider>
+                        <ThemeProvider mode={mode}>
+                          <LocalProvider>
+                            <KeybindProvider>
+                              <PromptStashProvider>
+                                <DialogProvider>
+                                  <CommandProvider>
+                                    <FrecencyProvider>
+                                      <PromptHistoryProvider>
+                                        <PromptRefProvider>
+                                          <App />
+                                        </PromptRefProvider>
+                                      </PromptHistoryProvider>
+                                    </FrecencyProvider>
+                                  </CommandProvider>
+                                </DialogProvider>
+                              </PromptStashProvider>
+                            </KeybindProvider>
+                          </LocalProvider>
+                        </ThemeProvider>
+                        </LobsterProvider>
+                      </SyncProvider>
+                    </SDKProvider>
+                  </RouteProvider>
+                </ToastProvider>
+              </KVProvider>
+            </ExitProvider>
+          </ArgsProvider>
+        </ErrorBoundary>
+      )
+    },
+    {
+      targetFps: 60,
+      gatherStats: false,
+      exitOnCtrlC: false,
+      useKittyKeyboard: {},
+      autoFocus: false,
+      consoleOptions: {
+        keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
+        onCopySelection: (text) => {
+          Clipboard.copy(text).catch((error) => {
+            console.error(`Failed to copy console selection to clipboard: ${error}`)
+          })
         },
       },
-    )
-  })
+    },
+  )
+
+  return exitPromise
 }
 
 function App() {
@@ -765,12 +771,28 @@ function App() {
     >
       <Switch>
         <Match when={route.data.type === "home"}>
-          <Home />
+          <ErrorBoundary fallback={(err) => <SectionError error={err} section="Home" />}>
+            <Home />
+          </ErrorBoundary>
         </Match>
         <Match when={route.data.type === "session"}>
-          <Session />
+          <ErrorBoundary fallback={(err) => <SectionError error={err} section="Session" />}>
+            <Session />
+          </ErrorBoundary>
         </Match>
       </Switch>
+    </box>
+  )
+}
+
+function SectionError(props: { error: Error; section: string }) {
+  const { theme } = useTheme()
+  return (
+    <box paddingLeft={2} paddingTop={2} gap={1}>
+      <text fg={theme.error} attributes={TextAttributes.BOLD}>
+        {props.section} encountered an error
+      </text>
+      <text fg={theme.textMuted}>{props.error.message}</text>
     </box>
   )
 }

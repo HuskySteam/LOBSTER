@@ -660,6 +660,8 @@ export namespace MessageV2 {
     )
   }
 
+  // NOTE: This loads the full message ID list into memory. For very large sessions,
+  // consider using filterCompacted or Session.messages with a limit to avoid excessive memory usage.
   export const stream = fn(Identifier.schema("session"), async function* (sessionID) {
     const list = await Array.fromAsync(await Storage.list(["message", sessionID]))
     for (let i = list.length - 1; i >= 0; i--) {
@@ -795,7 +797,7 @@ export namespace MessageV2 {
       case e instanceof Error:
         return new NamedError.Unknown({ message: e.toString() }, { cause: e }).toObject()
       default:
-        return new NamedError.Unknown({ message: JSON.stringify(e) }, { cause: e })
+        return new NamedError.Unknown({ message: JSON.stringify(e) }, { cause: e }).toObject()
     }
   }
 }

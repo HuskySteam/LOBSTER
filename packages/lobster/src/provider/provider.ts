@@ -175,13 +175,11 @@ export namespace Provider {
 
       const awsAccessKeyId = Env.get("AWS_ACCESS_KEY_ID")
 
-      // TODO: Using process.env directly because Env.set only updates a process.env shallow copy,
-      // until the scope of the Env API is clarified (test only or runtime?)
       const awsBearerToken = iife(() => {
-        const envToken = process.env.AWS_BEARER_TOKEN_BEDROCK
+        const envToken = Env.get("AWS_BEARER_TOKEN_BEDROCK")
         if (envToken) return envToken
         if (auth?.type === "api") {
-          process.env.AWS_BEARER_TOKEN_BEDROCK = auth.key
+          Env.set("AWS_BEARER_TOKEN_BEDROCK", auth.key)
           return auth.key
         }
         return undefined
@@ -360,19 +358,17 @@ export namespace Provider {
     },
     "sap-ai-core": async () => {
       const auth = await Auth.get("sap-ai-core")
-      // TODO: Using process.env directly because Env.set only updates a shallow copy (not process.env),
-      // until the scope of the Env API is clarified (test only or runtime?)
       const envServiceKey = iife(() => {
-        const envAICoreServiceKey = process.env.AICORE_SERVICE_KEY
+        const envAICoreServiceKey = Env.get("AICORE_SERVICE_KEY")
         if (envAICoreServiceKey) return envAICoreServiceKey
         if (auth?.type === "api") {
-          process.env.AICORE_SERVICE_KEY = auth.key
+          Env.set("AICORE_SERVICE_KEY", auth.key)
           return auth.key
         }
         return undefined
       })
-      const deploymentId = process.env.AICORE_DEPLOYMENT_ID
-      const resourceGroup = process.env.AICORE_RESOURCE_GROUP
+      const deploymentId = Env.get("AICORE_DEPLOYMENT_ID")
+      const resourceGroup = Env.get("AICORE_RESOURCE_GROUP")
 
       return {
         autoload: !!envServiceKey,
@@ -966,7 +962,8 @@ export namespace Provider {
           ...model.headers,
         }
 
-      const key = Bun.hash.xxHash32(JSON.stringify({ providerID: model.providerID, npm: model.api.npm, options }))
+      const { apiKey: _excludedKey, ...hashOptions } = options
+      const key = Bun.hash.xxHash32(JSON.stringify({ providerID: model.providerID, npm: model.api.npm, options: hashOptions }))
       const existing = s.sdk.get(key)
       if (existing) return existing
 
@@ -992,16 +989,19 @@ export namespace Provider {
         // Message, Reasoning, FunctionCall, LocalShellCall, CustomToolCall, WebSearchCall
         // IDs are only re-attached for Azure with store=true
         if (model.api.npm === "@ai-sdk/openai" && opts.body && opts.method === "POST") {
-          const body = JSON.parse(opts.body as string)
-          const isAzure = model.providerID.includes("azure")
-          const keepIds = isAzure && body.store === true
-          if (!keepIds && Array.isArray(body.input)) {
-            for (const item of body.input) {
-              if ("id" in item) {
-                delete item.id
+          const bodyStr = opts.body as string
+          if (bodyStr.includes('"input"')) {
+            const body = JSON.parse(bodyStr)
+            const isAzure = model.providerID.includes("azure")
+            const keepIds = isAzure && body.store === true
+            if (!keepIds && Array.isArray(body.input)) {
+              for (const item of body.input) {
+                if ("id" in item) {
+                  delete item.id
+                }
               }
+              opts.body = JSON.stringify(body)
             }
-            opts.body = JSON.stringify(body)
           }
         }
 
@@ -1023,17 +1023,35 @@ export namespace Provider {
         return loaded as SDK
       }
 
-      let installedPath: string
-      if (!model.api.npm.startsWith("file://")) {
-        installedPath = await BunProc.install(model.api.npm, "latest")
-      } else {
-        log.info("loading local provider", { pkg: model.api.npm })
-        installedPath = model.api.npm
+      // Validate npm package name: must be a valid scoped or unscoped npm package
+      const npmPkg = model.api.npm
+      const validNpmPattern = /^(@[a-z0-9-]+\/)?[a-z0-9][a-z0-9._-]*$/
+      if (npmPkg.startsWith("file://")) {
+        throw new InitError(
+          { providerID: model.providerID },
+          { cause: new Error(`file:// provider URIs are not supported: ${npmPkg}`) },
+        )
       }
+      if (!validNpmPattern.test(npmPkg)) {
+        throw new InitError(
+          { providerID: model.providerID },
+          { cause: new Error(`Invalid npm package name: ${npmPkg}`) },
+        )
+      }
+
+      log.info("installing npm provider", { providerID: model.providerID, pkg: npmPkg })
+      const installedPath = await BunProc.install(npmPkg, "latest")
 
       const mod = await import(installedPath)
 
-      const fn = mod[Object.keys(mod).find((key) => key.startsWith("create"))!]
+      const createKey = Object.keys(mod).find((key) => key.startsWith("create"))
+      if (!createKey) {
+        throw new InitError(
+          { providerID: model.providerID },
+          { cause: new Error(`No create* export found in provider package: ${npmPkg}`) },
+        )
+      }
+      const fn = mod[createKey]
       const loaded = fn({
         name: model.providerID,
         ...options,

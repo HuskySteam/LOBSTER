@@ -143,7 +143,7 @@ export namespace Storage {
 
   function validateKey(key: string[]) {
     for (const segment of key) {
-      if (segment.includes("..") || segment.includes("/") || segment.includes("\\") || segment === "") {
+      if (segment.includes("..") || segment.includes("/") || segment.includes("\\") || segment === "" || segment.includes("\0")) {
         throw new Error(`Invalid storage key segment: "${segment}"`)
       }
     }
@@ -158,7 +158,7 @@ export namespace Storage {
     for (let index = migration; index < MIGRATIONS.length; index++) {
       log.info("running migration", { index })
       const migration = MIGRATIONS[index]
-      await migration(dir).catch(() => log.error("failed to run migration", { index }))
+      await migration(dir).catch((err) => log.warn("migration failed", { index, error: err instanceof Error ? err.message : String(err) }))
       await Bun.write(path.join(dir, "migration"), (index + 1).toString())
     }
     return {

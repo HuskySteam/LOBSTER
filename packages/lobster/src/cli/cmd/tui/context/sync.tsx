@@ -28,6 +28,53 @@ import { useArgs } from "./args"
 import { batch, onMount } from "solid-js"
 import { Log } from "@/util/log"
 import type { Path } from "@lobster-ai/sdk"
+import type { Team } from "@/team/team"
+import type { TeamTask } from "@/team/task"
+
+// Typed team event interfaces
+type TeamCreatedEvent = {
+  type: "team.created"
+  properties: { info: Team.Info }
+}
+
+type TeamUpdatedEvent = {
+  type: "team.updated"
+  properties: { info: Team.Info }
+}
+
+type TeamDeletedEvent = {
+  type: "team.deleted"
+  properties: { teamName: string }
+}
+
+type TeamTaskCreatedEvent = {
+  type: "team.task.created"
+  properties: { task: TeamTask.Info }
+}
+
+type TeamTaskUpdatedEvent = {
+  type: "team.task.updated"
+  properties: { task: TeamTask.Info }
+}
+
+type TeamEvent =
+  | TeamCreatedEvent
+  | TeamUpdatedEvent
+  | TeamDeletedEvent
+  | TeamTaskCreatedEvent
+  | TeamTaskUpdatedEvent
+
+const teamEventTypes = new Set([
+  "team.created",
+  "team.updated",
+  "team.deleted",
+  "team.task.created",
+  "team.task.updated",
+])
+
+function isTeamEvent(event: { type: string; properties?: unknown }): event is TeamEvent {
+  return teamEventTypes.has(event.type)
+}
 
 export const { use: useSync, provider: SyncProvider } = createSimpleContext({
   name: "Sync",
@@ -122,6 +169,65 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     })
 
     const sdk = useSDK()
+
+    // Map from "teamName:taskId" -> index for O(1) task lookup
+    const taskIndex = new Map<string, number>()
+
+    function handleTeamEvent(event: TeamEvent) {
+      switch (event.type) {
+        case "team.created":
+        case "team.updated": {
+          setStore("teams", event.properties.info.name, reconcile(event.properties.info))
+          break
+        }
+        case "team.deleted": {
+          const { teamName } = event.properties
+          setStore(
+            "teams",
+            produce((draft) => {
+              delete draft[teamName]
+            }),
+          )
+          setStore(
+            "team_tasks",
+            produce((draft) => {
+              delete draft[teamName]
+            }),
+          )
+          // Clean up task index entries for this team
+          for (const key of taskIndex.keys()) {
+            if (key.startsWith(teamName + ":")) taskIndex.delete(key)
+          }
+          break
+        }
+        case "team.task.created":
+        case "team.task.updated": {
+          const task = event.properties.task
+          const tasks = store.team_tasks[task.teamName] ?? []
+          const key = task.teamName + ":" + task.id
+          const summary = {
+            id: task.id,
+            subject: task.subject,
+            status: task.status,
+            owner: task.owner ?? "",
+            blockedBy: task.blockedBy ?? [],
+          }
+          const cachedIndex = taskIndex.get(key)
+          const existing = cachedIndex !== undefined && cachedIndex < tasks.length && tasks[cachedIndex]?.id === task.id
+            ? cachedIndex
+            : tasks.findIndex((t) => t.id === task.id)
+          if (existing >= 0) {
+            taskIndex.set(key, existing)
+            setStore("team_tasks", task.teamName, existing, reconcile(summary))
+          } else {
+            const newIndex = tasks.length
+            taskIndex.set(key, newIndex)
+            setStore("team_tasks", task.teamName, [...tasks, summary])
+          }
+          break
+        }
+      }
+    }
 
     sdk.event.listen((e) => {
       const event = e.details
@@ -265,6 +371,11 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           const updated = store.message[event.properties.info.sessionID]
           if (updated.length > 100) {
             const oldest = updated[0]
+            Log.Default.warn("evicting oldest message from TUI buffer", {
+              sessionID: event.properties.info.sessionID,
+              evictedMessageID: oldest.id,
+              bufferSize: updated.length,
+            })
             batch(() => {
               setStore(
                 "message",
@@ -347,43 +458,9 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       }
 
       // Handle team events outside the switch since they aren't in the SDK's event type union
-      const eventType = (event as any).type as string
-      if (eventType === "team.created" || eventType === "team.updated") {
-        const info = (event as any).properties.info
-        setStore("teams", info.name, reconcile(info))
-      } else if (eventType === "team.deleted") {
-        const props = (event as any).properties
-        setStore(
-          "teams",
-          produce((draft: any) => {
-            delete draft[props.teamName]
-          }),
-        )
-        setStore(
-          "team_tasks",
-          produce((draft: any) => {
-            delete draft[props.teamName]
-          }),
-        )
-      } else if (eventType === "team.task.created" || eventType === "team.task.updated") {
-        const task = (event as any).properties.task
-        const tasks = store.team_tasks[task.teamName] ?? []
-        const existing = tasks.findIndex((t: any) => t.id === task.id)
-        const summary = {
-          id: task.id,
-          subject: task.subject,
-          status: task.status,
-          owner: task.owner ?? "",
-          blockedBy: task.blockedBy ?? [],
-        }
-        if (existing >= 0) {
-          setStore("team_tasks", task.teamName, existing, reconcile(summary))
-        } else {
-          setStore("team_tasks", task.teamName, [...tasks, summary])
-        }
+      if (isTeamEvent(event)) {
+        handleTeamEvent(event)
       }
-      // team.member.joined, team.member.status, team.task.unblocked,
-      // team.message.sent, team.message.delivered are no-ops
     })
 
     const exit = useExit()

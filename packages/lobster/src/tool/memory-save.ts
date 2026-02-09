@@ -21,6 +21,16 @@ export const MemorySaveTool = Tool.define("memorysave", {
     ).default("note"),
   }),
   async execute(params, ctx) {
+    await ctx.ask({
+      permission: "memorysave",
+      patterns: [params.category],
+      always: ["*"],
+      metadata: {
+        category: params.category,
+        tags: params.tags,
+      },
+    })
+
     const entry = await MemoryManager.save({
       content: params.content,
       tags: params.tags,

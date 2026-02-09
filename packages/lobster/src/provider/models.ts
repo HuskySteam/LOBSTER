@@ -95,7 +95,13 @@ export namespace ModelsDev {
     if (snapshot) return snapshot
     if (Flag.LOBSTER_DISABLE_MODELS_FETCH) return {}
     const json = await fetch(`${url()}/api.json`).then((x) => x.text())
-    return JSON.parse(json)
+    const parsed = JSON.parse(json)
+    // Validate top-level structure: must be an object with provider entries
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      log.error("Invalid models.dev response: expected object")
+      return {}
+    }
+    return parsed
   })
 
   export async function get() {
@@ -123,10 +129,14 @@ export namespace ModelsDev {
 }
 
 if (!Flag.LOBSTER_DISABLE_MODELS_FETCH) {
-  ModelsDev.refresh()
+  ModelsDev.refresh().catch((e) => {
+    Log.create({ service: "models.dev" }).error("Background refresh failed", { error: e })
+  })
   setInterval(
     async () => {
-      await ModelsDev.refresh()
+      await ModelsDev.refresh().catch((e) => {
+        Log.create({ service: "models.dev" }).error("Background refresh failed", { error: e })
+      })
     },
     60 * 1000 * 60,
   ).unref()

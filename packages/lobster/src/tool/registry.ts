@@ -44,11 +44,18 @@ export namespace ToolRegistry {
     const custom = [] as Tool.Info[]
     const glob = new Bun.Glob("{tool,tools}/*.{js,ts}")
 
-    const matches = await Config.directories().then((dirs) =>
-      dirs.flatMap((dir) => [...glob.scanSync({ cwd: dir, absolute: true, followSymlinks: true, dot: true })]),
-    )
+    const configDirs = await Config.directories()
+    const matches = configDirs.flatMap((dir) => [...glob.scanSync({ cwd: dir, absolute: true, followSymlinks: true, dot: true })])
     if (matches.length) await Config.waitForDependencies()
     for (const match of matches) {
+      // Validate tool file is within a config directory (project's .lobster/ or global config)
+      const resolved = path.resolve(match)
+      const isAllowed = configDirs.some((dir) => resolved.startsWith(path.resolve(dir)))
+      if (!isAllowed) {
+        log.warn("skipping tool outside config directory", { path: resolved })
+        continue
+      }
+      log.info("loading custom tool", { path: resolved })
       const namespace = path.basename(match, path.extname(match))
       const mod = await import(match)
       for (const [id, def] of Object.entries<ToolDefinition>(mod)) {

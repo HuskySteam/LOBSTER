@@ -52,7 +52,19 @@ export async function search(query: string) {
   UI.println(UI.Style.TEXT_DIM + `Found ${data.objects.length} plugin(s)` + UI.Style.TEXT_NORMAL)
 }
 
+// Valid npm package name pattern: scoped (@scope/name) or unscoped (name)
+const NPM_PACKAGE_NAME = /^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/
+
 export async function install(name: string, directory: string) {
+  if (!NPM_PACKAGE_NAME.test(name)) {
+    UI.println(
+      UI.Style.TEXT_DANGER +
+        `Invalid plugin name: "${name}". Must be a valid npm package name.` +
+        UI.Style.TEXT_NORMAL,
+    )
+    return
+  }
+
   const configPath = path.join(directory, "lobster.json")
   const configFile = Bun.file(configPath)
 

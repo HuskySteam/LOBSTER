@@ -58,6 +58,9 @@ export namespace ProviderAuth {
     }),
     async (input): Promise<Authorization | undefined> => {
       const auth = await state().then((s) => s.methods[input.providerID])
+      if (!auth || input.method < 0 || input.method >= auth.methods.length) {
+        throw new OauthMissing({ providerID: input.providerID })
+      }
       const method = auth.methods[input.method]
       if (method.type === "oauth") {
         const result = await method.authorize()

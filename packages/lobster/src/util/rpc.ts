@@ -5,7 +5,13 @@ export namespace Rpc {
 
   export function listen(rpc: Definition) {
     onmessage = async (evt) => {
-      const parsed = JSON.parse(evt.data)
+      let parsed: any
+      try {
+        parsed = JSON.parse(evt.data)
+      } catch {
+        console.error("RPC: malformed message received", evt.data)
+        return
+      }
       if (parsed.type === "rpc.request") {
         if (typeof rpc[parsed.method] !== "function") {
           console.error(`RPC method not found: ${parsed.method}`)
@@ -29,7 +35,13 @@ export namespace Rpc {
     const listeners = new Map<string, Set<(data: any) => void>>()
     let id = 0
     target.onmessage = async (evt) => {
-      const parsed = JSON.parse(evt.data)
+      let parsed: any
+      try {
+        parsed = JSON.parse(evt.data)
+      } catch {
+        console.error("RPC client: malformed message received", evt.data)
+        return
+      }
       if (parsed.type === "rpc.result") {
         const resolve = pending.get(parsed.id)
         if (resolve) {
@@ -47,10 +59,17 @@ export namespace Rpc {
       }
     }
     return {
-      call<Method extends keyof T>(method: Method, input: Parameters<T[Method]>[0]): Promise<ReturnType<T[Method]>> {
+      call<Method extends keyof T>(method: Method, input: Parameters<T[Method]>[0], timeoutMs = 30_000): Promise<ReturnType<T[Method]>> {
         const requestId = id++
-        return new Promise((resolve) => {
-          pending.set(requestId, resolve)
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            pending.delete(requestId)
+            reject(new Error(`RPC call '${String(method)}' timed out after ${timeoutMs}ms`))
+          }, timeoutMs)
+          pending.set(requestId, (result) => {
+            clearTimeout(timer)
+            resolve(result)
+          })
           target.postMessage(JSON.stringify({ type: "rpc.request", method, input, id: requestId }))
         })
       },

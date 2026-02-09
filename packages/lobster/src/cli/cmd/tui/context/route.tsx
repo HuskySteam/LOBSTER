@@ -15,18 +15,26 @@ export type SessionRoute = {
 
 export type Route = HomeRoute | SessionRoute
 
+function parseRouteEnv(raw: string): Route {
+  try {
+    const parsed = JSON.parse(raw)
+    if (typeof parsed !== "object" || parsed === null) return { type: "home" }
+    if (parsed.type === "home") return { type: "home" }
+    if (parsed.type === "session" && typeof parsed.sessionID === "string") {
+      return { type: "session", sessionID: parsed.sessionID }
+    }
+    return { type: "home" }
+  } catch {
+    return { type: "home" }
+  }
+}
+
 export const { use: useRoute, provider: RouteProvider } = createSimpleContext({
   name: "Route",
   init: () => {
     const [store, setStore] = createStore<Route>(
       process.env["LOBSTER_ROUTE"]
-        ? (() => {
-            try {
-              return JSON.parse(process.env["LOBSTER_ROUTE"])
-            } catch {
-              return { type: "home" }
-            }
-          })()
+        ? parseRouteEnv(process.env["LOBSTER_ROUTE"])
         : {
             type: "home",
           },

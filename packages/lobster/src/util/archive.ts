@@ -7,10 +7,8 @@ export namespace Archive {
       const winZipPath = path.resolve(zipPath)
       const winDestDir = path.resolve(destDir)
       // $global:ProgressPreference suppresses PowerShell's blue progress bar popup
-      // Escape single quotes in paths to prevent PowerShell injection
-      const safeZipPath = winZipPath.replace(/'/g, "''")
-      const safeDestDir = winDestDir.replace(/'/g, "''")
-      const cmd = `$global:ProgressPreference = 'SilentlyContinue'; Expand-Archive -Path '${safeZipPath}' -DestinationPath '${safeDestDir}' -Force`
+      // Use -LiteralPath to avoid PowerShell wildcard/injection issues with special characters in paths
+      const cmd = `$global:ProgressPreference = 'SilentlyContinue'; Expand-Archive -LiteralPath '${winZipPath.replace(/'/g, "''")}' -DestinationPath '${winDestDir.replace(/'/g, "''")}' -Force`
       await $`powershell -NoProfile -NonInteractive -Command ${cmd}`.quiet()
     } else {
       await $`unzip -o -q ${zipPath} -d ${destDir}`.quiet()

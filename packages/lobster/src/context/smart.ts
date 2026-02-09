@@ -83,7 +83,8 @@ export namespace SmartContext {
       score -= 1
     }
 
-    if (relative.includes("node_modules") || relative.includes("/dist/") || relative.includes("/build/")) {
+    const normalized = path.normalize(relative).toLowerCase()
+    if (normalized.includes("node_modules") || normalized.includes(`${path.sep}dist${path.sep}`) || normalized.includes(`${path.sep}build${path.sep}`)) {
       return 0
     }
 

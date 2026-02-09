@@ -80,8 +80,15 @@ export namespace Config {
     for (const [key, value] of Object.entries(auth)) {
       if (value.type === "wellknown") {
         process.env[value.key] = value.token
-        log.debug("fetching remote config", { url: `${key}/.well-known/lobster` })
-        const response = await fetch(`${key}/.well-known/lobster`)
+        const remoteUrl = `${key}/.well-known/lobster`
+        log.debug("fetching remote config", { url: remoteUrl })
+        if (!remoteUrl.startsWith("https://")) {
+          log.warn("remote config URL is not HTTPS, connection is not secure", { url: remoteUrl })
+        }
+        const response = await fetch(remoteUrl, {
+          signal: AbortSignal.timeout(5000),
+          tls: { rejectUnauthorized: true },
+        } as any)
         if (!response.ok) {
           throw new Error(`failed to fetch remote config from ${key}: ${response.status}`)
         }
@@ -1225,6 +1232,12 @@ export namespace Config {
             .boolean()
             .optional()
             .describe("Automatically find and attach relevant files based on user query"),
+          team_agent_timeout_minutes: z
+            .number()
+            .int()
+            .positive()
+            .optional()
+            .describe("Max lifetime in minutes for background team agents (default: 30)"),
         })
         .optional(),
     })
@@ -1279,6 +1292,10 @@ export namespace Config {
   async function load(text: string, configFilepath: string) {
     const original = text
     text = text.replace(/\{env:([^}]+)\}/g, (_, varName) => {
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(varName)) {
+        log.warn("invalid env var name in config, skipping", { varName })
+        return ""
+      }
       return process.env[varName] || ""
     })
 
@@ -1347,9 +1364,12 @@ export namespace Config {
     if (parsed.success) {
       if (!parsed.data.$schema) {
         parsed.data.$schema = "https://opencode.ai/config.json"
-        // Write the $schema to the original text to preserve variables like {env:VAR}
-        const updated = original.replace(/^\s*\{/, '{\n  "$schema": "https://opencode.ai/config.json",')
-        await Bun.write(configFilepath, updated).catch(() => {})
+        // Only write $schema back if the config file is in a lobster-managed directory
+        const isLobsterManaged = configFilepath.includes(".lobster") || configFilepath.includes(Global.Path.config)
+        if (isLobsterManaged) {
+          const updated = original.replace(/^\s*\{/, '{\n  "$schema": "https://opencode.ai/config.json",')
+          await Bun.write(configFilepath, updated).catch(() => {})
+        }
       }
       const data = parsed.data
       if (data.plugin) {

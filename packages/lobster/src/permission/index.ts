@@ -179,7 +179,11 @@ export namespace Permission {
       }
       const items = pending[input.sessionID]
       if (!items) return
-      for (const item of Object.values(items)) {
+      // Snapshot keys to avoid mutation during iteration
+      const pendingIds = Object.keys(items)
+      for (const id of pendingIds) {
+        const item = items[id]
+        if (!item) continue
         const itemKeys = toKeys(item.info.pattern, item.info.type)
         if (covered(itemKeys, approved[input.sessionID])) {
           respond({

@@ -2,7 +2,7 @@ import z from "zod"
 import { BusEvent } from "@/bus/bus-event"
 
 export namespace Team {
-  export const MemberStatus = z.enum(["active", "idle", "shutdown"])
+  export const MemberStatus = z.enum(["starting", "active", "idle", "shutdown"])
   export type MemberStatus = z.infer<typeof MemberStatus>
 
   export const Member = z.object({

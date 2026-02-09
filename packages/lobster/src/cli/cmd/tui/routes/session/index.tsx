@@ -201,20 +201,22 @@ export function Session() {
     }
   })
 
-  let lastSwitch: string | undefined = undefined
+  const [lastSwitch, setLastSwitch] = createSignal<string | undefined>(undefined)
+  // Reset lastSwitch when navigating to a different session
+  createEffect(on(() => route.sessionID, () => setLastSwitch(undefined)))
   sdk.event.on("message.part.updated", (evt) => {
     const part = evt.properties.part
     if (part.type !== "tool") return
     if (part.sessionID !== route.sessionID) return
     if (part.state.status !== "completed") return
-    if (part.id === lastSwitch) return
+    if (part.id === lastSwitch()) return
 
     if (part.tool === "plan_exit") {
       local.agent.set("build")
-      lastSwitch = part.id
+      setLastSwitch(part.id)
     } else if (part.tool === "plan_enter") {
       local.agent.set("plan")
-      lastSwitch = part.id
+      setLastSwitch(part.id)
     }
   })
 
@@ -551,7 +553,7 @@ export function Session() {
     {
       title: conceal() ? "Disable code concealment" : "Enable code concealment",
       value: "session.toggle.conceal",
-      keybind: "messages_toggle_conceal" as any,
+      // No keybind defined in KeybindsConfig for conceal toggle
       category: "Session",
       onSelect: (dialog) => {
         setConceal((prev) => !prev)
@@ -856,7 +858,21 @@ export function Session() {
           } else {
             const exportDir = process.cwd()
             const filename = options.filename.trim()
-            const filepath = path.join(exportDir, filename)
+
+            // Validate filename to prevent path traversal
+            if (filename.includes("..") || path.isAbsolute(filename) || filename.includes("\0")) {
+              toast.show({ message: "Invalid filename: must not contain '..' or absolute paths", variant: "error" })
+              dialog.clear()
+              return
+            }
+
+            const filepath = path.resolve(exportDir, filename)
+            // Ensure resolved path stays within the export directory
+            if (!filepath.startsWith(exportDir + path.sep) && filepath !== exportDir) {
+              toast.show({ message: "Invalid filename: path escapes working directory", variant: "error" })
+              dialog.clear()
+              return
+            }
 
             await Bun.write(filepath, transcript)
 

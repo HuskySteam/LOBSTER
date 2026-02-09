@@ -38,11 +38,13 @@ export namespace VoiceInput {
   }
 
   export async function record(options: RecordOptions): Promise<{ file: string; buffer: Buffer }> {
+    // Clamp duration to valid range [1, 120] seconds
+    const duration = Math.max(1, Math.min(120, options.duration))
     const outFile = tempFile()
-    const cmd = recordCommand(outFile, options.duration)
+    const cmd = recordCommand(outFile, duration)
     const tool = cmd[0]
 
-    log.info("recording", { cmd: cmd.join(" "), duration: options.duration })
+    log.info("recording", { cmd: cmd.join(" "), duration })
 
     // Check if the recording tool is available
     const which = Bun.which(tool)

@@ -30,6 +30,15 @@ export const BatchTool = Tool.define("batch", async () => {
       return `Invalid parameters for tool 'batch':\n${formattedErrors}\n\nExpected payload format:\n  [{"tool": "tool_name", "parameters": {...}}, {...}]`
     },
     async execute(params, ctx) {
+      await ctx.ask({
+        permission: "batch",
+        patterns: params.tool_calls.map((c) => c.tool),
+        always: ["*"],
+        metadata: {
+          tools: params.tool_calls.map((c) => c.tool),
+        },
+      })
+
       const { Session } = await import("../session")
       const { Identifier } = await import("../id/id")
 
@@ -37,7 +46,7 @@ export const BatchTool = Tool.define("batch", async () => {
       const discardedCalls = params.tool_calls.slice(25)
 
       const { ToolRegistry } = await import("./registry")
-      const availableTools = await ToolRegistry.tools({ modelID: "", providerID: "" })
+      const availableTools = await ToolRegistry.tools({ modelID: ctx.agent ?? "", providerID: "" })
       const toolMap = new Map(availableTools.map((t) => [t.id, t]))
 
       const executeCall = async (call: (typeof toolCalls)[0]) => {

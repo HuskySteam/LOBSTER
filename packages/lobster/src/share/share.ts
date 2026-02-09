@@ -69,9 +69,22 @@ export namespace Share {
     })
   }
 
-  export const URL =
-    process.env["LOBSTER_API"] ??
-    (Installation.isPreview() || Installation.isLocal() ? "https://api.dev.opencode.ai" : "https://api.opencode.ai")
+  export const URL = (() => {
+    const envUrl = process.env["LOBSTER_API"]
+    if (envUrl) {
+      try {
+        const parsed = new globalThis.URL(envUrl)
+        if (parsed.protocol !== "https:") {
+          console.warn("Share API URL must use HTTPS, falling back to default")
+        } else {
+          return envUrl.replace(/\/+$/, "")
+        }
+      } catch {
+        console.warn("Invalid Share API URL, falling back to default")
+      }
+    }
+    return Installation.isPreview() || Installation.isLocal() ? "https://api.dev.opencode.ai" : "https://api.opencode.ai"
+  })()
 
   const disabled = process.env["LOBSTER_DISABLE_SHARE"] === "true" || process.env["LOBSTER_DISABLE_SHARE"] === "1"
 

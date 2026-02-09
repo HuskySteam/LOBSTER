@@ -1,4 +1,7 @@
+import { Log } from "./log"
+
 export namespace Lock {
+  const log = Log.create({ service: "lock" })
   const locks = new Map<
     string,
     {
@@ -23,7 +26,11 @@ export namespace Lock {
 
   function process(key: string) {
     const lock = locks.get(key)
-    if (!lock || lock.writer || lock.readers > 0) return
+    if (!lock) {
+      log.debug("process called for missing lock", { key })
+      return
+    }
+    if (lock.writer || lock.readers > 0) return
 
     // Prioritize writers to prevent starvation
     if (lock.waitingWriters.length > 0) {

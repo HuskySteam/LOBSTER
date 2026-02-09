@@ -146,33 +146,33 @@ export namespace LSPClient {
       },
       notify: {
         async open(input: { path: string }) {
-          input.path = path.isAbsolute(input.path) ? input.path : path.resolve(Instance.directory, input.path)
-          const file = Bun.file(input.path)
+          const resolvedPath = path.isAbsolute(input.path) ? input.path : path.resolve(Instance.directory, input.path)
+          const file = Bun.file(resolvedPath)
           const text = await file.text()
-          const extension = path.extname(input.path)
+          const extension = path.extname(resolvedPath)
           const languageId = LANGUAGE_EXTENSIONS[extension] ?? "plaintext"
 
-          const version = files[input.path]
+          const version = files[resolvedPath]
           if (version !== undefined) {
-            log.info("workspace/didChangeWatchedFiles", input)
+            log.info("workspace/didChangeWatchedFiles", { path: resolvedPath })
             await connection.sendNotification("workspace/didChangeWatchedFiles", {
               changes: [
                 {
-                  uri: pathToFileURL(input.path).href,
+                  uri: pathToFileURL(resolvedPath).href,
                   type: 2, // Changed
                 },
               ],
             })
 
             const next = version + 1
-            files[input.path] = next
+            files[resolvedPath] = next
             log.info("textDocument/didChange", {
-              path: input.path,
+              path: resolvedPath,
               version: next,
             })
             await connection.sendNotification("textDocument/didChange", {
               textDocument: {
-                uri: pathToFileURL(input.path).href,
+                uri: pathToFileURL(resolvedPath).href,
                 version: next,
               },
               contentChanges: [{ text }],
@@ -180,27 +180,27 @@ export namespace LSPClient {
             return
           }
 
-          log.info("workspace/didChangeWatchedFiles", input)
+          log.info("workspace/didChangeWatchedFiles", { path: resolvedPath })
           await connection.sendNotification("workspace/didChangeWatchedFiles", {
             changes: [
               {
-                uri: pathToFileURL(input.path).href,
+                uri: pathToFileURL(resolvedPath).href,
                 type: 1, // Created
               },
             ],
           })
 
-          log.info("textDocument/didOpen", input)
-          diagnostics.delete(input.path)
+          log.info("textDocument/didOpen", { path: resolvedPath })
+          diagnostics.delete(resolvedPath)
           await connection.sendNotification("textDocument/didOpen", {
             textDocument: {
-              uri: pathToFileURL(input.path).href,
+              uri: pathToFileURL(resolvedPath).href,
               languageId,
               version: 0,
               text,
             },
           })
-          files[input.path] = 0
+          files[resolvedPath] = 0
           return
         },
       },
@@ -212,24 +212,22 @@ export namespace LSPClient {
           path.isAbsolute(input.path) ? input.path : path.resolve(Instance.directory, input.path),
         )
         log.info("waiting for diagnostics", { path: normalizedPath })
-        let unsub: () => void
+        let unsub: (() => void) | undefined
         let debounceTimer: ReturnType<typeof setTimeout> | undefined
-        return await withTimeout(
-          new Promise<void>((resolve) => {
-            unsub = Bus.subscribe(Event.Diagnostics, (event) => {
-              if (event.properties.path === normalizedPath && event.properties.serverID === result.serverID) {
-                // Debounce to allow LSP to send follow-up diagnostics (e.g., semantic after syntax)
-                if (debounceTimer) clearTimeout(debounceTimer)
-                debounceTimer = setTimeout(() => {
-                  log.info("got diagnostics", { path: normalizedPath })
-                  unsub?.()
-                  resolve()
-                }, DIAGNOSTICS_DEBOUNCE_MS)
-              }
-            })
-          }),
-          3000,
-        )
+        const promise = new Promise<void>((resolve) => {
+          unsub = Bus.subscribe(Event.Diagnostics, (event) => {
+            if (event.properties.path === normalizedPath && event.properties.serverID === result.serverID) {
+              // Debounce to allow LSP to send follow-up diagnostics (e.g., semantic after syntax)
+              if (debounceTimer) clearTimeout(debounceTimer)
+              debounceTimer = setTimeout(() => {
+                log.info("got diagnostics", { path: normalizedPath })
+                unsub?.()
+                resolve()
+              }, DIAGNOSTICS_DEBOUNCE_MS)
+            }
+          })
+        })
+        return await withTimeout(promise, 3000)
           .catch(() => {})
           .finally(() => {
             if (debounceTimer) clearTimeout(debounceTimer)

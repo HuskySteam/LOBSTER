@@ -1,4 +1,5 @@
 import type { Hooks, PluginInput, Plugin as PluginInstance } from "@lobster-ai/plugin"
+import path from "path"
 import { Config } from "../config/config"
 import { Bus } from "../bus"
 import { Log } from "../util/log"
@@ -14,6 +15,8 @@ import { CopilotAuthPlugin } from "./copilot"
 import { gitlabAuthPlugin as GitlabAuthPlugin } from "@gitlab/opencode-gitlab-auth"
 import { ClaudeCompat } from "./claude-compat"
 import { GitPlugin } from "./git"
+import { Global } from "@/global"
+import { Filesystem } from "@/util/filesystem"
 
 export namespace Plugin {
   const log = Log.create({ service: "plugin" })
@@ -106,12 +109,40 @@ export namespace Plugin {
 
       // Check if the resolved path is a Claude Code plugin directory
       const resolvedPath = plugin.startsWith("file://") ? new URL(plugin).pathname : plugin
+
+      // Validate file:// paths resolve within the project or global plugin directory
+      if (plugin.startsWith("file://")) {
+        const resolved = path.resolve(resolvedPath)
+        const inProject = Filesystem.contains(Instance.directory, resolved)
+        const inGlobal = Filesystem.contains(Global.Path.cache, resolved)
+        const inData = Filesystem.contains(Global.Path.data, resolved)
+        if (!inProject && !inGlobal && !inData) {
+          log.warn("file:// plugin path outside allowed directories, skipping", {
+            path: resolved,
+            project: Instance.directory,
+          })
+          continue
+        }
+      }
+
       if (await ClaudeCompat.detect(resolvedPath)) {
         const init = await ClaudeCompat.load(resolvedPath, input)
         hooks.push(init)
         continue
       }
 
+      // Validate plugin paths are within expected directories before dynamic import
+      const importPath = path.resolve(plugin)
+      const inCache = Filesystem.contains(Global.Path.cache, importPath)
+      const inProject = Filesystem.contains(Instance.directory, importPath)
+      const inData = Filesystem.contains(Global.Path.data, importPath)
+      if (!inCache && !inProject && !inData) {
+        log.warn("plugin path outside allowed directories, skipping dynamic import", {
+          path: importPath,
+        })
+        continue
+      }
+      log.warn("loading plugin via dynamic import", { path: plugin })
       const mod = await import(plugin)
       // Prevent duplicate initialization when plugins export the same function
       // as both a named export and default export (e.g., `export const X` and `export default X`).

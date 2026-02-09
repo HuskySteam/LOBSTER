@@ -94,9 +94,8 @@ export namespace Log {
       : result
   }
 
-  let last = Date.now()
   export function create(tags?: Record<string, any>) {
-    tags = tags || {}
+    tags = tags ? { ...tags } : {}
 
     const service = tags["service"]
     if (service && typeof service === "string") {
@@ -106,6 +105,7 @@ export namespace Log {
       }
     }
 
+    let last = Date.now()
     function build(message: any, extra?: Record<string, any>) {
       const prefix = Object.entries({
         ...tags,
@@ -146,7 +146,7 @@ export namespace Log {
         }
       },
       tag(key: string, value: string) {
-        if (tags) tags[key] = value
+        tags = { ...tags, [key]: value }
         return result
       },
       clone() {

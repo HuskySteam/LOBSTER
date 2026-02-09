@@ -5,7 +5,9 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
 export function csrf(): MiddlewareHandler {
   return async (c, next) => {
     if (SAFE_METHODS.has(c.req.method)) return next()
-    if (c.req.path.startsWith("/auth/")) return next()
+    // Only exempt specific OAuth callback endpoints from CSRF, not all auth routes
+    if (c.req.path.match(/^\/provider\/[^/]+\/oauth\/callback$/) || c.req.path.match(/^\/mcp\/[^/]+\/auth\/callback$/))
+      return next()
 
     const hasCSRFHeader = c.req.header("x-lobster-csrf") === "1"
     const hasXHRHeader = c.req.header("x-requested-with") === "XMLHttpRequest"

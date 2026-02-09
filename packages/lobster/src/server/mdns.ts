@@ -1,5 +1,6 @@
 import { Log } from "@/util/log"
 import { Bonjour } from "bonjour-service"
+import { randomBytes } from "crypto"
 
 const log = Log.create({ service: "mdns" })
 
@@ -12,8 +13,9 @@ export namespace MDNS {
     if (bonjour) unpublish()
 
     try {
-      const host = domain ?? "lobster.local"
-      const name = `lobster-${port}`
+      const suffix = randomBytes(4).toString("hex")
+      const host = domain ?? `lobster-${suffix}.local`
+      const name = `lobster-${port}-${suffix}`
       bonjour = new Bonjour()
       const service = bonjour.publish({
         name,

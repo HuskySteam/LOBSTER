@@ -28,6 +28,11 @@ export namespace McpAuth {
   })
   export type Entry = z.infer<typeof Entry>
 
+  // Security model: credentials are stored as JSON on disk with file permissions
+  // restricted to the current user (mode 0o600). This relies on OS-level file
+  // access control. OS keychain integration (e.g. macOS Keychain, Windows
+  // Credential Manager) could be added as a future improvement for stronger
+  // at-rest protection.
   const filepath = path.join(Global.Path.data, "mcp-auth.json")
 
   export async function get(mcpName: string): Promise<Entry | undefined> {

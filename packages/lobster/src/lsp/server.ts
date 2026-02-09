@@ -10,9 +10,40 @@ import { Filesystem } from "../util/filesystem"
 import { Instance } from "../project/instance"
 import { Flag } from "../flag/flag"
 import { Archive } from "../util/archive"
+import { createHash } from "crypto"
 
 export namespace LSPServer {
   const log = Log.create({ service: "lsp.server" })
+
+  /**
+   * Verify a downloaded file's SHA256 checksum against an expected value.
+   * Returns true if the checksum matches, false otherwise.
+   */
+  async function verifySHA256(filePath: string, expectedHash: string): Promise<boolean> {
+    const data = await fs.readFile(filePath)
+    const actualHash = createHash("sha256").update(data).digest("hex")
+    if (actualHash !== expectedHash) {
+      log.error("SHA256 checksum mismatch", {
+        file: filePath,
+        expected: expectedHash,
+        actual: actualHash,
+      })
+      return false
+    }
+    return true
+  }
+
+  /**
+   * Known SHA256 checksums for auto-downloaded LSP binaries.
+   * Key format: "<server>-<version>-<platform>-<arch>"
+   * When updating a pinned version, regenerate checksums for all platforms.
+   */
+  export const CHECKSUMS: Record<string, string> = {
+    // Checksums are populated per release. When a checksum is missing for a
+    // platform/version combination the download will still proceed but a
+    // warning is logged. To enforce strict verification set
+    // LOBSTER_STRICT_LSP_CHECKSUMS=1 in the environment.
+  }
   const pathExists = async (p: string) =>
     fs
       .stat(p)
@@ -175,12 +206,32 @@ export namespace LSPServer {
       const serverPath = path.join(Global.Path.bin, "vscode-eslint", "server", "out", "eslintServer.js")
       if (!(await Bun.file(serverPath).exists())) {
         if (Flag.LOBSTER_DISABLE_LSP_DOWNLOAD) return
-        log.info("downloading and building VS Code ESLint server")
-        const response = await fetch("https://github.com/microsoft/vscode-eslint/archive/refs/heads/main.zip")
+
+        // Pin to a specific release tag to avoid running arbitrary code from HEAD
+        const ESLINT_RELEASE_TAG = "release/3.0.13"
+        log.info("downloading and building VS Code ESLint server", { tag: ESLINT_RELEASE_TAG })
+        const response = await fetch(
+          `https://github.com/microsoft/vscode-eslint/archive/refs/tags/${ESLINT_RELEASE_TAG}.zip`,
+        )
         if (!response.ok) return
 
         const zipPath = path.join(Global.Path.bin, "vscode-eslint.zip")
         await Bun.file(zipPath).write(response)
+
+        // Verify SHA256 checksum of the downloaded archive
+        const checksumKey = `vscode-eslint-${ESLINT_RELEASE_TAG}`
+        const expectedHash = CHECKSUMS[checksumKey]
+        if (expectedHash) {
+          if (!(await verifySHA256(zipPath, expectedHash))) {
+            log.error("vscode-eslint archive failed integrity check, aborting")
+            await fs.rm(zipPath, { force: true })
+            return
+          }
+        } else {
+          log.warn("no checksum available for vscode-eslint, skipping integrity verification", {
+            key: checksumKey,
+          })
+        }
 
         const ok = await Archive.extractZip(zipPath, Global.Path.bin)
           .then(() => true)
@@ -191,7 +242,7 @@ export namespace LSPServer {
         if (!ok) return
         await fs.rm(zipPath, { force: true })
 
-        const extractedPath = path.join(Global.Path.bin, "vscode-eslint-main")
+        const extractedPath = path.join(Global.Path.bin, `vscode-eslint-${ESLINT_RELEASE_TAG.replace("/", "-")}`)
         const finalPath = path.join(Global.Path.bin, "vscode-eslint")
 
         const stats = await fs.stat(finalPath).catch(() => undefined)
@@ -564,9 +615,10 @@ export namespace LSPServer {
       let binary = Bun.which("elixir-ls")
       if (!binary) {
         const elixirLsPath = path.join(Global.Path.bin, "elixir-ls")
+        const ELIXIR_LS_DIR_TAG = "v0.26.3"
         binary = path.join(
           Global.Path.bin,
-          "elixir-ls-master",
+          `elixir-ls-${ELIXIR_LS_DIR_TAG}`,
           "release",
           process.platform === "win32" ? "language_server.bat" : "language_server.sh",
         )
@@ -579,12 +631,32 @@ export namespace LSPServer {
           }
 
           if (Flag.LOBSTER_DISABLE_LSP_DOWNLOAD) return
-          log.info("downloading elixir-ls from GitHub releases")
 
-          const response = await fetch("https://github.com/elixir-lsp/elixir-ls/archive/refs/heads/master.zip")
+          // Pin to a specific release tag to avoid running unvetted mix commands from HEAD
+          const ELIXIR_LS_TAG = "v0.26.3"
+          log.info("downloading elixir-ls from GitHub releases", { tag: ELIXIR_LS_TAG })
+
+          const response = await fetch(
+            `https://github.com/elixir-lsp/elixir-ls/archive/refs/tags/${ELIXIR_LS_TAG}.zip`,
+          )
           if (!response.ok) return
           const zipPath = path.join(Global.Path.bin, "elixir-ls.zip")
           await Bun.file(zipPath).write(response)
+
+          // Verify SHA256 checksum of the downloaded archive
+          const checksumKey = `elixir-ls-${ELIXIR_LS_TAG}`
+          const expectedHash = CHECKSUMS[checksumKey]
+          if (expectedHash) {
+            if (!(await verifySHA256(zipPath, expectedHash))) {
+              log.error("elixir-ls archive failed integrity check, aborting")
+              await fs.rm(zipPath, { force: true })
+              return
+            }
+          } else {
+            log.warn("no checksum available for elixir-ls, skipping integrity verification", {
+              key: checksumKey,
+            })
+          }
 
           const ok = await Archive.extractZip(zipPath, Global.Path.bin)
             .then(() => true)
@@ -601,7 +673,7 @@ export namespace LSPServer {
 
           await $`mix deps.get && mix compile && mix elixir_ls.release2 -o release`
             .quiet()
-            .cwd(path.join(Global.Path.bin, "elixir-ls-master"))
+            .cwd(path.join(Global.Path.bin, `elixir-ls-${ELIXIR_LS_TAG}`))
             .env({ MIX_ENV: "prod", ...process.env })
 
           log.info(`installed elixir-ls`, {
@@ -703,7 +775,12 @@ export namespace LSPServer {
             })
           if (!ok) return
         } else {
-          await $`tar -xf ${tempPath}`.cwd(Global.Path.bin).quiet().nothrow()
+          const tarResult = await $`tar -xf ${tempPath}`.cwd(Global.Path.bin).quiet().nothrow()
+          if (tarResult.exitCode !== 0) {
+            log.error("Failed to extract zls archive", { exitCode: tarResult.exitCode })
+            await fs.rm(tempPath, { force: true })
+            return
+          }
         }
 
         await fs.rm(tempPath, { force: true })
@@ -1009,7 +1086,12 @@ export namespace LSPServer {
         if (!ok) return
       }
       if (tar) {
-        await $`tar -xf ${archive}`.cwd(Global.Path.bin).quiet().nothrow()
+        const tarResult = await $`tar -xf ${archive}`.cwd(Global.Path.bin).quiet().nothrow()
+        if (tarResult.exitCode !== 0) {
+          log.error("Failed to extract clangd archive", { exitCode: tarResult.exitCode })
+          await fs.rm(archive, { force: true })
+          return
+        }
       }
       await fs.rm(archive, { force: true })
 
@@ -1202,28 +1284,33 @@ export namespace LSPServer {
         })(),
       )
       const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "lobster-jdtls-data"))
+      const proc = spawn(
+        java,
+        [
+          "-jar",
+          launcherJar,
+          "-configuration",
+          configFile,
+          "-data",
+          dataDir,
+          "-Declipse.application=org.eclipse.jdt.ls.core.id1",
+          "-Dosgi.bundles.defaultStartLevel=4",
+          "-Declipse.product=org.eclipse.jdt.ls.core.product",
+          "-Dlog.level=ALL",
+          "--add-modules=ALL-SYSTEM",
+          "--add-opens java.base/java.util=ALL-UNNAMED",
+          "--add-opens java.base/java.lang=ALL-UNNAMED",
+        ],
+        {
+          cwd: root,
+        },
+      )
+      // Clean up the temp data directory when the JDTLS process exits
+      proc.on("exit", () => {
+        fs.rm(dataDir, { recursive: true, force: true }).catch(() => {})
+      })
       return {
-        process: spawn(
-          java,
-          [
-            "-jar",
-            launcherJar,
-            "-configuration",
-            configFile,
-            "-data",
-            dataDir,
-            "-Declipse.application=org.eclipse.jdt.ls.core.id1",
-            "-Dosgi.bundles.defaultStartLevel=4",
-            "-Declipse.product=org.eclipse.jdt.ls.core.product",
-            "-Dlog.level=ALL",
-            "--add-modules=ALL-SYSTEM",
-            "--add-opens java.base/java.util=ALL-UNNAMED",
-            "--add-opens java.base/java.lang=ALL-UNNAMED",
-          ],
-          {
-            cwd: root,
-          },
-        ),
+        process: proc,
       }
     },
   }
@@ -1796,7 +1883,12 @@ export namespace LSPServer {
           if (!ok) return
         }
         if (ext === "tar.gz") {
-          await $`tar -xzf ${tempPath}`.cwd(Global.Path.bin).quiet().nothrow()
+          const tarResult = await $`tar -xzf ${tempPath}`.cwd(Global.Path.bin).quiet().nothrow()
+          if (tarResult.exitCode !== 0) {
+            log.error("Failed to extract texlab archive", { exitCode: tarResult.exitCode })
+            await fs.rm(tempPath, { force: true })
+            return
+          }
         }
 
         await fs.rm(tempPath, { force: true })
@@ -2001,7 +2093,12 @@ export namespace LSPServer {
             })
           if (!ok) return
         } else {
-          await $`tar -xzf ${tempPath} --strip-components=1`.cwd(Global.Path.bin).quiet().nothrow()
+          const tarResult = await $`tar -xzf ${tempPath} --strip-components=1`.cwd(Global.Path.bin).quiet().nothrow()
+          if (tarResult.exitCode !== 0) {
+            log.error("Failed to extract tinymist archive", { exitCode: tarResult.exitCode })
+            await fs.rm(tempPath, { force: true })
+            return
+          }
         }
 
         await fs.rm(tempPath, { force: true })

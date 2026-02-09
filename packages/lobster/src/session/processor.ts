@@ -47,7 +47,13 @@ export namespace SessionProcessor {
         log.info("process")
         needsCompaction = false
         const shouldBreak = (await Config.get()).experimental?.continue_loop_on_deny !== true
-        while (true) {
+        const MAX_ITERATIONS = 1000
+        let iteration = 0
+        while (iteration++ < MAX_ITERATIONS) {
+          if (iteration === MAX_ITERATIONS) {
+            log.warn("process loop hit MAX_ITERATIONS guard", { iterations: MAX_ITERATIONS })
+            break
+          }
           try {
             let currentText: MessageV2.TextPart | undefined
             let reasoningMap: Record<string, MessageV2.ReasoningPart> = {}
@@ -325,7 +331,7 @@ export namespace SessionProcessor {
                     )
                     currentText.text = textOutput.text
                     currentText.time = {
-                      start: Date.now(),
+                      start: currentText.time?.start ?? Date.now(),
                       end: Date.now(),
                     }
                     if (value.providerMetadata) currentText.metadata = value.providerMetadata

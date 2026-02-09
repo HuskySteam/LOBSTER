@@ -178,6 +178,7 @@ export namespace Session {
       const idMap = new Map<string, string>()
 
       for (const msg of msgs) {
+        // Message IDs are ULIDs (lexicographically sortable), so string comparison is correct
         if (input.messageID && msg.info.id >= input.messageID) break
         const newID = Identifier.ascending("message")
         idMap.set(msg.info.id, newID)

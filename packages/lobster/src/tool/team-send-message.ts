@@ -221,6 +221,15 @@ export const TeamSendMessageTool = Tool.define("sendmessage", {
           metadata: { messageId: id, approve: params.approve } as Record<string, any>,
         }
       }
+
+      default: {
+        const _exhaustive: never = params.type
+        return {
+          title: "Unknown message type",
+          output: `Error: Unknown message type "${params.type}".`,
+          metadata: {} as Record<string, any>,
+        }
+      }
     }
   },
 })

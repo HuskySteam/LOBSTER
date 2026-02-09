@@ -3,6 +3,12 @@ function truthy(key: string) {
   return value === "true" || value === "1"
 }
 
+/**
+ * Feature flags are evaluated at import time (module load) unless marked with
+ * `declare` and backed by a dynamic `Object.defineProperty` getter below.
+ * If you need runtime re-evaluation of a flag, add a dynamic getter like
+ * LOBSTER_DISABLE_PROJECT_CONFIG, LOBSTER_CONFIG_DIR, or LOBSTER_CLIENT.
+ */
 export namespace Flag {
   export const LOBSTER_AUTO_SHARE = truthy("LOBSTER_AUTO_SHARE")
   export const LOBSTER_GIT_BASH_PATH = process.env["LOBSTER_GIT_BASH_PATH"]

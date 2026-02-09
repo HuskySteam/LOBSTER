@@ -21,6 +21,20 @@ export const { use: useKV, provider: KVProvider } = createSimpleContext({
         setReady(true)
       })
 
+    let flushTimer: ReturnType<typeof setTimeout> | undefined
+    let dirty = false
+
+    function scheduleFlush() {
+      dirty = true
+      if (flushTimer !== undefined) return
+      flushTimer = setTimeout(() => {
+        flushTimer = undefined
+        if (!dirty) return
+        dirty = false
+        Bun.write(file, JSON.stringify(store, null, 2)).catch(() => {})
+      }, 500)
+    }
+
     const result = {
       get ready() {
         return ready()
@@ -44,7 +58,7 @@ export const { use: useKV, provider: KVProvider } = createSimpleContext({
       },
       set(key: string, value: any) {
         setStore(key, value)
-        Bun.write(file, JSON.stringify(store, null, 2)).catch(() => {})
+        scheduleFlush()
       },
     }
     return result

@@ -75,6 +75,9 @@ export namespace FileWatcher {
       const subs: ParcelWatcher.AsyncSubscription[] = []
       const cfgIgnores = cfg.watcher?.ignore ?? []
 
+      // Experimental: watches the full Instance.directory tree instead of only
+      // the VCS (.git) directory. Enabled via LOBSTER_EXPERIMENTAL_FILEWATCHER flag.
+      // This may have higher resource usage on large repositories.
       if (Flag.LOBSTER_EXPERIMENTAL_FILEWATCHER) {
         const pending = w.subscribe(Instance.directory, subscribe, {
           ignore: [...FileIgnore.PATTERNS, ...cfgIgnores],

@@ -118,8 +118,14 @@ export namespace TeamManager {
       },
     ).catch(async () => {
       // Counter may not exist yet if team creation was interrupted; initialize and retry
-      await Storage.write(["team_counter", teamName], { next: 2 })
-      return { next: 2 }
+      await Storage.write(["team_counter", teamName], { next: 1 })
+      // Re-run the atomic update to avoid race with concurrent callers
+      return Storage.update<{ next: number }>(
+        ["team_counter", teamName],
+        (draft) => {
+          draft.next++
+        },
+      )
     })
     return String(counter.next - 1)
   }
@@ -199,7 +205,8 @@ export namespace TeamManager {
       addBlockedBy?: string[]
     },
   ): Promise<TeamTask.Info> {
-    // Circular dependency detection
+    // Perform cycle detection AND task update atomically inside Storage.update
+    // to avoid TOCTOU race between detectCycle check and the mutation
     if (updates.addBlocks) {
       for (const targetId of updates.addBlocks) {
         if (await detectCycle(teamName, taskId, targetId)) {
@@ -218,6 +225,22 @@ export namespace TeamManager {
     const task = await Storage.update<TeamTask.Info>(
       ["team_task", teamName, taskId],
       (draft) => {
+        // Re-validate cycle detection atomically within the lock:
+        // If dependencies were added concurrently, the blocks/blockedBy arrays
+        // in draft will reflect the latest state. Check for direct self-cycles.
+        if (updates.addBlocks) {
+          for (const id of updates.addBlocks) {
+            if (id === taskId) throw new Error(`Circular dependency detected: task ${taskId} cannot block itself`)
+            if (draft.blockedBy.includes(id)) throw new Error(`Circular dependency detected: task ${taskId} cannot block task ${id} which already blocks it`)
+          }
+        }
+        if (updates.addBlockedBy) {
+          for (const id of updates.addBlockedBy) {
+            if (id === taskId) throw new Error(`Circular dependency detected: task ${taskId} cannot be blocked by itself`)
+            if (draft.blocks.includes(id)) throw new Error(`Circular dependency detected: task ${taskId} cannot be blocked by task ${id} which it already blocks`)
+          }
+        }
+
         if (updates.status) draft.status = updates.status
         if (updates.owner !== undefined) draft.owner = updates.owner
         if (updates.subject) draft.subject = updates.subject
@@ -278,23 +301,28 @@ export namespace TeamManager {
   }
 
   async function unblockDependents(teamName: string, completedTaskId: string) {
-    const allKeys = await Storage.list(["team_task", teamName])
-    for (const key of allKeys) {
-      const id = key[key.length - 1]
-      const task = await Storage.read<TeamTask.Info>(key).catch(() => undefined)
-      if (!task) continue
-      if (!task.blockedBy.includes(completedTaskId)) continue
+    // Use the completed task's `blocks` array to only check dependent tasks
+    // instead of scanning all tasks in the team
+    const completedTask = await Storage.read<TeamTask.Info>(
+      ["team_task", teamName, completedTaskId],
+    ).catch(() => undefined)
+    if (!completedTask) return
 
-      const updated = await Storage.update<TeamTask.Info>(key, (draft) => {
-        draft.blockedBy = draft.blockedBy.filter((b) => b !== completedTaskId)
-        draft.time.updated = Date.now()
-      })
+    for (const dependentId of completedTask.blocks) {
+      const updated = await Storage.update<TeamTask.Info>(
+        ["team_task", teamName, dependentId],
+        (draft) => {
+          draft.blockedBy = draft.blockedBy.filter((b) => b !== completedTaskId)
+          draft.time.updated = Date.now()
+        },
+      ).catch(() => undefined)
+      if (!updated) continue
 
       Bus.publish(TeamTask.Event.Updated, { task: updated })
       if (updated.blockedBy.length === 0) {
         Bus.publish(TeamTask.Event.Unblocked, {
           teamName,
-          taskId: id,
+          taskId: dependentId,
           unblockedBy: completedTaskId,
         })
       }
@@ -340,6 +368,13 @@ export namespace TeamManager {
         ["team_inbox", message.teamName, message.recipient, message.id],
         message,
       )
+      // Index shutdown requests by requestId for fast response routing
+      if (message.type === "shutdown_request") {
+        await Storage.write(
+          ["team_shutdown_req", message.teamName, message.requestId],
+          { sender: message.sender, requestId: message.requestId },
+        )
+      }
     } else if (message.type === "broadcast") {
       const members = await getMembers(message.teamName)
       for (const member of members) {
@@ -350,19 +385,13 @@ export namespace TeamManager {
         )
       }
     } else if (message.type === "shutdown_response") {
-      // Route shutdown response back: find the original request to determine recipient
-      const keys = await Storage.list(["team_msglog", message.teamName])
+      // Route shutdown response back: look up the original request sender directly
       let recipientName: string | undefined
-      for (const key of keys) {
-        const msg = await Storage.read<TeamMessage.Info>(key).catch(() => undefined)
-        if (
-          msg &&
-          msg.type === "shutdown_request" &&
-          msg.requestId === message.requestId
-        ) {
-          recipientName = msg.sender
-          break
-        }
+      const reqIndex = await Storage.read<{ sender: string; requestId: string }>(
+        ["team_shutdown_req", message.teamName, message.requestId],
+      ).catch(() => undefined)
+      if (reqIndex) {
+        recipientName = reqIndex.sender
       }
       if (!recipientName) {
         // Fallback: route to team lead

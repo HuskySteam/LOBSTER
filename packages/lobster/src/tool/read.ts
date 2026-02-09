@@ -13,6 +13,7 @@ import { InstructionPrompt } from "../session/instruction"
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
 const MAX_BYTES = 50 * 1024
+const MAX_BINARY_BYTES = 20 * 1024 * 1024 // 20MB
 
 export const ReadTool = Tool.define("read", {
   description: DESCRIPTION,
@@ -44,17 +45,21 @@ export const ReadTool = Tool.define("read", {
       const dir = path.dirname(filepath)
       const base = path.basename(filepath)
 
-      const dirEntries = await readdir(dir)
-      const suggestions = dirEntries
-        .filter(
-          (entry) =>
-            entry.toLowerCase().includes(base.toLowerCase()) || base.toLowerCase().includes(entry.toLowerCase()),
-        )
-        .map((entry) => path.join(dir, entry))
-        .slice(0, 3)
+      // Only suggest files if the directory is within the project root
+      const isInsideProject = path.resolve(dir).startsWith(path.resolve(Instance.worktree))
+      if (isInsideProject) {
+        const dirEntries = await readdir(dir).catch(() => [] as string[])
+        const suggestions = dirEntries
+          .filter(
+            (entry) =>
+              entry.toLowerCase().includes(base.toLowerCase()) || base.toLowerCase().includes(entry.toLowerCase()),
+          )
+          .map((entry) => path.join(dir, entry))
+          .slice(0, 3)
 
-      if (suggestions.length > 0) {
-        throw new Error(`File not found: ${filepath}\n\nDid you mean one of these?\n${suggestions.join("\n")}`)
+        if (suggestions.length > 0) {
+          throw new Error(`File not found: ${filepath}\n\nDid you mean one of these?\n${suggestions.join("\n")}`)
+        }
       }
 
       throw new Error(`File not found: ${filepath}`)
@@ -67,6 +72,10 @@ export const ReadTool = Tool.define("read", {
       file.type.startsWith("image/") && file.type !== "image/svg+xml" && file.type !== "image/vnd.fastbidsheet"
     const isPdf = file.type === "application/pdf"
     if (isImage || isPdf) {
+      const stat = await file.stat()
+      if (stat.size > MAX_BINARY_BYTES) {
+        throw new Error(`File too large for binary read (${Math.round(stat.size / 1024 / 1024)}MB exceeds ${MAX_BINARY_BYTES / 1024 / 1024}MB limit): ${filepath}`)
+      }
       const mime = file.type
       const msg = `${isImage ? "Image" : "PDF"} read successfully`
       return {

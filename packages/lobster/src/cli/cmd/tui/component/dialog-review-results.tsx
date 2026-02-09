@@ -51,15 +51,23 @@ export function DialogReviewResults() {
     return map[severity]
   }
 
+  // Keyboard shortcuts:
+  //   up/k     - Move selection up
+  //   down/j   - Move selection down
+  //   return   - Toggle expand/collapse details
+  //   a        - Accept selected finding (only when expanded)
+  //   r        - Reject selected finding (only when expanded)
+  //   s        - Skip selected finding (only when expanded)
+  //   escape   - Close dialog (handled by dialog system)
   useKeyboard((evt) => {
     const items = sortedFindings()
     if (items.length === 0) return
 
-    if (evt.name === "up" || evt.name === "k") {
+    if (evt.name === "up" || (evt.name === "k" && !evt.ctrl && !evt.meta && !evt.shift)) {
       evt.preventDefault()
       setSelectedIndex((i) => Math.max(0, i - 1))
     }
-    if (evt.name === "down" || evt.name === "j") {
+    if (evt.name === "down" || (evt.name === "j" && !evt.ctrl && !evt.meta && !evt.shift)) {
       evt.preventDefault()
       setSelectedIndex((i) => Math.min(items.length - 1, i + 1))
     }
@@ -67,20 +75,23 @@ export function DialogReviewResults() {
       evt.preventDefault()
       setExpandedIndex((prev) => (prev === selectedIndex() ? null : selectedIndex()))
     }
-    if (evt.name === "a" && !evt.ctrl && !evt.meta) {
-      evt.preventDefault()
-      const finding = items[selectedIndex()]
-      if (finding) lobster.updateFinding(finding.id, "accepted")
-    }
-    if (evt.name === "r" && !evt.ctrl && !evt.meta) {
-      evt.preventDefault()
-      const finding = items[selectedIndex()]
-      if (finding) lobster.updateFinding(finding.id, "rejected")
-    }
-    if (evt.name === "s" && !evt.ctrl && !evt.meta) {
-      evt.preventDefault()
-      const finding = items[selectedIndex()]
-      if (finding) lobster.updateFinding(finding.id, "skipped")
+    // Accept/reject/skip only when expanded to prevent accidental action
+    if (expandedIndex() === selectedIndex() && expandedIndex() !== null) {
+      if (evt.name === "a" && !evt.ctrl && !evt.meta && !evt.shift) {
+        evt.preventDefault()
+        const finding = items[selectedIndex()]
+        if (finding) lobster.updateFinding(finding.id, "accepted")
+      }
+      if (evt.name === "r" && !evt.ctrl && !evt.meta && !evt.shift) {
+        evt.preventDefault()
+        const finding = items[selectedIndex()]
+        if (finding) lobster.updateFinding(finding.id, "rejected")
+      }
+      if (evt.name === "s" && !evt.ctrl && !evt.meta && !evt.shift) {
+        evt.preventDefault()
+        const finding = items[selectedIndex()]
+        if (finding) lobster.updateFinding(finding.id, "skipped")
+      }
     }
   })
 

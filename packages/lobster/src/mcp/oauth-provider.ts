@@ -31,6 +31,9 @@ export class McpOAuthProvider implements OAuthClientProvider {
     private callbacks: McpOAuthCallbacks,
   ) {}
 
+  // HTTP is acceptable here because the redirect target is 127.0.0.1 (loopback).
+  // Traffic never leaves the local machine, so TLS is not required. OAuth 2.0
+  // RFC 8252 Section 7.3 explicitly permits HTTP for loopback redirect URIs.
   get redirectUrl(): string {
     return `http://127.0.0.1:${OAUTH_CALLBACK_PORT}${OAUTH_CALLBACK_PATH}`
   }

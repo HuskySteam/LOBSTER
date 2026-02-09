@@ -1,3 +1,5 @@
+const MAX_PENDING_RESOLVERS = 10_000
+
 export class AsyncQueue<T> implements AsyncIterable<T> {
   private queue: T[] = []
   private resolvers: ((value: T) => void)[] = []
@@ -10,6 +12,9 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
 
   async next(): Promise<T> {
     if (this.queue.length > 0) return this.queue.shift()!
+    if (this.resolvers.length >= MAX_PENDING_RESOLVERS) {
+      console.warn(`AsyncQueue: pending resolvers reached limit (${MAX_PENDING_RESOLVERS})`)
+    }
     return new Promise((resolve) => this.resolvers.push(resolve))
   }
 
@@ -23,7 +28,7 @@ export async function work<T>(concurrency: number, items: T[], fn: (item: T) => 
   await Promise.all(
     Array.from({ length: concurrency }, async () => {
       while (true) {
-        const item = pending.pop()
+        const item = pending.shift()
         if (item === undefined) return
         await fn(item)
       }

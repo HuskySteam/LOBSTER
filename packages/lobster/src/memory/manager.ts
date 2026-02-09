@@ -53,6 +53,8 @@ export namespace MemoryManager {
     log.info("memory deleted", { id })
   }
 
+  // NOTE: This is an O(n*m) linear scan where n=entries and m=keywords.
+  // For large memory stores, consider adding a TF-IDF or keyword index.
   export async function relevant(context: string): Promise<Memory.Entry[]> {
     const all = await listAll()
     if (!all.length) return []
@@ -75,11 +77,11 @@ export namespace MemoryManager {
 
   async function listAll(): Promise<Memory.Entry[]> {
     const keys = await Storage.list(["memory"])
-    const entries: Memory.Entry[] = []
-    for (const key of keys) {
-      const entry = await Storage.read<Memory.Entry>(key).catch(() => undefined)
-      if (entry) entries.push(entry)
-    }
-    return entries.sort((a, b) => b.time.created - a.time.created)
+    const results = await Promise.all(
+      keys.map((key) => Storage.read<Memory.Entry>(key).catch(() => undefined)),
+    )
+    return results
+      .filter((entry): entry is Memory.Entry => entry !== undefined)
+      .sort((a, b) => b.time.created - a.time.created)
   }
 }

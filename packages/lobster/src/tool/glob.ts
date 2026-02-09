@@ -33,27 +33,28 @@ export const GlobTool = Tool.define("glob", {
     await assertExternalDirectory(ctx, search, { kind: "directory" })
 
     const limit = 100
-    const files = []
+    const filePaths: string[] = []
     let truncated = false
     for await (const file of Ripgrep.files({
       cwd: search,
       glob: [params.pattern],
       signal: ctx.abort,
     })) {
-      if (files.length >= limit) {
+      if (filePaths.length >= limit) {
         truncated = true
         break
       }
-      const full = path.resolve(search, file)
-      const stats = await Bun.file(full)
-        .stat()
-        .then((x) => x.mtime.getTime())
-        .catch(() => 0)
-      files.push({
-        path: full,
-        mtime: stats,
-      })
+      filePaths.push(path.resolve(search, file))
     }
+    const files = await Promise.all(
+      filePaths.map(async (full) => ({
+        path: full,
+        mtime: await Bun.file(full)
+          .stat()
+          .then((x) => x.mtime.getTime())
+          .catch(() => 0),
+      })),
+    )
     files.sort((a, b) => b.mtime - a.mtime)
 
     const output = []

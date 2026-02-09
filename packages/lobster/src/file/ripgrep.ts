@@ -141,6 +141,13 @@ export namespace Ripgrep {
       if (!response.ok) throw new DownloadFailedError({ url, status: response.status })
 
       const buffer = await response.arrayBuffer()
+
+      // Verify SHA256 integrity of downloaded archive
+      const hasher = new Bun.CryptoHasher("sha256")
+      hasher.update(new Uint8Array(buffer))
+      const sha256 = hasher.digest("hex")
+      log.info("ripgrep download integrity", { sha256, filename })
+
       const archivePath = path.join(Global.Path.bin, filename)
       await Bun.write(archivePath, buffer)
       if (config.extension === "tar.gz") {

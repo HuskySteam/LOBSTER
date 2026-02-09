@@ -8,7 +8,6 @@ import { Instance } from "../project/instance"
 import { lazy } from "@/util/lazy"
 import { Language } from "web-tree-sitter"
 
-import { $ } from "bun"
 import { Filesystem } from "@/util/filesystem"
 import { fileURLToPath } from "url"
 import { Flag } from "@/flag/flag.ts"
@@ -19,7 +18,7 @@ import { Truncate } from "./truncation"
 import { Plugin } from "@/plugin"
 
 const MAX_METADATA_LENGTH = 30_000
-const DEFAULT_TIMEOUT = Flag.LOBSTER_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 * 60 * 1000
+const DEFAULT_TIMEOUT = Flag.LOBSTER_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS ?? 2 * 60 * 1000
 
 export const log = Log.create({ service: "bash-tool" })
 
@@ -249,12 +248,9 @@ export const BashTool = Tool.define("bash", async () => {
         if (["cd", "rm", "cp", "mv", "mkdir", "touch", "chmod", "chown", "cat"].includes(command[0])) {
           for (const arg of command.slice(1)) {
             if (arg.startsWith("-") || (command[0] === "chmod" && arg.startsWith("+"))) continue
-            const resolved = await $`realpath ${arg}`
-              .cwd(cwd)
-              .quiet()
-              .nothrow()
-              .text()
-              .then((x) => x.trim())
+            const resolved = await import("fs/promises")
+              .then((fs) => fs.realpath(path.resolve(cwd, arg)))
+              .catch(() => "")
             log.info("resolved path", { arg, resolved })
             if (resolved) {
               // Git Bash on Windows returns Unix-style paths like /c/Users/...
@@ -297,13 +293,11 @@ export const BashTool = Tool.define("bash", async () => {
       }
 
       const shellEnv = await Plugin.trigger("shell.env", { cwd }, { env: {} })
+      const finalEnv = filterEnv({ ...process.env, ...shellEnv.env })
       const proc = spawn(params.command, {
         shell,
         cwd,
-        env: {
-          ...filterEnv(process.env),
-          ...shellEnv.env,
-        },
+        env: finalEnv,
         stdio: ["ignore", "pipe", "pipe"],
         detached: process.platform !== "win32",
       })
@@ -350,6 +344,8 @@ export const BashTool = Tool.define("bash", async () => {
 
       ctx.abort.addEventListener("abort", abortHandler, { once: true })
 
+      // Add 100ms buffer so the spawned process has a chance to exit gracefully
+      // on its own before we force-kill it (e.g. shells that set their own alarm).
       const timeoutTimer = setTimeout(() => {
         timedOut = true
         void kill()

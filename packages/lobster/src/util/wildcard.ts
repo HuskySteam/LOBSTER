@@ -43,14 +43,23 @@ export namespace Wildcard {
   }
 
   function matchSequence(items: string[], patterns: string[]): boolean {
-    if (patterns.length === 0) return true
-    const [pattern, ...rest] = patterns
-    if (pattern === "*") return matchSequence(items, rest)
-    for (let i = 0; i < items.length; i++) {
-      if (match(items[i], pattern) && matchSequence(items.slice(i + 1), rest)) {
-        return true
+    // Filter out standalone "*" patterns (they match anything)
+    const filtered = patterns.filter((p) => p !== "*")
+    if (filtered.length === 0) return true
+
+    const n = items.length
+    const m = filtered.length
+    // dp[j] = true means filtered[0..j-1] have been matched
+    const dp = new Array<boolean>(m + 1).fill(false)
+    dp[0] = true
+    for (let i = 0; i < n; i++) {
+      // Iterate backwards to avoid using updated values from the same row
+      for (let j = m - 1; j >= 0; j--) {
+        if (dp[j] && match(items[i], filtered[j])) {
+          dp[j + 1] = true
+        }
       }
     }
-    return false
+    return dp[m]
   }
 }

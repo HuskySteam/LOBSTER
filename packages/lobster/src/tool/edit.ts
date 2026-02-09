@@ -61,6 +61,9 @@ export const EditTool = Tool.define("edit", {
             diff,
           },
         })
+        const parentDir = path.dirname(filePath)
+        const { mkdir } = await import("fs/promises")
+        await mkdir(parentDir, { recursive: true })
         await Bun.write(filePath, params.newString)
         await Bus.publish(File.Event.Edited, {
           file: filePath,
@@ -157,7 +160,7 @@ export const EditTool = Tool.define("edit", {
 export type Replacer = (content: string, find: string) => Generator<string, void, unknown>
 
 // Similarity thresholds for block anchor fallback matching
-const SINGLE_CANDIDATE_SIMILARITY_THRESHOLD = 0.0
+const SINGLE_CANDIDATE_SIMILARITY_THRESHOLD = 0.4
 const MULTIPLE_CANDIDATES_SIMILARITY_THRESHOLD = 0.3
 
 /**
@@ -636,6 +639,36 @@ export function replace(content: string, oldString: string, newString: string, r
     for (const search of replacer(content, oldString)) {
       const index = content.indexOf(search)
       if (index === -1) continue
+
+      // Validate indentation consistency: if the match has different
+      // indentation than the search string, verify the relative indentation
+      // structure is preserved to avoid wrong-level matches
+      if (replacer !== SimpleReplacer && replacer !== MultiOccurrenceReplacer) {
+        const searchLines = oldString.split("\n")
+        const matchLines = search.split("\n")
+        if (searchLines.length > 1 && matchLines.length > 1) {
+          const getIndent = (line: string) => {
+            const m = line.match(/^(\s*)/)
+            return m ? m[1].length : 0
+          }
+          const searchIndents = searchLines.filter((l) => l.trim().length > 0).map(getIndent)
+          const matchIndents = matchLines.filter((l) => l.trim().length > 0).map(getIndent)
+          if (searchIndents.length > 1 && matchIndents.length > 1) {
+            const searchDeltas = searchIndents.slice(1).map((v, i) => v - searchIndents[i])
+            const matchDeltas = matchIndents.slice(1).map((v, i) => v - matchIndents[i])
+            const minLen = Math.min(searchDeltas.length, matchDeltas.length)
+            let indentMismatch = false
+            for (let k = 0; k < minLen; k++) {
+              if (searchDeltas[k] !== matchDeltas[k]) {
+                indentMismatch = true
+                break
+              }
+            }
+            if (indentMismatch) continue
+          }
+        }
+      }
+
       notFound = false
       if (replaceAll) {
         return content.replaceAll(search, newString)

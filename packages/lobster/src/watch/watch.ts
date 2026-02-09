@@ -1,3 +1,4 @@
+import path from "path"
 import { createLobsterClient, type LobsterClient } from "@lobster-ai/sdk/v2"
 import { Server } from "../server/server"
 import { Provider } from "../provider/provider"
@@ -152,17 +153,21 @@ export namespace WatchMode {
       "After fixing, briefly explain what you changed.",
     ].join("\n")
 
+    // Restrict auto-fix permissions to only file operations within the project directory.
+    // Bash is intentionally denied to prevent unrestricted command execution.
+    const projectDir = process.cwd()
+    const projectGlob = path.join(projectDir, "**")
     const rules: PermissionNext.Ruleset = [
       { permission: "question", action: "deny", pattern: "*" },
       { permission: "plan_enter", action: "deny", pattern: "*" },
       { permission: "plan_exit", action: "deny", pattern: "*" },
-      { permission: "bash", action: "allow", pattern: "*" },
-      { permission: "read", action: "allow", pattern: "*" },
-      { permission: "edit", action: "allow", pattern: "*" },
-      { permission: "write", action: "allow", pattern: "*" },
-      { permission: "glob", action: "allow", pattern: "*" },
-      { permission: "grep", action: "allow", pattern: "*" },
-      { permission: "list", action: "allow", pattern: "*" },
+      { permission: "bash", action: "deny", pattern: "*" },
+      { permission: "read", action: "allow", pattern: projectGlob },
+      { permission: "edit", action: "allow", pattern: projectGlob },
+      { permission: "write", action: "allow", pattern: projectGlob },
+      { permission: "glob", action: "allow", pattern: projectGlob },
+      { permission: "grep", action: "allow", pattern: projectGlob },
+      { permission: "list", action: "allow", pattern: projectGlob },
     ]
 
     const session = await sdk.session.create({
@@ -231,6 +236,12 @@ export namespace WatchMode {
     })
 
     await eventLoop
+
+    // Explicitly close the event stream to release resources
+    if (events.stream && typeof (events.stream as any).return === "function") {
+      await (events.stream as any).return()
+    }
+
     UI.println(
       UI.Style.TEXT_SUCCESS + "v" + UI.Style.TEXT_NORMAL,
       `Fix attempt complete. ${fixedFiles.size} file(s) modified.`,

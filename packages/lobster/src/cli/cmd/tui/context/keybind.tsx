@@ -1,4 +1,4 @@
-import { createMemo } from "solid-js"
+import { createMemo, onCleanup } from "solid-js"
 import { useSync } from "@tui/context/sync"
 import { Keybind } from "@/util/keybind"
 import { pipe, mapValues } from "remeda"
@@ -24,7 +24,7 @@ export const { use: useKeybind, provider: KeybindProvider } = createSimpleContex
     const renderer = useRenderer()
 
     let focus: Renderable | null
-    let timeout: NodeJS.Timeout
+    let timeout: ReturnType<typeof setTimeout> | undefined
     function leader(active: boolean) {
       if (active) {
         setStore("leader", true)
@@ -41,12 +41,24 @@ export const { use: useKeybind, provider: KeybindProvider } = createSimpleContex
       }
 
       if (!active) {
+        if (timeout) {
+          clearTimeout(timeout)
+          timeout = undefined
+        }
         if (focus && !renderer.currentFocusedRenderable) {
           focus.focus()
         }
         setStore("leader", false)
       }
     }
+
+    // Clear timeout on unmount to prevent leaked timers
+    onCleanup(() => {
+      if (timeout) {
+        clearTimeout(timeout)
+        timeout = undefined
+      }
+    })
 
     useKeyboard(async (evt) => {
       if (!store.leader && result.match("leader", evt)) {

@@ -53,6 +53,8 @@ import { Memory } from "../memory/memory"
 import { SmartContext } from "../context/smart"
 import { Config } from "../config/config"
 
+// Suppress AI SDK warnings that pollute stdout. The AI SDK checks this global
+// to decide whether to log warnings. See: https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
 
@@ -267,8 +269,12 @@ export namespace SessionPrompt {
     const abort = start(sessionID)
     if (!abort) {
       return new Promise<MessageV2.WithParts>((resolve, reject) => {
-        const callbacks = state()[sessionID].callbacks
-        callbacks.push({ resolve, reject })
+        const session = state()[sessionID]
+        if (!session) {
+          reject(new Error("Session terminated"))
+          return
+        }
+        session.callbacks.push({ resolve, reject })
       })
     }
 
@@ -572,7 +578,8 @@ export namespace SessionPrompt {
       if (step === 1) {
         const config = await Config.get()
         if (config.experimental?.smart_context) {
-          const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
+          const lastUserIdx = msgs.findLastIndex((m) => m.info.role === "user")
+          const lastUserMsg = lastUserIdx >= 0 ? msgs[lastUserIdx] : undefined
           const hasUserFiles = lastUserMsg?.parts.some((p) => p.type === "file") ?? false
           if (lastUserMsg && !hasUserFiles) {
             const userText = lastUserMsg.parts
@@ -582,14 +589,19 @@ export namespace SessionPrompt {
             if (userText.trim().length > 0) {
               const relevantFiles = await SmartContext.findRelevant(userText).catch(() => [] as string[])
               if (relevantFiles.length > 0) {
-                lastUserMsg.parts.push({
-                  id: Identifier.ascending("part"),
-                  messageID: lastUserMsg.info.id,
-                  sessionID: lastUserMsg.info.sessionID,
-                  type: "text",
-                  text: `<system-reminder>\nRelevant files detected:\n${relevantFiles.map((f) => `- ${f}`).join("\n")}\n</system-reminder>`,
-                  synthetic: true,
-                })
+                // Clone the message to avoid mutating the original
+                msgs = msgs.map((m, i) =>
+                  i === lastUserIdx
+                    ? { ...m, parts: [...m.parts, {
+                        id: Identifier.ascending("part"),
+                        messageID: m.info.id,
+                        sessionID: m.info.sessionID,
+                        type: "text" as const,
+                        text: `<system-reminder>\nRelevant files detected:\n${relevantFiles.map((f) => `- ${f}`).join("\n")}\n</system-reminder>`,
+                        synthetic: true,
+                      }] }
+                    : m,
+                )
               }
             }
           }
@@ -721,8 +733,11 @@ export namespace SessionPrompt {
     for await (const item of MessageV2.stream(sessionID)) {
       if (item.info.role === "user") continue
       const queued = state()[sessionID]?.callbacks ?? []
-      for (const q of queued) {
-        q.resolve(item)
+      const resolved = new Set<number>()
+      for (let i = 0; i < queued.length; i++) {
+        if (resolved.has(i)) continue
+        resolved.add(i)
+        queued[i].resolve(item)
       }
       return item
     }
@@ -750,7 +765,7 @@ export namespace SessionPrompt {
 
     const context = (args: any, options: ToolCallOptions): Tool.Context => ({
       sessionID: input.session.id,
-      abort: options.abortSignal!,
+      abort: options.abortSignal ?? new AbortController().signal,
       messageID: input.processor.message.id,
       callID: options.toolCallId,
       extra: { model: input.model, bypassAgentCheck: input.bypassAgentCheck, team: input.session.team },
@@ -1039,7 +1054,7 @@ export namespace SessionPrompt {
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: Buffer.from(part.url, "base64url").toString(),
+                    text: Buffer.from(part.url.slice(part.url.indexOf(",") + 1), "base64url").toString(),
                   },
                   {
                     ...part,

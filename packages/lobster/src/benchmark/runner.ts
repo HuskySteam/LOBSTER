@@ -29,7 +29,7 @@ export namespace BenchmarkRunner {
       await fs.writeFile(testPath, challenge.test)
 
       // Run the test to verify initial state (should fail)
-      const initialResult = Bun.spawnSync(["bun", "test", testPath], {
+      Bun.spawnSync(["bun", "test", testPath], {
         cwd: tmpDir,
         env: { ...process.env, NODE_ENV: "test" },
       })
@@ -42,11 +42,21 @@ export namespace BenchmarkRunner {
       const { Identifier } = await import("../id/id")
 
       const model = await Provider.defaultModel()
+      const benchmarkPermissions = [
+        { permission: "read" as const, action: "allow" as const, pattern: path.join(tmpDir, "**") },
+        { permission: "edit" as const, action: "allow" as const, pattern: path.join(tmpDir, "**") },
+        { permission: "write" as const, action: "allow" as const, pattern: path.join(tmpDir, "**") },
+        { permission: "glob" as const, action: "allow" as const, pattern: path.join(tmpDir, "**") },
+        { permission: "grep" as const, action: "allow" as const, pattern: path.join(tmpDir, "**") },
+        { permission: "bash" as const, action: "allow" as const, pattern: "bun test*" },
+        { permission: "bash" as const, action: "deny" as const, pattern: "*" },
+        { permission: "question" as const, action: "deny" as const, pattern: "*" },
+      ]
       const session = await Session.createNext({
         parentID: undefined,
         directory: tmpDir,
         title: `Benchmark: ${challenge.name}`,
-        permission: [],
+        permission: benchmarkPermissions,
       })
 
       const prompt = [

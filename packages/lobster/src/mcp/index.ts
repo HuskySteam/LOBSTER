@@ -408,6 +408,13 @@ export namespace MCP {
 
     if (mcp.type === "local") {
       const [cmd, ...args] = mcp.command
+      if (!cmd || cmd.includes("\0")) {
+        log.error("invalid mcp command", { key, command: mcp.command })
+        return {
+          mcpClient: undefined,
+          status: { status: "failed" as const, error: "Invalid command" },
+        }
+      }
       const cwd = Instance.directory
       const transport = new StdioClientTransport({
         stderr: "pipe",
@@ -798,11 +805,11 @@ export namespace MCP {
 
     // The SDK has already added the state parameter to the authorization URL
     // We just need to open the browser
-    log.info("opening browser for oauth", { mcpName, url: authorizationUrl, state: oauthState })
+    log.info("opening browser for oauth", { mcpName, state: oauthState.slice(0, 8) + "..." })
 
     // Register the callback BEFORE opening the browser to avoid race condition
     // when the IdP has an active SSO session and redirects immediately
-    const callbackPromise = McpOAuthCallback.waitForCallback(oauthState)
+    const callbackPromise = McpOAuthCallback.waitForCallback(oauthState, mcpName)
 
     try {
       const subprocess = await open(authorizationUrl)

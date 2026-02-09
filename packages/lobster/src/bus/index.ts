@@ -53,7 +53,11 @@ export namespace Bus {
     for (const key of [def.type, "*"]) {
       const match = state().subscriptions.get(key)
       for (const sub of match ?? []) {
-        pending.push(sub(payload))
+        try {
+          pending.push(sub(payload))
+        } catch (e) {
+          log.error("subscriber error", { type: def.type, error: e instanceof Error ? e.message : String(e) })
+        }
       }
     }
     GlobalBus.emit("event", {
@@ -86,12 +90,17 @@ export namespace Bus {
     return raw("*", callback)
   }
 
+  const MAX_LISTENERS_WARNING = 50
+
   function raw(type: string, callback: (event: any) => void) {
     log.info("subscribing", { type })
     const subscriptions = state().subscriptions
     let match = subscriptions.get(type) ?? []
     match.push(callback)
     subscriptions.set(type, match)
+    if (match.length === MAX_LISTENERS_WARNING) {
+      log.warn("possible listener leak: too many subscribers", { type, count: match.length })
+    }
 
     return () => {
       log.info("unsubscribing", { type })

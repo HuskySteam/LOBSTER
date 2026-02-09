@@ -54,6 +54,8 @@ export const LANGUAGE_EXTENSIONS: Record<string, string> = {
   ".less": "less",
   ".lua": "lua",
   ".makefile": "makefile",
+  // Intentionally non-dot-prefixed: matches filenames like "makefile" or "Makefile"
+  // which have no extension and are matched by their full basename.
   makefile: "makefile",
   ".md": "markdown",
   ".markdown": "markdown",

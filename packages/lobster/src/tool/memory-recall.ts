@@ -21,7 +21,18 @@ export const MemoryRecallTool = Tool.define("memoryrecall", {
       "Filter by category: pattern, preference, convention, error, or note",
     ).optional(),
   }),
-  async execute(params) {
+  async execute(params, ctx) {
+    await ctx.ask({
+      permission: "memoryrecall",
+      patterns: [params.query || "*"],
+      always: ["*"],
+      metadata: {
+        query: params.query,
+        tags: params.tags,
+        category: params.category,
+      },
+    })
+
     let results: Memory.Entry[]
 
     if (params.query) {

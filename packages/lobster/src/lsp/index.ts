@@ -92,11 +92,54 @@ export namespace LSP {
         }
       }
 
-      for (const server of Object.values(LSPServer)) {
+      // Use an explicit registry array rather than Object.values() on the
+      // namespace, which would also include non-Info exports like CHECKSUMS.
+      const builtinServers: LSPServer.Info[] = [
+        LSPServer.Deno,
+        LSPServer.Typescript,
+        LSPServer.Vue,
+        LSPServer.ESLint,
+        LSPServer.Oxlint,
+        LSPServer.Biome,
+        LSPServer.Gopls,
+        LSPServer.Rubocop,
+        LSPServer.Ty,
+        LSPServer.Pyright,
+        LSPServer.ElixirLS,
+        LSPServer.Zls,
+        LSPServer.CSharp,
+        LSPServer.FSharp,
+        LSPServer.SourceKit,
+        LSPServer.RustAnalyzer,
+        LSPServer.Clangd,
+        LSPServer.Svelte,
+        LSPServer.Astro,
+        LSPServer.JDTLS,
+        LSPServer.KotlinLS,
+        LSPServer.YamlLS,
+        LSPServer.LuaLS,
+        LSPServer.PHPIntelephense,
+        LSPServer.Prisma,
+        LSPServer.Dart,
+        LSPServer.Ocaml,
+        LSPServer.BashLS,
+        LSPServer.TerraformLS,
+        LSPServer.TexLab,
+        LSPServer.DockerfileLS,
+        LSPServer.Gleam,
+        LSPServer.Clojure,
+        LSPServer.Nixd,
+        LSPServer.Tinymist,
+        LSPServer.HLS,
+      ]
+      for (const server of builtinServers) {
         servers[server.id] = server
       }
 
       filterExperimentalServers(servers)
+
+      // Shell metacharacters that may indicate command injection in custom LSP commands
+      const SHELL_METACHAR_RE = /[;&|`$(){}[\]<>!#~*?\n\r]/
 
       for (const [name, item] of Object.entries(cfg.lsp ?? {})) {
         const existing = servers[name]
@@ -105,6 +148,17 @@ export namespace LSP {
           delete servers[name]
           continue
         }
+
+        // Validate custom commands don't contain shell metacharacters
+        const hasMetachars = item.command.some((arg: string) => SHELL_METACHAR_RE.test(arg))
+        if (hasMetachars) {
+          log.warn(
+            `LSP server "${name}" command contains shell metacharacters — this is a potential security risk. ` +
+              `Ensure this is intentional.`,
+            { command: item.command },
+          )
+        }
+
         servers[name] = {
           ...existing,
           id: name,

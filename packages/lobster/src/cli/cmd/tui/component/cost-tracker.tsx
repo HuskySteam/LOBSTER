@@ -1,8 +1,6 @@
 import { useSync } from "@tui/context/sync"
 import { useTheme } from "@tui/context/theme"
 import { Show, createMemo } from "solid-js"
-import { pipe, sumBy } from "remeda"
-import type { Message } from "@lobster-ai/sdk/v2"
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M"
@@ -14,13 +12,14 @@ export function CostTracker(props: { sessionID: string }) {
   const sync = useSync()
   const { theme } = useTheme()
 
-  const messages = createMemo(() => (sync.data.message[props.sessionID] ?? []) as Message[])
+  const messages = createMemo(() => sync.data.message[props.sessionID] ?? [])
 
   const totalCost = createMemo(() => {
-    return pipe(
-      messages(),
-      sumBy((x) => (x.role === "assistant" ? x.cost : 0)),
-    )
+    let cost = 0
+    for (const msg of messages()) {
+      if (msg.role === "assistant") cost += msg.cost
+    }
+    return cost
   })
 
   const tokenStats = createMemo(() => {

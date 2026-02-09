@@ -69,25 +69,47 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
         return
       }
 
-      // Fall back to SSE
+      // Fall back to SSE with exponential backoff on reconnection
+      let backoff = 0
+      const MAX_BACKOFF = 8000
       while (true) {
         if (abort.signal.aborted) break
-        const events = await sdk.event.subscribe(
-          {},
-          {
-            signal: abort.signal,
-          },
-        )
+        try {
+          const events = await sdk.event.subscribe(
+            {},
+            {
+              signal: abort.signal,
+            },
+          )
 
-        for await (const event of events.stream) {
-          handleEvent(event)
+          // Reset backoff on successful connection
+          backoff = 0
+
+          for await (const event of events.stream) {
+            handleEvent(event)
+          }
+
+          // Flush any remaining events
+          if (timer) clearTimeout(timer)
+          if (queue.length > 0) {
+            flush()
+          }
+        } catch {
+          // Connection failed or stream ended with error
         }
 
-        // Flush any remaining events
-        if (timer) clearTimeout(timer)
-        if (queue.length > 0) {
-          flush()
-        }
+        if (abort.signal.aborted) break
+
+        // Exponential backoff: 1s, 2s, 4s, 8s max
+        backoff = backoff === 0 ? 1000 : Math.min(backoff * 2, MAX_BACKOFF)
+        await new Promise<void>((resolve) => {
+          const t = setTimeout(resolve, backoff)
+          const onAbort = () => {
+            clearTimeout(t)
+            resolve()
+          }
+          abort.signal.addEventListener("abort", onAbort, { once: true })
+        })
       }
     })
 

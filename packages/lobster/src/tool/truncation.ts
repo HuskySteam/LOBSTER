@@ -34,8 +34,11 @@ export namespace Truncate {
   export async function cleanup() {
     const cutoff = Identifier.timestamp(Identifier.create("tool", false, Date.now() - RETENTION_MS))
     const glob = new Bun.Glob("tool_*")
-    const entries = await Array.fromAsync(glob.scan({ cwd: DIR, onlyFiles: true })).catch(() => [] as string[])
-    for (const entry of entries) {
+    const MAX_SCAN = 1000
+    let scanned = 0
+    for await (const entry of glob.scan({ cwd: DIR, onlyFiles: true })) {
+      scanned++
+      if (scanned > MAX_SCAN) break
       if (Identifier.timestamp(entry) >= cutoff) continue
       await fs.unlink(path.join(DIR, entry)).catch(() => {})
     }
