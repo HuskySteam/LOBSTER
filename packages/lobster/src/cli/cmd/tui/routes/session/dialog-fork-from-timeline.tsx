@@ -47,8 +47,9 @@ export function DialogForkFromTimeline(props: { sessionID: string; onMove: (mess
             },
             { input: "", parts: [] as PromptInfo["parts"] },
           )
+          if (!forked.data?.id) throw new Error("Failed to fork session")
           route.navigate({
-            sessionID: forked.data!.id,
+            sessionID: forked.data.id,
             type: "session",
             initialPrompt,
           })

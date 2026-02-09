@@ -95,8 +95,9 @@ export function DialogMessage(props: {
                 { input: "", parts: [] as PromptInfo["parts"] },
               )
             })()
+            if (!result.data?.id) throw new Error("Failed to fork session")
             route.navigate({
-              sessionID: result.data!.id,
+              sessionID: result.data.id,
               type: "session",
               initialPrompt,
             })

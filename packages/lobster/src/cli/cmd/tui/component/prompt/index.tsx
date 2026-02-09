@@ -743,8 +743,9 @@ export function Prompt(props: PromptProps) {
     const sessionID = props.sessionID
       ? props.sessionID
       : await (async () => {
-          const sessionID = await sdk.client.session.create({}).then((x) => x.data!.id)
-          return sessionID
+          const result = await sdk.client.session.create({})
+          if (!result.data?.id) throw new Error("Failed to create session")
+          return result.data.id
         })()
     const messageID = Identifier.ascending("message")
     let inputText = store.prompt.input
