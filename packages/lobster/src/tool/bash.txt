@@ -46,6 +46,16 @@ Usage notes:
     cd /foo/bar && pytest tests
     </bad-example>
 
+# Process Safety
+  - NEVER run commands that could spawn unbounded numbers of child processes (fork bombs, infinite process loops)
+  - NEVER copy, move, or install executables into system PATH directories, toolchain directories, or system bin folders
+  - NEVER set up or install compiler toolchains (GCC, MinGW, MSVC, Clang, CMake) or modify system-level development environments
+  - NEVER run `while true`, `for (;;)`, or other infinite loop patterns that spawn child processes
+  - NEVER run commands that recursively invoke compilers or build tools without explicit user request
+  - NEVER create scripts that execute themselves or other scripts in an unbounded loop
+  - Commands that spawn more than 50 child processes will be automatically terminated as a safety measure
+  - If you need to build software, use project-level build tools (npm, bun, cargo, go build) rather than raw compiler invocations
+
 # Committing changes with git
 
 Only create commits when requested by the user. If unclear, ask first. When the user asks you to create a new git commit, follow these steps carefully:

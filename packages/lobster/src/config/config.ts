@@ -1,6 +1,6 @@
 import { Log } from "../util/log"
 import path from "path"
-import { pathToFileURL } from "url"
+import { fileURLToPath, pathToFileURL } from "url"
 import os from "os"
 import z from "zod"
 import { Filesystem } from "../util/filesystem"
@@ -525,7 +525,12 @@ export namespace Config {
       return parts[parts.length - 1] || plugin
     }
     if (plugin.startsWith("file://")) {
-      return path.parse(new URL(plugin).pathname).name
+      try {
+        return path.parse(fileURLToPath(new URL(plugin))).name
+      } catch {
+        // fileURLToPath fails on Windows for non-Windows file URLs (e.g. file:///path/to/...)
+        return path.parse(new URL(plugin).pathname).name
+      }
     }
     const lastAt = plugin.lastIndexOf("@")
     if (lastAt > 0) {

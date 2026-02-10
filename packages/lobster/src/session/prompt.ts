@@ -1449,7 +1449,7 @@ export namespace SessionPrompt {
     const agentState = AgentState.get(input.session.id)
 
     // Switching from plan mode to build mode
-    if (input.agent.name !== "plan" && agentState?.mode === "plan") {
+    if (agentState && input.agent.name !== "plan" && agentState.mode === "plan") {
       AgentState.transition(input.session.id, "build", input.agent.name)
       const plan = Session.plan(input.session)
       const exists = await Bun.file(plan).exists()

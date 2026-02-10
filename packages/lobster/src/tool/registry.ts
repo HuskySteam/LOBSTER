@@ -102,7 +102,14 @@ export namespace ToolRegistry {
   })
 
   function fromPlugin(id: string, def: ToolDefinition): Tool.Info {
-    const sanitizedId = id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 128)
+    let sanitizedId = id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 128)
+    if (!sanitizedId || !/^[a-zA-Z0-9]/.test(sanitizedId)) {
+      sanitizedId = "t" + sanitizedId
+    }
+    if (!sanitizedId || sanitizedId === "t") {
+      log.warn("skipping plugin tool with empty ID", { original: id })
+      sanitizedId = "unnamed_" + Math.random().toString(36).slice(2, 8)
+    }
     return {
       id: sanitizedId,
       init: async (initCtx) => ({

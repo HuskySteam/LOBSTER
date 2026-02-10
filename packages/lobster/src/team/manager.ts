@@ -113,23 +113,23 @@ export namespace TeamManager {
   // Task operations
 
   export async function nextTaskId(teamName: string): Promise<string> {
-    const counter = await Storage.update<{ next: number }>(
-      ["team_counter", teamName],
-      (draft) => {
-        draft.next++
-      },
-    ).catch(async () => {
-      // Counter may not exist yet if team creation was interrupted; initialize and retry
-      await Storage.write(["team_counter", teamName], { next: 1 })
-      // Re-run the atomic update to avoid race with concurrent callers
-      return Storage.update<{ next: number }>(
-        ["team_counter", teamName],
-        (draft) => {
-          draft.next++
-        },
-      )
-    })
-    return String(counter.next - 1)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const counter = await Storage.update<{ next: number }>(
+          ["team_counter", teamName],
+          (draft) => {
+            draft.next++
+          },
+        )
+        return String(counter.next - 1)
+      } catch {
+        if (attempt === 0) {
+          await Storage.write(["team_counter", teamName], { next: 1 })
+        }
+      }
+    }
+    // Fallback: use timestamp-based ID
+    return String(Date.now())
   }
 
   export async function createTask(input: {
@@ -342,8 +342,8 @@ export namespace TeamManager {
     }
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
     return tasks.sort((a, b) => {
-      const pa = priorityOrder[a.priority ?? "medium"]
-      const pb = priorityOrder[b.priority ?? "medium"]
+      const pa = priorityOrder[a.priority ?? "medium"] ?? 2
+      const pb = priorityOrder[b.priority ?? "medium"] ?? 2
       if (pa !== pb) return pa - pb
       return Number(a.id) - Number(b.id)
     })

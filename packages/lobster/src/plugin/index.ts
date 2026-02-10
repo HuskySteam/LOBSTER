@@ -146,7 +146,11 @@ export namespace Plugin {
         continue
       }
       log.warn("loading plugin via dynamic import", { path: plugin })
-      const mod = await import(plugin)
+      const mod = await import(plugin).catch((err) => {
+        log.error("failed to load plugin", { path: plugin, error: err instanceof Error ? err.message : String(err) })
+        return undefined
+      })
+      if (!mod) continue
       // Prevent duplicate initialization when plugins export the same function
       // as both a named export and default export (e.g., `export const X` and `export default X`).
       // Object.entries(mod) would return both entries pointing to the same function reference.

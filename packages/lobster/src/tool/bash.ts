@@ -19,6 +19,8 @@ import { Plugin } from "@/plugin"
 
 const MAX_METADATA_LENGTH = 30_000
 const DEFAULT_TIMEOUT = Flag.LOBSTER_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS ?? 2 * 60 * 1000
+const MAX_PROCESS_TREE_SIZE = 50
+const WATCHDOG_INTERVAL_MS = 3000
 
 export const log = Log.create({ service: "bash-tool" })
 
@@ -245,7 +247,7 @@ export const BashTool = Tool.define("bash", async () => {
         }
 
         // not an exhaustive list, but covers most common cases
-        if (["cd", "rm", "cp", "mv", "mkdir", "touch", "chmod", "chown", "cat"].includes(command[0])) {
+        if (["cd", "rm", "cp", "mv", "mkdir", "touch", "chmod", "chown", "cat", "ln", "rsync", "tar", "install", "dd", "unzip"].includes(command[0])) {
           for (const arg of command.slice(1)) {
             if (arg.startsWith("-") || (command[0] === "chmod" && arg.startsWith("+"))) continue
             const resolved = await import("fs/promises")
@@ -332,6 +334,27 @@ export const BashTool = Tool.define("bash", async () => {
 
       const kill = () => Shell.killTree(proc, { exited: () => exited })
 
+      // Watchdog: periodically check process tree size to detect fork bombs
+      let processLimitExceeded = false
+      let watchdogStopped = false
+      const runWatchdog = async () => {
+        if (!proc.pid || exited || watchdogStopped) return
+        const treeSize = await Shell.countProcessTree(proc.pid).catch(() => 0)
+        if (exited || watchdogStopped) return
+        if (treeSize > MAX_PROCESS_TREE_SIZE) {
+          processLimitExceeded = true
+          log.warn("process tree limit exceeded, killing", {
+            pid: proc.pid,
+            treeSize,
+            limit: MAX_PROCESS_TREE_SIZE,
+          })
+          await kill()
+          return
+        }
+        if (!exited && !watchdogStopped) watchdogTimer = setTimeout(runWatchdog, WATCHDOG_INTERVAL_MS)
+      }
+      let watchdogTimer: ReturnType<typeof setTimeout> | undefined = setTimeout(runWatchdog, WATCHDOG_INTERVAL_MS)
+
       if (ctx.abort.aborted) {
         aborted = true
         await kill()
@@ -354,6 +377,8 @@ export const BashTool = Tool.define("bash", async () => {
       await new Promise<void>((resolve, reject) => {
         const cleanup = () => {
           clearTimeout(timeoutTimer)
+          watchdogStopped = true
+          clearTimeout(watchdogTimer)
           ctx.abort.removeEventListener("abort", abortHandler)
         }
 
@@ -378,6 +403,12 @@ export const BashTool = Tool.define("bash", async () => {
 
       if (aborted) {
         resultMetadata.push("User aborted the command")
+      }
+
+      if (processLimitExceeded) {
+        resultMetadata.push(
+          `Command terminated: spawned too many child processes (>${MAX_PROCESS_TREE_SIZE}). This appears to be a fork bomb or runaway process chain.`,
+        )
       }
 
       if (resultMetadata.length > 0) {

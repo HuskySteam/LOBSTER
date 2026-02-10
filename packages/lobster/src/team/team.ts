@@ -14,7 +14,7 @@ export namespace Team {
   export type Member = z.infer<typeof Member>
 
   export const Config = z.object({
-    agentTimeoutMinutes: z.number().positive().default(30),
+    agentTimeoutMinutes: z.number().positive().max(1440).default(30),
   }).default({ agentTimeoutMinutes: 30 })
   export type Config = z.infer<typeof Config>
 

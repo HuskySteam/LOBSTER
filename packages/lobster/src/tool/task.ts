@@ -20,6 +20,16 @@ import { MemoryManager } from "../memory/manager"
 
 const log = Log.create({ service: "tool.task" })
 
+// Subscribe to MemberStalled event — wrapped in try/catch since Bus may not be
+// initialized at import time in test environments
+try {
+  Bus.subscribe(Team.Event.MemberStalled, (evt) => {
+    log.warn("team member stalled", { team: evt.properties.teamName, member: evt.properties.memberName, staleMs: evt.properties.staleSinceMs })
+  })
+} catch {
+  // Bus not initialized in this context — skip subscription
+}
+
 const EXPLORE_KEYWORDS = ["find", "search", "look", "where", "locate", "grep", "pattern", "file", "read", "understand", "analyze", "codebase"]
 const GENERAL_KEYWORDS = ["implement", "write", "create", "build", "fix", "refactor", "modify", "test", "update", "add", "change", "delete", "remove"]
 
@@ -213,7 +223,23 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           throw new Error(`Team "${teamName}" does not exist.`)
         }
 
-        // Register as "starting" initially; transition to "active" once prompt begins
+        let promptParts: Awaited<ReturnType<typeof SessionPrompt.resolvePromptParts>>
+        promptParts = await SessionPrompt.resolvePromptParts(params.prompt)
+
+        // Inject relevant memories into subagent context
+        const asyncMemories = await MemoryManager.relevant(params.prompt).catch(() => [])
+        if (asyncMemories.length > 0) {
+          const memoryContext = asyncMemories.slice(0, 5).map(m => {
+            const content = m.content.length > 400 ? m.content.slice(0, 400) + "..." : m.content
+            return `- [${m.category}] ${content}`
+          }).join("\n").slice(0, 2000)
+          promptParts.unshift({
+            type: "text",
+            text: `<memory-context>\nRelevant memories:\n${memoryContext}\n</memory-context>`,
+          })
+        }
+
+        // Register member only after prompt resolution succeeds to avoid orphaned members
         await TeamManager.addMember({
           teamName,
           name: agentName,
@@ -222,55 +248,37 @@ export const TaskTool = Tool.define("task", async (ctx) => {
         })
         await TeamManager.setMemberStatus(teamName, agentName, "starting")
 
-        let promptParts: Awaited<ReturnType<typeof SessionPrompt.resolvePromptParts>>
-        try {
-          promptParts = await SessionPrompt.resolvePromptParts(params.prompt)
+        // Inject team context so the agent knows its teammates and current tasks
+        const members = await TeamManager.getMembers(teamName)
+        const tasks = await TeamManager.listTasks(teamName)
+        const rosterLines = members
+          .filter((m) => m.name !== agentName)
+          .map((m) => `- ${m.name} (type: ${m.agentType}, status: ${m.status})`)
+        const taskLines = tasks
+          .filter((t) => t.status !== "deleted")
+          .map((t) => `- #${t.id} [${t.status}] ${t.subject}${t.owner ? ` (owner: ${t.owner})` : ""}`)
 
-          // Inject relevant memories into subagent context
-          const asyncMemories = await MemoryManager.relevant(params.prompt).catch(() => [])
-          if (asyncMemories.length > 0) {
-            const memoryContext = asyncMemories.slice(0, 5).map(m => `- [${m.category}] ${m.content}`).join("\n")
-            promptParts.unshift({
-              type: "text",
-              text: `<memory-context>\nRelevant memories:\n${memoryContext}\n</memory-context>`,
-            })
-          }
+        const teamContext = [
+          `<team-context>`,
+          `Team: ${teamName}`,
+          `Your name: ${agentName}`,
+          ``,
+          `## Teammates`,
+          rosterLines.length > 0 ? rosterLines.join("\n") : "(no other members yet)",
+          ``,
+          `## Current Task List`,
+          taskLines.length > 0 ? taskLines.join("\n") : "(no tasks yet)",
+          ``,
+          `Use sendmessage type:"message" recipient:"<name>" to message any teammate directly.`,
+          `Check tasklist to find and claim available work.`,
+          `</team-context>`,
+        ].join("\n")
 
-          // Inject team context so the agent knows its teammates and current tasks
-          const members = await TeamManager.getMembers(teamName)
-          const tasks = await TeamManager.listTasks(teamName)
-          const rosterLines = members
-            .filter((m) => m.name !== agentName)
-            .map((m) => `- ${m.name} (type: ${m.agentType}, status: ${m.status})`)
-          const taskLines = tasks
-            .filter((t) => t.status !== "deleted")
-            .map((t) => `- #${t.id} [${t.status}] ${t.subject}${t.owner ? ` (owner: ${t.owner})` : ""}`)
+        promptParts.push({
+          type: "text",
+          text: teamContext,
+        })
 
-          const teamContext = [
-            `<team-context>`,
-            `Team: ${teamName}`,
-            `Your name: ${agentName}`,
-            ``,
-            `## Teammates`,
-            rosterLines.length > 0 ? rosterLines.join("\n") : "(no other members yet)",
-            ``,
-            `## Current Task List`,
-            taskLines.length > 0 ? taskLines.join("\n") : "(no tasks yet)",
-            ``,
-            `Use sendmessage type:"message" recipient:"<name>" to message any teammate directly.`,
-            `Check tasklist to find and claim available work.`,
-            `</team-context>`,
-          ].join("\n")
-
-          promptParts.push({
-            type: "text",
-            text: teamContext,
-          })
-        } catch (err) {
-          // Roll back member registration on failure
-          await TeamManager.removeMember(teamName, agentName)
-          throw err
-        }
         const messageID = Identifier.ascending("message")
 
         // Transition to active now that prompt is about to start
@@ -391,7 +399,10 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       // Inject relevant memories into subagent context
       const memories = await MemoryManager.relevant(params.prompt).catch(() => [])
       if (memories.length > 0) {
-        const memoryContext = memories.slice(0, 5).map(m => `- [${m.category}] ${m.content}`).join("\n")
+        const memoryContext = memories.slice(0, 5).map(m => {
+          const content = m.content.length > 400 ? m.content.slice(0, 400) + "..." : m.content
+          return `- [${m.category}] ${content}`
+        }).join("\n").slice(0, 2000)
         promptParts.unshift({
           type: "text",
           text: `<memory-context>\nRelevant memories:\n${memoryContext}\n</memory-context>`,

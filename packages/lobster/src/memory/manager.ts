@@ -65,11 +65,10 @@ export namespace MemoryManager {
   export async function relevant(context: string): Promise<Memory.Entry[]> {
     const all = await listAll()
     if (!all.length) return []
-    const words = context
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((w) => w.length > 3 && !STOP_WORDS.has(w))
-    if (!words.length) return all.slice(0, 5)
+    const rawWords = context.toLowerCase().split(/\s+/).filter(Boolean)
+    const words = rawWords.filter((w) => w.length > 3 && !STOP_WORDS.has(w))
+    const searchWords = words.length > 0 ? words : rawWords.filter(Boolean)
+    if (!searchWords.length) return all.slice(0, 5)
     const now = Date.now()
     const ONE_DAY = 24 * 60 * 60 * 1000
     const SEVEN_DAYS = 7 * ONE_DAY
@@ -77,8 +76,8 @@ export namespace MemoryManager {
       .map((entry) => {
         const contentLower = entry.content.toLowerCase()
         const tagsLower = entry.tags.join(" ").toLowerCase()
-        const contentScore = words.filter((w) => contentLower.includes(w)).length
-        const tagScore = words.filter((w) => tagsLower.includes(w)).length * 2
+        const contentScore = searchWords.filter((w) => contentLower.includes(w)).length
+        const tagScore = searchWords.filter((w) => tagsLower.includes(w)).length * 2
         const age = now - entry.time.created
         const recencyBoost = age < ONE_DAY ? 2 : age < SEVEN_DAYS ? 1 : 0
         const score = contentScore + tagScore + recencyBoost

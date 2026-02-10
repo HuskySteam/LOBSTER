@@ -284,15 +284,16 @@ export namespace Agent {
 
       if (value.capabilities) {
         // Use factory for capability-based permission building
+        // Pass raw permission as agentOverrides so capabilities always win
         item.permission = buildPermissions({
           defaults,
+          agentOverrides: PermissionNext.fromConfig(value.permission ?? {}),
           user,
           capabilities: value.capabilities,
         })
+      } else {
+        item.permission = PermissionNext.merge(item.permission, PermissionNext.fromConfig(value.permission ?? {}))
       }
-
-      // Existing permission merge still applies on top if specified
-      item.permission = PermissionNext.merge(item.permission, PermissionNext.fromConfig(value.permission ?? {}))
     }
 
     // Ensure Truncate.GLOB is allowed unless explicitly configured
