@@ -13,10 +13,16 @@ export namespace Team {
   })
   export type Member = z.infer<typeof Member>
 
+  export const Config = z.object({
+    agentTimeoutMinutes: z.number().positive().default(30),
+  }).default({ agentTimeoutMinutes: 30 })
+  export type Config = z.infer<typeof Config>
+
   export const Info = z.object({
     name: z.string(),
     members: z.array(Member),
     leadSessionID: z.string(),
+    config: Config,
     time: z.object({
       created: z.number(),
       updated: z.number(),
@@ -56,6 +62,14 @@ export namespace Team {
         teamName: z.string(),
         memberName: z.string(),
         status: MemberStatus,
+      }),
+    ),
+    MemberStalled: BusEvent.define(
+      "team.member.stalled",
+      z.object({
+        teamName: z.string(),
+        memberName: z.string(),
+        staleSinceMs: z.number(),
       }),
     ),
   }

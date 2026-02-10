@@ -133,7 +133,9 @@ export namespace Plugin {
       }
 
       // Validate plugin paths are within expected directories before dynamic import
-      const importPath = path.resolve(plugin)
+      // For file:// URLs, use the already-resolved filesystem path instead of path.resolve
+      // which would produce an invalid path from a file:// URL string
+      const importPath = plugin.startsWith("file://") ? resolvedPath : path.resolve(plugin)
       const inCache = Filesystem.contains(Global.Path.cache, importPath)
       const inProject = Filesystem.contains(Instance.directory, importPath)
       const inData = Filesystem.contains(Global.Path.data, importPath)

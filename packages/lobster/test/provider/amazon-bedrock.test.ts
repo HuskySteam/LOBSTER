@@ -30,7 +30,8 @@ test("Bedrock: config region takes precedence over AWS_REGION env var", async ()
     directory: tmp.path,
     init: async () => {
       Env.set("AWS_REGION", "us-east-1")
-      Env.set("AWS_PROFILE", "default")
+      // Use bearer token to avoid credential chain (requires BunProc.install)
+      Env.set("AWS_BEARER_TOKEN_BEDROCK", "test-token")
     },
     fn: async () => {
       const providers = await Provider.list()
@@ -55,7 +56,8 @@ test("Bedrock: falls back to AWS_REGION env var when no config region", async ()
     directory: tmp.path,
     init: async () => {
       Env.set("AWS_REGION", "eu-west-1")
-      Env.set("AWS_PROFILE", "default")
+      // Use bearer token to avoid credential chain (requires BunProc.install)
+      Env.set("AWS_BEARER_TOKEN_BEDROCK", "test-token")
     },
     fn: async () => {
       const providers = await Provider.list()
@@ -156,7 +158,8 @@ test("Bedrock: config profile takes precedence over AWS_PROFILE env var", async 
     directory: tmp.path,
     init: async () => {
       Env.set("AWS_PROFILE", "default")
-      Env.set("AWS_ACCESS_KEY_ID", "test-key-id")
+      // Use bearer token to avoid credential chain (requires BunProc.install)
+      Env.set("AWS_BEARER_TOKEN_BEDROCK", "test-token")
     },
     fn: async () => {
       const providers = await Provider.list()
@@ -187,7 +190,8 @@ test("Bedrock: includes custom endpoint in options when specified", async () => 
   await Instance.provide({
     directory: tmp.path,
     init: async () => {
-      Env.set("AWS_PROFILE", "default")
+      // Use bearer token to avoid credential chain (requires BunProc.install)
+      Env.set("AWS_BEARER_TOKEN_BEDROCK", "test-token")
     },
     fn: async () => {
       const providers = await Provider.list()
@@ -224,6 +228,8 @@ test("Bedrock: autoloads when AWS_WEB_IDENTITY_TOKEN_FILE is present", async () 
       Env.set("AWS_ROLE_ARN", "arn:aws:iam::123456789012:role/my-eks-role")
       Env.set("AWS_PROFILE", "")
       Env.set("AWS_ACCESS_KEY_ID", "")
+      // Also set bearer token to avoid credential chain install in test env
+      Env.set("AWS_BEARER_TOKEN_BEDROCK", "test-token")
     },
     fn: async () => {
       const providers = await Provider.list()
@@ -263,7 +269,8 @@ test("Bedrock: model with us. prefix should not be double-prefixed", async () =>
   await Instance.provide({
     directory: tmp.path,
     init: async () => {
-      Env.set("AWS_PROFILE", "default")
+      // Use bearer token to avoid credential chain (requires BunProc.install)
+      Env.set("AWS_BEARER_TOKEN_BEDROCK", "test-token")
     },
     fn: async () => {
       const providers = await Provider.list()
@@ -300,7 +307,8 @@ test("Bedrock: model with global. prefix should not be prefixed", async () => {
   await Instance.provide({
     directory: tmp.path,
     init: async () => {
-      Env.set("AWS_PROFILE", "default")
+      // Use bearer token to avoid credential chain (requires BunProc.install)
+      Env.set("AWS_BEARER_TOKEN_BEDROCK", "test-token")
     },
     fn: async () => {
       const providers = await Provider.list()
@@ -336,7 +344,8 @@ test("Bedrock: model with eu. prefix should not be double-prefixed", async () =>
   await Instance.provide({
     directory: tmp.path,
     init: async () => {
-      Env.set("AWS_PROFILE", "default")
+      // Use bearer token to avoid credential chain (requires BunProc.install)
+      Env.set("AWS_BEARER_TOKEN_BEDROCK", "test-token")
     },
     fn: async () => {
       const providers = await Provider.list()
@@ -372,7 +381,8 @@ test("Bedrock: model without prefix in US region should get us. prefix added", a
   await Instance.provide({
     directory: tmp.path,
     init: async () => {
-      Env.set("AWS_PROFILE", "default")
+      // Use bearer token to avoid credential chain (requires BunProc.install)
+      Env.set("AWS_BEARER_TOKEN_BEDROCK", "test-token")
     },
     fn: async () => {
       const providers = await Provider.list()

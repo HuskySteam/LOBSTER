@@ -794,10 +794,11 @@ export namespace Provider {
     }
 
     // load env
-    const env = Env.all()
+    // Use Env.get() for each key individually because Env.all() filters out
+    // sensitive keys (API keys, tokens, etc.) that providers need for detection
     for (const [providerID, provider] of Object.entries(database)) {
       if (disabled.has(providerID)) continue
-      const apiKey = provider.env.map((item) => env[item]).find(Boolean)
+      const apiKey = provider.env.map((item) => Env.get(item)).find(Boolean)
       if (!apiKey) continue
       mergeProvider(providerID, {
         source: "env",

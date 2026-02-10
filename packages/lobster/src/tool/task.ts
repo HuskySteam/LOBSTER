@@ -12,16 +12,58 @@ import { defer } from "@/util/defer"
 import { Config } from "../config/config"
 import { PermissionNext } from "@/permission/next"
 import { TeamManager } from "../team/manager"
+import { Team } from "../team/team"
 import { Log } from "../util/log"
 import { Instance } from "../project/instance"
 import { Provider } from "../provider/provider"
+import { MemoryManager } from "../memory/manager"
 
 const log = Log.create({ service: "tool.task" })
+
+const EXPLORE_KEYWORDS = ["find", "search", "look", "where", "locate", "grep", "pattern", "file", "read", "understand", "analyze", "codebase"]
+const GENERAL_KEYWORDS = ["implement", "write", "create", "build", "fix", "refactor", "modify", "test", "update", "add", "change", "delete", "remove"]
+
+function routeTask(prompt: string, agents: Agent.Info[]): string {
+  const lower = prompt.toLowerCase()
+  const scores: Record<string, number> = {}
+
+  for (const agent of agents) {
+    if (agent.name === "team-member" || agent.hidden) continue
+    scores[agent.name] = 0
+
+    const keywords =
+      agent.name === "explore" ? EXPLORE_KEYWORDS
+      : agent.name === "general" ? GENERAL_KEYWORDS
+      : []
+
+    for (const kw of keywords) {
+      if (lower.includes(kw)) scores[agent.name]++
+    }
+
+    // Match against agent description (2x weight)
+    if (agent.description) {
+      const descWords = agent.description.toLowerCase().split(/\s+/)
+      for (const word of descWords) {
+        if (word.length > 3 && lower.includes(word)) scores[agent.name] += 2
+      }
+    }
+  }
+
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1])
+  if (sorted.length === 0) return "general"
+
+  const [topName, topScore] = sorted[0]
+  const secondScore = sorted.length > 1 ? sorted[1][1] : 0
+
+  if (topScore < 3 || topScore - secondScore <= 1) return "general"
+
+  return topName
+}
 
 const parameters = z.object({
   description: z.string().describe("A short (3-5 words) description of the task"),
   prompt: z.string().describe("The task for the agent to perform"),
-  subagent_type: z.string().describe("The type of specialized agent to use for this task"),
+  subagent_type: z.string().describe("The type of specialized agent to use for this task. If omitted, the system auto-selects the best agent.").optional(),
   task_id: z
     .string()
     .describe(
@@ -64,21 +106,24 @@ export const TaskTool = Tool.define("task", async (ctx) => {
     async execute(params: z.infer<typeof parameters>, ctx) {
       const config = await Config.get()
 
+      // Auto-route when subagent_type is not provided
+      const subagentType = params.subagent_type ?? routeTask(params.prompt, accessibleAgents)
+
       // Skip permission check when user explicitly invoked via @ or command subtask
       if (!ctx.extra?.bypassAgentCheck) {
         await ctx.ask({
           permission: "task",
-          patterns: [params.subagent_type],
+          patterns: [subagentType],
           always: ["*"],
           metadata: {
             description: params.description,
-            subagent_type: params.subagent_type,
+            subagent_type: subagentType,
           },
         })
       }
 
-      const agent = await Agent.get(params.subagent_type)
-      if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
+      const agent = await Agent.get(subagentType)
+      if (!agent) throw new Error(`Unknown agent type: ${subagentType} is not a valid agent type`)
 
       const hasTaskPermission = agent.permission.some((rule) => rule.permission === "task")
 
@@ -86,45 +131,11 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       const teamName = params.team_name ?? ctx.extra?.team?.teamName
       const agentName = params.name
 
-      // Build team-specific permissions for team members
+      // Extract team permissions from the team-member agent definition at runtime
       const teamPermissions: PermissionNext.Ruleset = teamName
-        ? [
-            {
-              permission: "taskcreate",
-              pattern: "*",
-              action: "allow" as const,
-            },
-            {
-              permission: "taskupdate",
-              pattern: "*",
-              action: "allow" as const,
-            },
-            {
-              permission: "taskget",
-              pattern: "*",
-              action: "allow" as const,
-            },
-            {
-              permission: "tasklist",
-              pattern: "*",
-              action: "allow" as const,
-            },
-            {
-              permission: "sendmessage",
-              pattern: "*",
-              action: "allow" as const,
-            },
-            {
-              permission: "teamcreate",
-              pattern: "*",
-              action: "deny" as const,
-            },
-            {
-              permission: "teamdelete",
-              pattern: "*",
-              action: "deny" as const,
-            },
-          ]
+        ? await Agent.get("team-member").then(
+            (tm) => (tm ? Agent.extractTeamPermissions(tm.permission) : []),
+          ).catch(() => [])
         : []
 
       const teamContext = teamName && agentName
@@ -207,13 +218,23 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           teamName,
           name: agentName,
           agentId: session.id,
-          agentType: params.subagent_type,
+          agentType: subagentType,
         })
         await TeamManager.setMemberStatus(teamName, agentName, "starting")
 
         let promptParts: Awaited<ReturnType<typeof SessionPrompt.resolvePromptParts>>
         try {
           promptParts = await SessionPrompt.resolvePromptParts(params.prompt)
+
+          // Inject relevant memories into subagent context
+          const asyncMemories = await MemoryManager.relevant(params.prompt).catch(() => [])
+          if (asyncMemories.length > 0) {
+            const memoryContext = asyncMemories.slice(0, 5).map(m => `- [${m.category}] ${m.content}`).join("\n")
+            promptParts.unshift({
+              type: "text",
+              text: `<memory-context>\nRelevant memories:\n${memoryContext}\n</memory-context>`,
+            })
+          }
 
           // Inject team context so the agent knows its teammates and current tasks
           const members = await TeamManager.getMembers(teamName)
@@ -256,7 +277,8 @@ export const TaskTool = Tool.define("task", async (ctx) => {
         await TeamManager.setMemberStatus(teamName, agentName, "active")
 
         // Fire-and-forget: start prompt in background with configurable timeout
-        const maxLifetimeMs = (config.experimental?.team_agent_timeout_minutes ?? 30) * 60 * 1000
+        const teamTimeout = team?.config?.agentTimeoutMinutes
+        const maxLifetimeMs = (teamTimeout ?? config.experimental?.team_agent_timeout_minutes ?? 30) * 60 * 1000
         const timeoutController = new AbortController()
         const timeoutId = setTimeout(() => {
           log.warn("team agent exceeded max lifetime, terminating", {
@@ -267,6 +289,26 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           SessionPrompt.cancel(session.id)
           timeoutController.abort()
         }, maxLifetimeMs)
+
+        // Health check: periodically verify the agent session is still active
+        const healthCheckInterval = setInterval(async () => {
+          const member = (await TeamManager.getMembers(teamName)).find(m => m.name === agentName)
+          if (!member || member.status === "idle" || member.status === "shutdown") {
+            clearInterval(healthCheckInterval)
+            return
+          }
+          const sessionInfo = await Session.get(session.id).catch(() => undefined)
+          if (!sessionInfo) {
+            clearInterval(healthCheckInterval)
+            return
+          }
+          const lastActivity = sessionInfo.time?.updated ?? sessionInfo.time?.created ?? 0
+          const staleMs = Date.now() - lastActivity
+          if (staleMs > 5 * 60 * 1000) {
+            log.warn("team agent stalled", { teamName, agentName, staleMs })
+            Bus.publish(Team.Event.MemberStalled, { teamName, memberName: agentName, staleSinceMs: staleMs })
+          }
+        }, 5 * 60 * 1000)
 
         SessionPrompt.prompt({
           messageID,
@@ -286,11 +328,13 @@ export const TaskTool = Tool.define("task", async (ctx) => {
         })
           .then(() => {
             clearTimeout(timeoutId)
+            clearInterval(healthCheckInterval)
             TeamManager.setMemberStatus(teamName, agentName, "idle").catch(() => {})
             log.info("team agent completed", { teamName, agentName, sessionId: session.id })
           })
           .catch((err) => {
             clearTimeout(timeoutId)
+            clearInterval(healthCheckInterval)
             log.error("team agent failed", { teamName, agentName, error: err })
             TeamManager.setMemberStatus(teamName, agentName, "idle").catch(() => {})
           })
@@ -306,7 +350,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           output: [
             `Team member "${agentName}" spawned in team "${teamName}"`,
             `Session ID: ${session.id}`,
-            `Agent type: ${params.subagent_type}`,
+            `Agent type: ${subagentType}`,
             `The agent is now running in the background.`,
           ].join("\n"),
         }
@@ -343,6 +387,16 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       ctx.abort.addEventListener("abort", cancel)
       using _ = defer(() => ctx.abort.removeEventListener("abort", cancel))
       const promptParts = await SessionPrompt.resolvePromptParts(params.prompt)
+
+      // Inject relevant memories into subagent context
+      const memories = await MemoryManager.relevant(params.prompt).catch(() => [])
+      if (memories.length > 0) {
+        const memoryContext = memories.slice(0, 5).map(m => `- [${m.category}] ${m.content}`).join("\n")
+        promptParts.unshift({
+          type: "text",
+          text: `<memory-context>\nRelevant memories:\n${memoryContext}\n</memory-context>`,
+        })
+      }
 
       const result = await SessionPrompt.prompt({
         messageID,

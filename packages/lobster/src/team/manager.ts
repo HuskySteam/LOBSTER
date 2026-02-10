@@ -21,12 +21,14 @@ export namespace TeamManager {
   export async function create(input: {
     name: string
     leadSessionID: string
+    config?: Team.Config
   }): Promise<Team.Info> {
     validateName(input.name, "team name")
     const info: Team.Info = {
       name: input.name,
       members: [],
       leadSessionID: input.leadSessionID,
+      config: input.config ?? Team.Config.parse(undefined),
       time: {
         created: Date.now(),
         updated: Date.now(),
@@ -136,6 +138,7 @@ export namespace TeamManager {
     description: string
     activeForm?: string
     model_hint?: string
+    priority?: TeamTask.Priority
   }): Promise<TeamTask.Info> {
     const id = await nextTaskId(input.teamName)
     const task: TeamTask.Info = {
@@ -146,6 +149,7 @@ export namespace TeamManager {
       activeForm: input.activeForm,
       model_hint: input.model_hint,
       status: "pending",
+      priority: input.priority ?? "medium",
       blocks: [],
       blockedBy: [],
       metadata: {},
@@ -336,7 +340,13 @@ export namespace TeamManager {
       const task = await Storage.read<TeamTask.Info>(key).catch(() => undefined)
       if (task && task.status !== "deleted") tasks.push(task)
     }
-    return tasks.sort((a, b) => Number(a.id) - Number(b.id))
+    const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
+    return tasks.sort((a, b) => {
+      const pa = priorityOrder[a.priority ?? "medium"]
+      const pb = priorityOrder[b.priority ?? "medium"]
+      if (pa !== pb) return pa - pb
+      return Number(a.id) - Number(b.id)
+    })
   }
 
   export async function removeAllTasks(teamName: string) {

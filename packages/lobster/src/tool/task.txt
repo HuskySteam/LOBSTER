@@ -4,6 +4,7 @@ Available agent types and the tools they have access to:
 {agents}
 
 When using the Task tool, you must specify a subagent_type parameter to select which agent type to use.
+The `subagent_type` parameter is optional. If omitted, the system auto-selects the best agent based on the task description.
 
 When to use the Task tool:
 - When you are instructed to execute custom slash commands. Use the Task tool with the slash command invocation as the entire prompt. The slash command can take arguments. For example: Task(description="Check the file", prompt="/check-file path/to/file.py")

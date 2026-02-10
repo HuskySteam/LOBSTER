@@ -748,6 +748,8 @@ export namespace Config {
         .describe("Maximum number of agentic iterations before forcing text-only response"),
       maxSteps: z.number().int().positive().optional().describe("@deprecated Use 'steps' field instead."),
       permission: Permission.optional(),
+      capabilities: z.array(z.enum(["question", "plan_enter", "plan_exit", "task", "team", "memory"])).optional()
+        .describe("Capabilities to automatically configure permissions for. E.g., ['task', 'memory'] auto-grants task launching and memory access."),
     })
     .catchall(z.any())
     .transform((agent, ctx) => {
@@ -768,6 +770,7 @@ export namespace Config {
         "permission",
         "disable",
         "tools",
+        "capabilities",
       ])
 
       // Extract unknown properties into options

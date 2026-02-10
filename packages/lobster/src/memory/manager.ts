@@ -53,6 +53,13 @@ export namespace MemoryManager {
     log.info("memory deleted", { id })
   }
 
+  const STOP_WORDS = new Set([
+    "the", "and", "for", "that", "this", "with", "from", "have", "been",
+    "will", "what", "when", "where", "which", "their", "there", "about",
+    "would", "could", "should", "into", "more", "some", "than", "them",
+    "then", "also",
+  ])
+
   // NOTE: This is an O(n*m) linear scan where n=entries and m=keywords.
   // For large memory stores, consider adding a TF-IDF or keyword index.
   export async function relevant(context: string): Promise<Memory.Entry[]> {
@@ -61,12 +68,20 @@ export namespace MemoryManager {
     const words = context
       .toLowerCase()
       .split(/\s+/)
-      .filter((w) => w.length > 3)
+      .filter((w) => w.length > 3 && !STOP_WORDS.has(w))
     if (!words.length) return all.slice(0, 5)
+    const now = Date.now()
+    const ONE_DAY = 24 * 60 * 60 * 1000
+    const SEVEN_DAYS = 7 * ONE_DAY
     return all
       .map((entry) => {
-        const lower = entry.content.toLowerCase() + " " + entry.tags.join(" ").toLowerCase()
-        const score = words.filter((w) => lower.includes(w)).length
+        const contentLower = entry.content.toLowerCase()
+        const tagsLower = entry.tags.join(" ").toLowerCase()
+        const contentScore = words.filter((w) => contentLower.includes(w)).length
+        const tagScore = words.filter((w) => tagsLower.includes(w)).length * 2
+        const age = now - entry.time.created
+        const recencyBoost = age < ONE_DAY ? 2 : age < SEVEN_DAYS ? 1 : 0
+        const score = contentScore + tagScore + recencyBoost
         return { entry, score }
       })
       .filter((x) => x.score > 0)

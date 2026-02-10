@@ -5,6 +5,9 @@ export namespace TeamTask {
   export const Status = z.enum(["pending", "in_progress", "completed", "deleted"])
   export type Status = z.infer<typeof Status>
 
+  export const Priority = z.enum(["low", "medium", "high", "critical"])
+  export type Priority = z.infer<typeof Priority>
+
   export const Info = z.object({
     id: z.string(),
     teamName: z.string(),
@@ -12,6 +15,7 @@ export namespace TeamTask {
     description: z.string(),
     activeForm: z.string().optional(),
     status: Status,
+    priority: Priority.default("medium"),
     owner: z.string().optional(),
     blocks: z.array(z.string()).default([]),
     blockedBy: z.array(z.string()).default([]),

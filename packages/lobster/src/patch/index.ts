@@ -587,9 +587,9 @@ export namespace Patch {
   }
 
   // Main patch application function
-  export async function applyPatch(patchText: string): Promise<AffectedPaths> {
+  export async function applyPatch(patchText: string, cwd?: string): Promise<AffectedPaths> {
     const { hunks } = parsePatch(patchText)
-    return applyHunksToFiles(hunks)
+    return applyHunksToFiles(hunks, cwd)
   }
 
   // Async version of maybeParseApplyPatchVerified

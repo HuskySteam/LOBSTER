@@ -53,9 +53,15 @@ export namespace ToolRegistry {
 
   export const state = Instance.state(async () => {
     // Subscribe to MCP tool changes (must be inside Instance.state to have context)
-    Bus.subscribe(MCP.ToolsChanged, () => {
-      invalidateToolCache()
-    })
+    // Guard: Bus.subscribe may not be available in test environments where Instance
+    // state is torn down between test files
+    try {
+      Bus.subscribe(MCP.ToolsChanged, () => {
+        invalidateToolCache()
+      })
+    } catch {
+      // Bus not initialized in this context — skip subscription
+    }
 
     const custom = [] as Tool.Info[]
     const glob = new Bun.Glob("{tool,tools}/*.{js,ts}")
@@ -73,7 +79,11 @@ export namespace ToolRegistry {
       }
       log.info("loading custom tool", { path: resolved })
       const namespace = path.basename(match, path.extname(match))
-      const mod = await import(match)
+      const mod = await import(match).catch((err) => {
+        log.error("failed to load custom tool", { path: resolved, error: err instanceof Error ? err.message : String(err) })
+        return undefined
+      })
+      if (!mod) continue
       for (const [id, def] of Object.entries<ToolDefinition>(mod)) {
         custom.push(fromPlugin(id === "default" ? namespace : `${namespace}_${id}`, def))
       }

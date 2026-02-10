@@ -141,7 +141,7 @@ PATCH`
 +This is a new file
 *** End Patch`
 
-      const result = await Patch.applyPatch(patchText)
+      const result = await Patch.applyPatch(patchText, tempDir)
       expect(result.added).toHaveLength(1)
       expect(result.modified).toHaveLength(0)
       expect(result.deleted).toHaveLength(0)
@@ -158,7 +158,7 @@ PATCH`
 *** Delete File: ${filePath}
 *** End Patch`
 
-      const result = await Patch.applyPatch(patchText)
+      const result = await Patch.applyPatch(patchText, tempDir)
       expect(result.deleted).toHaveLength(1)
       expect(result.deleted[0]).toBe(filePath)
 
@@ -182,7 +182,7 @@ PATCH`
  line 3
 *** End Patch`
 
-      const result = await Patch.applyPatch(patchText)
+      const result = await Patch.applyPatch(patchText, tempDir)
       expect(result.modified).toHaveLength(1)
       expect(result.modified[0]).toBe(filePath)
 
@@ -203,7 +203,7 @@ PATCH`
 +new content
 *** End Patch`
 
-      const result = await Patch.applyPatch(patchText)
+      const result = await Patch.applyPatch(patchText, tempDir)
       expect(result.modified).toHaveLength(1)
       expect(result.modified[0]).toBe(newPath)
 
@@ -235,7 +235,7 @@ PATCH`
 *** Delete File: ${file2}
 *** End Patch`
 
-      const result = await Patch.applyPatch(patchText)
+      const result = await Patch.applyPatch(patchText, tempDir)
       expect(result.added).toHaveLength(1)
       expect(result.modified).toHaveLength(1)
       expect(result.deleted).toHaveLength(1)
@@ -249,7 +249,7 @@ PATCH`
 +Deep nested content
 *** End Patch`
 
-      const result = await Patch.applyPatch(patchText)
+      const result = await Patch.applyPatch(patchText, tempDir)
       expect(result.added).toHaveLength(1)
       expect(result.added[0]).toBe(nestedPath)
 
@@ -272,7 +272,7 @@ PATCH`
 +new line
 *** End Patch`
 
-      await expect(Patch.applyPatch(patchText)).rejects.toThrow()
+      await expect(Patch.applyPatch(patchText, tempDir)).rejects.toThrow()
     })
 
     test("should throw error when deleting non-existent file", async () => {
@@ -282,7 +282,7 @@ PATCH`
 *** Delete File: ${nonExistent}
 *** End Patch`
 
-      await expect(Patch.applyPatch(patchText)).rejects.toThrow()
+      await expect(Patch.applyPatch(patchText, tempDir)).rejects.toThrow()
     })
   })
 
@@ -297,7 +297,7 @@ PATCH`
 +First line
 *** End Patch`
 
-      const result = await Patch.applyPatch(patchText)
+      const result = await Patch.applyPatch(patchText, tempDir)
       expect(result.modified).toHaveLength(1)
 
       const content = await fs.readFile(emptyFile, "utf-8")
@@ -315,7 +315,7 @@ PATCH`
 +has newline now
 *** End Patch`
 
-      const result = await Patch.applyPatch(patchText)
+      const result = await Patch.applyPatch(patchText, tempDir)
       expect(result.modified).toHaveLength(1)
 
       const content = await fs.readFile(filePath, "utf-8")
@@ -338,7 +338,7 @@ PATCH`
 +LINE 4
 *** End Patch`
 
-      const result = await Patch.applyPatch(patchText)
+      const result = await Patch.applyPatch(patchText, tempDir)
       expect(result.modified).toHaveLength(1)
 
       const content = await fs.readFile(filePath, "utf-8")

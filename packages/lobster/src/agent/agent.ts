@@ -20,8 +20,10 @@ import { Global } from "@/global"
 import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
+import { Log } from "../util/log"
 
 export namespace Agent {
+  const log = Log.create({ service: "agent" })
   export const Info = z
     .object({
       name: z.string(),
@@ -48,6 +50,44 @@ export namespace Agent {
       ref: "Agent",
     })
   export type Info = z.infer<typeof Info>
+
+  const TEAM_PERMISSIONS = ["taskcreate", "taskupdate", "taskget", "tasklist", "sendmessage", "teamcreate", "teamdelete"]
+
+  export function buildPermissions(input: {
+    defaults: PermissionNext.Ruleset
+    agentOverrides?: PermissionNext.Ruleset
+    user: PermissionNext.Ruleset
+    capabilities: Array<"question" | "plan_enter" | "plan_exit" | "task" | "team" | "memory">
+  }): PermissionNext.Ruleset {
+    const capRules: Record<string, PermissionNext.Ruleset> = {
+      question: PermissionNext.fromConfig({ question: "allow" }),
+      plan_enter: PermissionNext.fromConfig({ plan_enter: "allow" }),
+      plan_exit: PermissionNext.fromConfig({ plan_exit: "allow" }),
+      task: PermissionNext.fromConfig({ task: "allow" }),
+      team: PermissionNext.fromConfig({
+        taskcreate: "allow",
+        taskupdate: "allow",
+        taskget: "allow",
+        tasklist: "allow",
+        sendmessage: "allow",
+        teamcreate: "deny",
+        teamdelete: "deny",
+      }),
+      memory: PermissionNext.fromConfig({ memory: "allow" }),
+    }
+    const afterUser: PermissionNext.Ruleset = input.capabilities.flatMap((c) => capRules[c] ?? [])
+    return PermissionNext.merge(
+      input.defaults,
+      ...(input.agentOverrides ? [input.agentOverrides] : []),
+      input.user,
+      afterUser,
+    )
+  }
+
+  /** Extract team-related permission rules from a given agent's ruleset */
+  export function extractTeamPermissions(ruleset: PermissionNext.Ruleset): PermissionNext.Ruleset {
+    return ruleset.filter((r) => TEAM_PERMISSIONS.includes(r.permission))
+  }
 
   const state = Instance.state(async () => {
     const cfg = await Config.get()
@@ -79,15 +119,11 @@ export namespace Agent {
         name: "build",
         description: "The default agent. Executes tools based on configured permissions.",
         options: {},
-        permission: PermissionNext.merge(
+        permission: buildPermissions({
           defaults,
           user,
-          // Critical: build agent MUST be able to ask questions and enter plan mode
-          PermissionNext.fromConfig({
-            question: "allow",
-            plan_enter: "allow",
-          }),
-        ),
+          capabilities: ["question", "plan_enter"],
+        }),
         mode: "primary",
         native: true,
       },
@@ -95,9 +131,9 @@ export namespace Agent {
         name: "plan",
         description: "Plan mode. Disallows all edit tools.",
         options: {},
-        permission: PermissionNext.merge(
+        permission: buildPermissions({
           defaults,
-          PermissionNext.fromConfig({
+          agentOverrides: PermissionNext.fromConfig({
             external_directory: {
               [path.join(Global.Path.data, "plans", "*")]: "allow",
             },
@@ -108,36 +144,32 @@ export namespace Agent {
             },
           }),
           user,
-          // Critical: plan agent MUST be able to launch subagents, ask questions, and exit plan mode
-          PermissionNext.fromConfig({
-            question: "allow",
-            plan_exit: "allow",
-            task: "allow",
-          }),
-        ),
+          capabilities: ["question", "plan_exit", "task"],
+        }),
         mode: "primary",
         native: true,
       },
       general: {
         name: "general",
         description: `General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.`,
-        permission: PermissionNext.merge(
+        permission: buildPermissions({
           defaults,
-          PermissionNext.fromConfig({
+          agentOverrides: PermissionNext.fromConfig({
             todoread: "deny",
             todowrite: "deny",
           }),
           user,
-        ),
+          capabilities: [],
+        }),
         options: {},
         mode: "subagent",
         native: true,
       },
       explore: {
         name: "explore",
-        permission: PermissionNext.merge(
+        permission: buildPermissions({
           defaults,
-          PermissionNext.fromConfig({
+          agentOverrides: PermissionNext.fromConfig({
             "*": "deny",
             grep: "allow",
             glob: "allow",
@@ -152,7 +184,8 @@ export namespace Agent {
             },
           }),
           user,
-        ),
+          capabilities: [],
+        }),
         description: `Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. "src/components/**/*.tsx"), search code for keywords (eg. "API endpoints"), or answer questions about the codebase (eg. "how do API endpoints work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions.`,
         prompt: PROMPT_EXPLORE,
         options: {},
@@ -165,13 +198,12 @@ export namespace Agent {
         native: true,
         hidden: true,
         prompt: PROMPT_COMPACTION,
-        permission: PermissionNext.merge(
+        permission: buildPermissions({
           defaults,
-          PermissionNext.fromConfig({
-            "*": "deny",
-          }),
+          agentOverrides: PermissionNext.fromConfig({ "*": "deny" }),
           user,
-        ),
+          capabilities: [],
+        }),
         options: {},
       },
       title: {
@@ -181,13 +213,12 @@ export namespace Agent {
         native: true,
         hidden: true,
         temperature: 0.5,
-        permission: PermissionNext.merge(
+        permission: buildPermissions({
           defaults,
-          PermissionNext.fromConfig({
-            "*": "deny",
-          }),
+          agentOverrides: PermissionNext.fromConfig({ "*": "deny" }),
           user,
-        ),
+          capabilities: [],
+        }),
         prompt: PROMPT_TITLE,
       },
       summary: {
@@ -196,36 +227,26 @@ export namespace Agent {
         options: {},
         native: true,
         hidden: true,
-        permission: PermissionNext.merge(
+        permission: buildPermissions({
           defaults,
-          PermissionNext.fromConfig({
-            "*": "deny",
-          }),
+          agentOverrides: PermissionNext.fromConfig({ "*": "deny" }),
           user,
-        ),
+          capabilities: [],
+        }),
         prompt: PROMPT_SUMMARY,
       },
       "team-member": {
         name: "team-member",
         description: "Agent that operates as a team member with access to team task and messaging tools.",
-        permission: PermissionNext.merge(
+        permission: buildPermissions({
           defaults,
-          PermissionNext.fromConfig({
+          agentOverrides: PermissionNext.fromConfig({
             todoread: "deny",
             todowrite: "deny",
           }),
           user,
-          // Critical: team members MUST be able to manage tasks and communicate
-          PermissionNext.fromConfig({
-            taskcreate: "allow",
-            taskupdate: "allow",
-            taskget: "allow",
-            tasklist: "allow",
-            sendmessage: "allow",
-            teamcreate: "deny",
-            teamdelete: "deny",
-          }),
-        ),
+          capabilities: ["team"],
+        }),
         prompt: PROMPT_TEAM_MEMBER,
         options: {},
         mode: "subagent",
@@ -260,6 +281,17 @@ export namespace Agent {
       item.name = value.name ?? item.name
       item.steps = value.steps ?? item.steps
       item.options = mergeDeep(item.options, value.options ?? {})
+
+      if (value.capabilities) {
+        // Use factory for capability-based permission building
+        item.permission = buildPermissions({
+          defaults,
+          user,
+          capabilities: value.capabilities,
+        })
+      }
+
+      // Existing permission merge still applies on top if specified
       item.permission = PermissionNext.merge(item.permission, PermissionNext.fromConfig(value.permission ?? {}))
     }
 
@@ -277,6 +309,28 @@ export namespace Agent {
         result[name].permission,
         PermissionNext.fromConfig({ external_directory: { [Truncate.GLOB]: "allow" } }),
       )
+    }
+
+    // Phase 1B: Validate agent configurations at load time
+    const subagents = Object.values(result).filter((a) => a.mode !== "primary")
+    for (const agent of Object.values(result)) {
+      // Primary agents should have question permission
+      if (agent.mode !== "subagent" && !agent.hidden) {
+        const questionRule = PermissionNext.evaluate("question", "*", agent.permission)
+        if (questionRule.action !== "allow") {
+          log.warn("primary agent missing question permission", { agent: agent.name, action: questionRule.action })
+        }
+      }
+      // Agents with task:allow should have at least one accessible subagent
+      const taskRule = PermissionNext.evaluate("task", "*", agent.permission)
+      if (taskRule.action === "allow" && subagents.length > 0) {
+        const hasAccessible = subagents.some(
+          (sub) => PermissionNext.evaluate("task", sub.name, agent.permission).action !== "deny",
+        )
+        if (!hasAccessible) {
+          log.warn("agent has task permission but no accessible subagents", { agent: agent.name })
+        }
+      }
     }
 
     return result
@@ -367,5 +421,22 @@ export namespace Agent {
 
     const result = await generateObject(params)
     return result.object
+  }
+
+  /**
+   * Resolve template markers in a custom agent prompt.
+   * - `{{base_prompt}}` is replaced with the base system prompt.
+   * - `{{memory_segment}}` is replaced with relevant memories.
+   * - If neither marker is present, the prompt is returned as-is (standalone).
+   *
+   * TODO: Integrate with session/prompt.ts when building system prompts for custom agents.
+   */
+  export function resolveAgentPrompt(prompt: string, basePrompt: string, memorySegment: string): string {
+    if (!prompt.includes("{{base_prompt}}") && !prompt.includes("{{memory_segment}}")) {
+      return prompt
+    }
+    return prompt
+      .replaceAll("{{base_prompt}}", basePrompt)
+      .replaceAll("{{memory_segment}}", memorySegment)
   }
 }

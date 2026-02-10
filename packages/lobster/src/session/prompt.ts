@@ -52,6 +52,7 @@ import { MemoryManager } from "../memory/manager"
 import { Memory } from "../memory/memory"
 import { SmartContext } from "../context/smart"
 import { Config } from "../config/config"
+import { AgentState } from "../agent/state"
 
 // Suppress AI SDK warnings that pollute stdout. The AI SDK checks this global
 // to decide whether to log warnings. See: https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
@@ -583,6 +584,15 @@ export namespace SessionPrompt {
 
       // normal processing
       const agent = await Agent.get(lastUser.agent)
+
+      // Initialize agent state on first encounter
+      if (!AgentState.get(sessionID)) {
+        AgentState.set(sessionID, {
+          mode: agent.name === "plan" ? "plan" : "build",
+          agentName: agent.name,
+          enteredAt: Date.now(),
+        })
+      }
 
       // Smart context: auto-find relevant files if enabled
       if (step === 1) {
@@ -1436,10 +1446,11 @@ export namespace SessionPrompt {
     }
 
     // New plan mode logic when flag is enabled
-    const assistantMessage = input.messages.findLast((msg) => msg.info.role === "assistant")
+    const agentState = AgentState.get(input.session.id)
 
     // Switching from plan mode to build mode
-    if (input.agent.name !== "plan" && assistantMessage?.info.agent === "plan") {
+    if (input.agent.name !== "plan" && agentState?.mode === "plan") {
+      AgentState.transition(input.session.id, "build", input.agent.name)
       const plan = Session.plan(input.session)
       const exists = await Bun.file(plan).exists()
       if (exists) {
@@ -1458,8 +1469,9 @@ export namespace SessionPrompt {
     }
 
     // Entering plan mode
-    if (input.agent.name === "plan" && assistantMessage?.info.agent !== "plan") {
+    if (input.agent.name === "plan" && agentState?.mode !== "plan") {
       const plan = Session.plan(input.session)
+      AgentState.transition(input.session.id, "plan", "plan", plan)
       const exists = await Bun.file(plan).exists()
       if (!exists) await fs.mkdir(path.dirname(plan), { recursive: true })
       const part = await Session.updatePart({

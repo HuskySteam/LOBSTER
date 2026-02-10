@@ -9,6 +9,7 @@ import { Provider } from "../provider/provider"
 import { Instance } from "../project/instance"
 import EXIT_DESCRIPTION from "./plan-exit.txt"
 import ENTER_DESCRIPTION from "./plan-enter.txt"
+import { AgentState } from "../agent/state"
 
 async function getLastModel(sessionID: string) {
   for await (const item of MessageV2.stream(sessionID)) {
@@ -63,6 +64,8 @@ export const PlanExitTool = Tool.define("plan_exit", {
       text: `The plan at ${plan} has been approved, you can now edit files. Execute the plan`,
       synthetic: true,
     } satisfies MessageV2.TextPart)
+
+    AgentState.transition(ctx.sessionID, "build", "build")
 
     return {
       title: "Switching to build agent",
@@ -120,6 +123,8 @@ export const PlanEnterTool = Tool.define("plan_enter", {
       text: "User has requested to enter plan mode. Switch to plan mode and begin planning.",
       synthetic: true,
     } satisfies MessageV2.TextPart)
+
+    AgentState.transition(ctx.sessionID, "plan", "plan", plan)
 
     return {
       title: "Switching to plan agent",

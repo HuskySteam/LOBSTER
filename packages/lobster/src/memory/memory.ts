@@ -2,7 +2,7 @@ import z from "zod"
 import { BusEvent } from "@/bus/bus-event"
 
 export namespace Memory {
-  export const Category = z.enum(["pattern", "preference", "convention", "error", "note"])
+  export const Category = z.enum(["pattern", "preference", "convention", "error", "note", "project", "dependency"])
   export type Category = z.infer<typeof Category>
 
   export const Entry = z.object({

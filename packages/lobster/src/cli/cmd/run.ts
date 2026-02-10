@@ -166,7 +166,7 @@ function websearch(info: ToolProps<typeof WebSearchTool>) {
 }
 
 function task(info: ToolProps<typeof TaskTool>) {
-  const agent = Locale.titlecase(info.input.subagent_type)
+  const agent = Locale.titlecase(info.input.subagent_type ?? "general")
   const desc = info.input.description
   const started = info.part.state.status === "running"
   const name = desc ?? `${agent} Task`
