@@ -704,10 +704,10 @@ export namespace SessionPrompt {
       await Plugin.trigger("experimental.chat.messages.transform", {}, { messages: sessionMessages })
 
       // Anti-Loop Intelligence: compute adaptive thinking budget
+      // Only reduce when circularity is actually detected — don't penalize normal long sessions
       let thinkingScale = 1.0
-      if (circularityDetected) thinkingScale *= 0.5
-      if (step > 5) thinkingScale *= 0.75
-      if (consecutiveEmptySteps >= 2) thinkingScale *= 0.5
+      if (circularityDetected) thinkingScale *= 0.75
+      if (consecutiveEmptySteps >= 3) thinkingScale *= 0.75
 
       const result = await processor.process({
         user: lastUser,
@@ -1547,8 +1547,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     }
 
     // Anti-Loop Intelligence: Dynamic Goal Anchoring
-    if (input.step && input.step > 1) {
-      // Find the first non-synthetic user message text for goal anchoring
+    // Only inject when circularity was detected — avoid adding tokens on normal iterations
+    if (input.step && input.step > 1 && input.circularityDetected) {
       const firstUserMsg = input.messages.find(
         (msg) => msg.info.role === "user" && msg.parts.some((p) => p.type === "text" && !("synthetic" in p && p.synthetic)),
       )
@@ -1558,30 +1558,10 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         .join(" ")
         .slice(0, 200)
 
-      // Count progress metrics
-      let toolCallCount = 0
-      let filesModified = 0
-      const modifiedFiles = new Set<string>()
-      for (const msg of input.messages) {
-        for (const part of msg.parts) {
-          if (part.type === "tool" && part.state.status === "completed") {
-            toolCallCount++
-            if (part.tool === "edit" || part.tool === "write" || part.tool === "multiedit" || part.tool === "apply_patch") {
-              const filePath = (part.state.input as any)?.file_path ?? (part.state.input as any)?.filePath
-              if (filePath) modifiedFiles.add(filePath)
-            }
-          }
-        }
-      }
-      filesModified = modifiedFiles.size
-
       const lines = [
         "<system-reminder>",
         originalIntent ? `Goal: ${originalIntent}` : "",
-        `Progress: ${toolCallCount} tool calls completed, ${filesModified} files modified.`,
-        input.circularityDetected
-          ? "Your thinking was going in circles. Commit to your approach and proceed."
-          : "",
+        "Your thinking was going in circles. Commit to your current approach and proceed with tool calls.",
         "</system-reminder>",
       ].filter(Boolean)
 

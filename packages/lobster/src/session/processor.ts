@@ -31,14 +31,13 @@ export namespace SessionProcessor {
   }
 
   // --- Anti-Loop Intelligence: Thinking Circularity Detection ---
+  // Only strong reversal phrases that indicate genuine flip-flopping, not normal deliberation
   const REVERSAL_MARKERS = [
-    "actually,", "on second thought", "wait,", "hmm,", "alternatively,",
-    "but then again", "let me reconsider", "i'm reconsidering",
-    "maybe instead", "actually no", "actually yes",
-    "i should instead", "or maybe", "come to think of it",
+    "on second thought", "but then again", "let me reconsider", "i'm reconsidering",
+    "actually no", "actually yes", "i should instead", "come to think of it",
   ]
-  const CIRCULARITY_THRESHOLD = 4
-  const SLIDING_WINDOW_SIZE = 200
+  const CIRCULARITY_THRESHOLD = 8
+  const SLIDING_WINDOW_SIZE = 500
 
   function countReversalMarkers(text: string): number {
     const lower = text.toLowerCase()

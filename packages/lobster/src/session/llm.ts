@@ -119,7 +119,7 @@ export namespace LLM {
 
     // Anti-Loop Intelligence: scale thinking budget if requested
     if (input.thinkingBudgetScale !== undefined && input.thinkingBudgetScale < 1.0) {
-      const scale = Math.max(0.1, input.thinkingBudgetScale)
+      const scale = Math.max(0.5, input.thinkingBudgetScale)
       applyThinkingBudgetScale(options, scale)
       l.info("thinking budget scaled", { scale })
     }
