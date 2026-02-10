@@ -39,16 +39,19 @@ export function Dialog(
         }}
         width={props.size === "large" ? 80 : 60}
         maxWidth={dimensions().width - 2}
-        backgroundColor={theme.backgroundPanel}
         border={["top", "bottom", "left", "right"]}
         borderColor={theme.border}
         customBorderChars={RoundedBorder}
-        paddingTop={1}
-        paddingBottom={1}
-        paddingLeft={2}
-        paddingRight={2}
       >
-        {props.children}
+        <box
+          backgroundColor={theme.backgroundPanel}
+          paddingTop={1}
+          paddingBottom={1}
+          paddingLeft={2}
+          paddingRight={2}
+        >
+          {props.children}
+        </box>
       </box>
     </box>
   )

@@ -6,7 +6,7 @@ import { createStore } from "solid-js/store"
 import { useSDK } from "@tui/context/sdk"
 import { useSync } from "@tui/context/sync"
 import { useTheme, selectedForeground } from "@tui/context/theme"
-import { SplitBorder } from "@tui/component/border"
+import { RoundedBorder } from "@tui/component/border"
 import { useCommandDialog } from "@tui/component/dialog-command"
 import { useTerminalDimensions } from "@opentui/solid"
 import { Locale } from "@/util/locale"
@@ -608,12 +608,13 @@ export function Autocomplete(props: {
     <box
       visible={store.visible !== false}
       position="absolute"
-      top={position().y - height()}
+      top={position().y - height() - 2}
       left={position().x}
       width={position().width}
       zIndex={100}
-      {...SplitBorder}
+      border={["top", "bottom", "left", "right"]}
       borderColor={theme.border}
+      customBorderChars={RoundedBorder}
     >
       <scrollbox
         ref={(r: ScrollBoxRenderable) => (scroll = r)}

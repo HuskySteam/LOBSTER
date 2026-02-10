@@ -1,8 +1,9 @@
-import { createSignal, createMemo, onCleanup, batch } from "solid-js"
+import { createSignal, createMemo, createEffect, onCleanup, batch, on } from "solid-js"
 import { watch, type FSWatcher } from "node:fs"
-import { rename, writeFile } from "node:fs/promises"
+import { rename, writeFile, mkdir } from "node:fs/promises"
 import path from "path"
 import { createSimpleContext } from "./helper"
+import { useSync } from "./sync"
 
 type ReviewLoopState = {
   task?: string
@@ -78,6 +79,7 @@ export type PatternInsight = {
 export const { use: useLobster, provider: LobsterProvider } = createSimpleContext({
   name: "Lobster",
   init: () => {
+    const sync = useSync()
     const [reviewLoop, setReviewLoop] = createSignal<ReviewLoopState | null>(null)
     const [cost, setCost] = createSignal<CostTracking | null>(null)
     const [budget, setBudget] = createSignal<CostBudget | null>(null)
@@ -89,16 +91,26 @@ export const { use: useLobster, provider: LobsterProvider } = createSimpleContex
     const writeQueue: Array<ReviewFinding[]> = []
     let writing = false
 
+    // Resolve memory directory from project directory (absolute path)
+    const resolvedMemoryDir = createMemo(() => {
+      const dir = sync.data.path.directory
+      if (!dir) return ""
+      return path.join(dir, ".lobster", "memory")
+    })
+
     async function processWriteQueue() {
       if (writing) return
+      const memDir = resolvedMemoryDir()
+      if (!memDir) return
       writing = true
       try {
         while (writeQueue.length > 0) {
           const data = writeQueue[writeQueue.length - 1]!
           // Drain all queued writes, only the latest matters
           writeQueue.length = 0
-          const findingsPath = ".lobster/memory/review-findings.json"
+          const findingsPath = path.join(memDir, "review-findings.json")
           const tmpPath = findingsPath + ".tmp." + Date.now()
+          await mkdir(memDir, { recursive: true }).catch(() => {})
           await writeFile(tmpPath, JSON.stringify(data, null, 2))
           await rename(tmpPath, findingsPath)
         }
@@ -107,31 +119,32 @@ export const { use: useLobster, provider: LobsterProvider } = createSimpleContex
       }
     }
 
-    const memoryDir = ".lobster/memory"
-    const fileSignals: Record<string, () => void> = {
-      "review-loop-state.json": () =>
-        Bun.file(path.join(memoryDir, "review-loop-state.json")).json().catch(() => null)
-          .then((rl) => setReviewLoop(rl as ReviewLoopState | null)),
-      "cost-tracking.json": () =>
-        Bun.file(path.join(memoryDir, "cost-tracking.json")).json().catch(() => null)
-          .then((c) => setCost(c as CostTracking | null)),
-      "cost-budget.json": () =>
-        Bun.file(path.join(memoryDir, "cost-budget.json")).json().catch(() => null)
-          .then((b) => setBudget(b as CostBudget | null)),
-      "review-findings.json": () => {
-        if (writing || writeQueue.length > 0) return
-        Bun.file(path.join(memoryDir, "review-findings.json")).json().catch(() => null)
-          .then((f) => setFindings(Array.isArray(f) ? (f as ReviewFinding[]) : []))
-      },
-      "index.json": () =>
-        Bun.file(path.join(memoryDir, "index.json")).json().catch(() => null)
-          .then((m) => setMemoryIndex(Array.isArray(m) ? (m as MemoryEntry[]) : [])),
-      "pattern-insights.json": () =>
-        Bun.file(path.join(memoryDir, "pattern-insights.json")).json().catch(() => null)
-          .then((p) => setPatterns(Array.isArray(p) ? (p as PatternInsight[]) : [])),
+    function buildFileSignals(memoryDir: string): Record<string, () => void> {
+      return {
+        "review-loop-state.json": () =>
+          Bun.file(path.join(memoryDir, "review-loop-state.json")).json().catch(() => null)
+            .then((rl) => setReviewLoop(rl as ReviewLoopState | null)),
+        "cost-tracking.json": () =>
+          Bun.file(path.join(memoryDir, "cost-tracking.json")).json().catch(() => null)
+            .then((c) => setCost(c as CostTracking | null)),
+        "cost-budget.json": () =>
+          Bun.file(path.join(memoryDir, "cost-budget.json")).json().catch(() => null)
+            .then((b) => setBudget(b as CostBudget | null)),
+        "review-findings.json": () => {
+          if (writing || writeQueue.length > 0) return
+          Bun.file(path.join(memoryDir, "review-findings.json")).json().catch(() => null)
+            .then((f) => setFindings(Array.isArray(f) ? (f as ReviewFinding[]) : []))
+        },
+        "index.json": () =>
+          Bun.file(path.join(memoryDir, "index.json")).json().catch(() => null)
+            .then((m) => setMemoryIndex(Array.isArray(m) ? (m as MemoryEntry[]) : [])),
+        "pattern-insights.json": () =>
+          Bun.file(path.join(memoryDir, "pattern-insights.json")).json().catch(() => null)
+            .then((p) => setPatterns(Array.isArray(p) ? (p as PatternInsight[]) : [])),
+      }
     }
 
-    async function refresh() {
+    async function refreshFromDir(memoryDir: string) {
       await Promise.all([
         Bun.file(path.join(memoryDir, "review-loop-state.json")).json().catch(() => null),
         Bun.file(path.join(memoryDir, "cost-tracking.json")).json().catch(() => null),
@@ -153,29 +166,43 @@ export const { use: useLobster, provider: LobsterProvider } = createSimpleContex
       })
     }
 
-    // Use fs.watch on the memory directory, fallback to polling at 10s
+    // Reactively watch the memory directory when the project path resolves
     let watcher: FSWatcher | undefined
     let debounceTimer: Timer | undefined
-    try {
-      watcher = watch(memoryDir, (_eventType, filename) => {
-        if (!filename) return
-        // Debounce rapid changes (e.g. atomic write = create tmp + rename)
-        if (debounceTimer) clearTimeout(debounceTimer)
-        debounceTimer = setTimeout(() => {
-          const handler = fileSignals[filename]
-          if (handler) handler()
-        }, 100)
-      })
-    } catch {
-      // Directory may not exist yet; fall back to polling
-    }
+    let interval: Timer | undefined
 
-    // Fallback polling at 10s in case fs.watch is unavailable or misses events
-    const interval = setInterval(refresh, 10_000)
-    refresh()
+    createEffect(on(resolvedMemoryDir, (memoryDir) => {
+      // Clean up previous watchers
+      if (watcher) { watcher.close(); watcher = undefined }
+      if (debounceTimer) clearTimeout(debounceTimer)
+      if (interval) clearInterval(interval)
+
+      if (!memoryDir) return
+
+      const fileSignals = buildFileSignals(memoryDir)
+
+      // Use fs.watch on the memory directory, fallback to polling at 10s
+      try {
+        watcher = watch(memoryDir, (_eventType, filename) => {
+          if (!filename) return
+          // Debounce rapid changes (e.g. atomic write = create tmp + rename)
+          if (debounceTimer) clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => {
+            const handler = fileSignals[filename]
+            if (handler) handler()
+          }, 100)
+        })
+      } catch {
+        // Directory may not exist yet; fall back to polling
+      }
+
+      // Fallback polling at 10s in case fs.watch is unavailable or misses events
+      interval = setInterval(() => refreshFromDir(memoryDir), 10_000)
+      refreshFromDir(memoryDir)
+    }))
 
     onCleanup(() => {
-      clearInterval(interval)
+      if (interval) clearInterval(interval)
       if (debounceTimer) clearTimeout(debounceTimer)
       watcher?.close()
     })
@@ -251,6 +278,11 @@ export const { use: useLobster, provider: LobsterProvider } = createSimpleContex
       setFindings(updated)
       writeQueue.push(updated)
       await processWriteQueue()
+    }
+
+    async function refresh() {
+      const memDir = resolvedMemoryDir()
+      if (memDir) await refreshFromDir(memDir)
     }
 
     return {

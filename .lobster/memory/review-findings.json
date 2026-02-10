@@ -1,0 +1,23 @@
+[
+  {
+    "id": "finding-1707400000-abc12-0",
+    "severity": "medium",
+    "title": "Missing rounded borders on dialogs",
+    "description": "Dialog components use default square borders instead of rounded customBorderChars",
+    "file": "packages/lobster/src/cli/cmd/tui/ui/dialog.tsx",
+    "line": 45,
+    "status": "accepted",
+    "agent": "reviewer",
+    "iteration": 1
+  },
+  {
+    "id": "finding-1707400000-def34-1",
+    "severity": "low",
+    "title": "Theme contrast ratio below WCAG AA",
+    "description": "Some text/background color combinations in the new theme have contrast ratios below 4.5:1",
+    "file": "packages/lobster/src/cli/cmd/tui/context/theme/lobster.json",
+    "status": "accepted",
+    "agent": "reviewer",
+    "iteration": 1
+  }
+]

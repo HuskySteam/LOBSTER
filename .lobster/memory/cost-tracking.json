@@ -1,0 +1,22 @@
+{
+  "sessions": {
+    "session-tui-redesign": {
+      "started_at": "2026-02-08T10:00:00.000Z",
+      "total_cost": 2.45,
+      "models": {
+        "claude-opus-4-6": {
+          "input_tokens": 125000,
+          "output_tokens": 45000,
+          "calls": 12,
+          "cost": 2.25
+        },
+        "claude-haiku-4-5": {
+          "input_tokens": 8000,
+          "output_tokens": 3000,
+          "calls": 5,
+          "cost": 0.20
+        }
+      }
+    }
+  }
+}
