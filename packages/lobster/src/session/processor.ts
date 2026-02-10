@@ -39,17 +39,19 @@ export namespace SessionProcessor {
   const CIRCULARITY_THRESHOLD = 8
   const SLIDING_WINDOW_SIZE = 500
 
-  function countReversalMarkers(text: string): number {
+  function countReversalMarkers(text: string, fromIndex: number): { count: number; scannedTo: number } {
     const lower = text.toLowerCase()
+    // Overlap by longest marker length to catch markers straddling delta boundaries
+    const scanFrom = Math.max(0, fromIndex - 30)
     let count = 0
     for (const marker of REVERSAL_MARKERS) {
-      let idx = 0
+      let idx = scanFrom
       while ((idx = lower.indexOf(marker, idx)) !== -1) {
         count++
         idx += marker.length
       }
     }
-    return count
+    return { count, scannedTo: text.length }
   }
 
   function detectSlidingWindowRepetition(text: string, seenHashes: Set<number>): boolean {
@@ -82,6 +84,8 @@ export namespace SessionProcessor {
     // Anti-Loop Intelligence state
     let circularityDetected = false
     const reasoningHashes = new Set<number>()
+    let reversalCount = 0
+    let lastScannedPosition = 0
 
     const result = {
       get message() {
@@ -137,14 +141,16 @@ export namespace SessionProcessor {
                     if (value.providerMetadata) part.metadata = value.providerMetadata
                     if (part.text) await Session.updatePart({ part, delta: value.text })
 
-                    // Anti-Loop Intelligence: detect circular reasoning
+                    // Anti-Loop Intelligence: detect circular reasoning (incremental scan)
                     if (!circularityDetected && part.text.length > 100) {
-                      const reversals = countReversalMarkers(part.text)
+                      const scan = countReversalMarkers(part.text, lastScannedPosition)
+                      reversalCount += scan.count
+                      lastScannedPosition = scan.scannedTo
                       const hasRepetition = detectSlidingWindowRepetition(part.text, reasoningHashes)
-                      if (reversals >= CIRCULARITY_THRESHOLD || hasRepetition) {
+                      if (reversalCount >= CIRCULARITY_THRESHOLD || hasRepetition) {
                         circularityDetected = true
                         log.warn("circularity detected in reasoning", {
-                          reversals,
+                          reversals: reversalCount,
                           hasRepetition,
                           reasoningLength: part.text.length,
                         })
@@ -512,11 +518,17 @@ export namespace SessionProcessor {
           const circularity = circularityDetected
           circularityDetected = false
           reasoningHashes.clear()
+          reversalCount = 0
+          lastScannedPosition = 0
 
-          if (needsCompaction) return { action: "compact" as const, circularityDetected: circularity }
-          if (blocked) return { action: "stop" as const, circularityDetected: circularity }
-          if (input.assistantMessage.error) return { action: "stop" as const, circularityDetected: circularity }
-          return { action: "continue" as const, circularityDetected: circularity }
+          const hasOutput = p.some((part) =>
+            part.type === "tool" || (part.type === "text" && part.text.trim().length > 0),
+          )
+
+          if (needsCompaction) return { action: "compact" as const, circularityDetected: circularity, hasOutput }
+          if (blocked) return { action: "stop" as const, circularityDetected: circularity, hasOutput }
+          if (input.assistantMessage.error) return { action: "stop" as const, circularityDetected: circularity, hasOutput }
+          return { action: "continue" as const, circularityDetected: circularity, hasOutput }
         }
       },
     }

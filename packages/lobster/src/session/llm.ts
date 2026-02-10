@@ -329,8 +329,9 @@ export namespace LLM {
     return matrix[a.length][b.length]
   }
 
-  /** Anti-Loop Intelligence: scale numeric thinking budget values in provider options */
+  /** Anti-Loop Intelligence: scale thinking budget values in provider options */
   function applyThinkingBudgetScale(options: Record<string, any>, scale: number) {
+    // Numeric token budgets
     // Anthropic: thinking.budgetTokens
     if (typeof options.thinking?.budgetTokens === "number") {
       options.thinking.budgetTokens = Math.max(1024, Math.floor(options.thinking.budgetTokens * scale))
@@ -347,5 +348,27 @@ export namespace LLM {
     if (typeof options.thinkingConfig?.thinkingBudget === "number") {
       options.thinkingConfig.thinkingBudget = Math.max(1024, Math.floor(options.thinkingConfig.thinkingBudget * scale))
     }
+
+    // String-based effort levels — downgrade by one tier
+    // OpenAI/Azure/xAI/DeepInfra/OpenAI-compatible: reasoningEffort
+    if (typeof options.reasoningEffort === "string") {
+      options.reasoningEffort = downgradeEffort(options.reasoningEffort)
+    }
+    // OpenRouter: reasoning.effort
+    if (typeof options.reasoning?.effort === "string") {
+      options.reasoning.effort = downgradeEffort(options.reasoning.effort)
+    }
+    // Google Gemini 3: thinkingConfig.thinkingLevel
+    if (typeof options.thinkingConfig?.thinkingLevel === "string") {
+      options.thinkingConfig.thinkingLevel = downgradeEffort(options.thinkingConfig.thinkingLevel)
+    }
+  }
+
+  const EFFORT_TIERS = ["none", "minimal", "low", "medium", "high", "xhigh"]
+
+  function downgradeEffort(current: string): string {
+    const idx = EFFORT_TIERS.indexOf(current.toLowerCase())
+    if (idx <= 0) return current // already lowest or unknown
+    return EFFORT_TIERS[idx - 1]
   }
 }

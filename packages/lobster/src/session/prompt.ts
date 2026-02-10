@@ -735,11 +735,8 @@ export namespace SessionPrompt {
       if (result) {
         circularityDetected = result.circularityDetected
 
-        // Track consecutive empty steps (no tool calls and no text output)
-        const parts = await MessageV2.parts(processor.message.id)
-        const hasToolCalls = parts.some((p) => p.type === "tool")
-        const hasText = parts.some((p) => p.type === "text" && p.text.trim().length > 0)
-        if (!hasToolCalls && !hasText) {
+        // Track consecutive empty steps using hasOutput from processor (avoids redundant DB read)
+        if (!result.hasOutput) {
           consecutiveEmptySteps++
         } else {
           consecutiveEmptySteps = 0
@@ -1557,6 +1554,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         .map((p) => p.text)
         .join(" ")
         .slice(0, 200)
+        .replace(/[<>]/g, "")
 
       const lines = [
         "<system-reminder>",
