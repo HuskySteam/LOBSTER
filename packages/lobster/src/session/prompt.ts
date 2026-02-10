@@ -286,6 +286,11 @@ export namespace SessionPrompt {
 
     let step = 0
     const session = await Session.get(sessionID)
+
+    // Anti-Loop Intelligence state
+    let circularityDetected = false
+    let consecutiveEmptySteps = 0
+
     while (true) {
       SessionStatus.set(sessionID, { type: "busy" })
       log.info("loop", { step, sessionID })
@@ -619,6 +624,8 @@ export namespace SessionPrompt {
         messages: msgs,
         agent,
         session,
+        step,
+        circularityDetected,
       })
 
       const processor = SessionProcessor.create({
@@ -696,6 +703,12 @@ export namespace SessionPrompt {
 
       await Plugin.trigger("experimental.chat.messages.transform", {}, { messages: sessionMessages })
 
+      // Anti-Loop Intelligence: compute adaptive thinking budget
+      let thinkingScale = 1.0
+      if (circularityDetected) thinkingScale *= 0.5
+      if (step > 5) thinkingScale *= 0.75
+      if (consecutiveEmptySteps >= 2) thinkingScale *= 0.5
+
       const result = await processor.process({
         user: lastUser,
         agent,
@@ -715,9 +728,26 @@ export namespace SessionPrompt {
         ],
         tools,
         model,
+        thinkingBudgetScale: thinkingScale < 1.0 ? thinkingScale : undefined,
       })
-      if (result === "stop") break
-      if (result === "compact") {
+
+      // Anti-Loop Intelligence: track circularity across iterations
+      if (result) {
+        circularityDetected = result.circularityDetected
+
+        // Track consecutive empty steps (no tool calls and no text output)
+        const parts = await MessageV2.parts(processor.message.id)
+        const hasToolCalls = parts.some((p) => p.type === "tool")
+        const hasText = parts.some((p) => p.type === "text" && p.text.trim().length > 0)
+        if (!hasToolCalls && !hasText) {
+          consecutiveEmptySteps++
+        } else {
+          consecutiveEmptySteps = 0
+        }
+      }
+
+      if (result?.action === "stop") break
+      if (result?.action === "compact") {
         await SessionCompaction.create({
           sessionID,
           agent: lastUser.agent,
@@ -1346,7 +1376,15 @@ export namespace SessionPrompt {
     }
   }
 
-  async function insertReminders(input: { messages: MessageV2.WithParts[]; agent: Agent.Info; session: Session.Info }) {
+  async function insertReminders(input: {
+    messages: MessageV2.WithParts[]
+    agent: Agent.Info
+    session: Session.Info
+    /** Anti-Loop Intelligence: current step number in the agentic loop */
+    step?: number
+    /** Anti-Loop Intelligence: whether circularity was detected in previous iteration */
+    circularityDetected?: boolean
+  }) {
     const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
     if (!userMessage) return input.messages
 
@@ -1507,6 +1545,56 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       userMessage.parts.push(part)
       return input.messages
     }
+
+    // Anti-Loop Intelligence: Dynamic Goal Anchoring
+    if (input.step && input.step > 1) {
+      // Find the first non-synthetic user message text for goal anchoring
+      const firstUserMsg = input.messages.find(
+        (msg) => msg.info.role === "user" && msg.parts.some((p) => p.type === "text" && !("synthetic" in p && p.synthetic)),
+      )
+      const originalIntent = firstUserMsg?.parts
+        .filter((p): p is MessageV2.TextPart => p.type === "text" && !("synthetic" in p && p.synthetic))
+        .map((p) => p.text)
+        .join(" ")
+        .slice(0, 200)
+
+      // Count progress metrics
+      let toolCallCount = 0
+      let filesModified = 0
+      const modifiedFiles = new Set<string>()
+      for (const msg of input.messages) {
+        for (const part of msg.parts) {
+          if (part.type === "tool" && part.state.status === "completed") {
+            toolCallCount++
+            if (part.tool === "edit" || part.tool === "write" || part.tool === "multiedit" || part.tool === "apply_patch") {
+              const filePath = (part.state.input as any)?.file_path ?? (part.state.input as any)?.filePath
+              if (filePath) modifiedFiles.add(filePath)
+            }
+          }
+        }
+      }
+      filesModified = modifiedFiles.size
+
+      const lines = [
+        "<system-reminder>",
+        originalIntent ? `Goal: ${originalIntent}` : "",
+        `Progress: ${toolCallCount} tool calls completed, ${filesModified} files modified.`,
+        input.circularityDetected
+          ? "Your thinking was going in circles. Commit to your approach and proceed."
+          : "",
+        "</system-reminder>",
+      ].filter(Boolean)
+
+      userMessage.parts.push({
+        id: Identifier.ascending("part"),
+        messageID: userMessage.info.id,
+        sessionID: userMessage.info.sessionID,
+        type: "text",
+        text: lines.join("\n"),
+        synthetic: true,
+      })
+    }
+
     return input.messages
   }
 

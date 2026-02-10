@@ -169,7 +169,7 @@ export namespace SessionCompaction {
       model,
     })
 
-    if (result === "continue" && input.auto) {
+    if (result?.action === "continue" && input.auto) {
       const continueMsg = await Session.updateMessage({
         id: Identifier.ascending("message"),
         role: "user",

@@ -30,6 +30,39 @@ export namespace SessionProcessor {
     return hash
   }
 
+  // --- Anti-Loop Intelligence: Thinking Circularity Detection ---
+  const REVERSAL_MARKERS = [
+    "actually,", "on second thought", "wait,", "hmm,", "alternatively,",
+    "but then again", "let me reconsider", "i'm reconsidering",
+    "maybe instead", "actually no", "actually yes",
+    "i should instead", "or maybe", "come to think of it",
+  ]
+  const CIRCULARITY_THRESHOLD = 4
+  const SLIDING_WINDOW_SIZE = 200
+
+  function countReversalMarkers(text: string): number {
+    const lower = text.toLowerCase()
+    let count = 0
+    for (const marker of REVERSAL_MARKERS) {
+      let idx = 0
+      while ((idx = lower.indexOf(marker, idx)) !== -1) {
+        count++
+        idx += marker.length
+      }
+    }
+    return count
+  }
+
+  function detectSlidingWindowRepetition(text: string, seenHashes: Set<number>): boolean {
+    if (text.length < SLIDING_WINDOW_SIZE) return false
+    const start = Math.max(0, text.length - SLIDING_WINDOW_SIZE)
+    const window = text.slice(start, start + SLIDING_WINDOW_SIZE)
+    const hash = djb2Hash(window)
+    if (seenHashes.has(hash)) return true
+    seenHashes.add(hash)
+    return false
+  }
+
   export type Info = Awaited<ReturnType<typeof create>>
   export type Result = Awaited<ReturnType<Info["process"]>>
 
@@ -46,6 +79,10 @@ export namespace SessionProcessor {
     let needsCompaction = false
     const WRITE_CAPABLE_TOOLS = new Set(["edit", "write", "multiedit", "bash", "apply_patch"])
     let hasWriteTools = false
+
+    // Anti-Loop Intelligence state
+    let circularityDetected = false
+    const reasoningHashes = new Set<number>()
 
     const result = {
       get message() {
@@ -100,6 +137,20 @@ export namespace SessionProcessor {
                     part.text += value.text
                     if (value.providerMetadata) part.metadata = value.providerMetadata
                     if (part.text) await Session.updatePart({ part, delta: value.text })
+
+                    // Anti-Loop Intelligence: detect circular reasoning
+                    if (!circularityDetected && part.text.length > 100) {
+                      const reversals = countReversalMarkers(part.text)
+                      const hasRepetition = detectSlidingWindowRepetition(part.text, reasoningHashes)
+                      if (reversals >= CIRCULARITY_THRESHOLD || hasRepetition) {
+                        circularityDetected = true
+                        log.warn("circularity detected in reasoning", {
+                          reversals,
+                          hasRepetition,
+                          reasoningLength: part.text.length,
+                        })
+                      }
+                    }
                   }
                   break
 
@@ -457,10 +508,16 @@ export namespace SessionProcessor {
           }
           input.assistantMessage.time.completed = Date.now()
           await Session.updateMessage(input.assistantMessage)
-          if (needsCompaction) return "compact"
-          if (blocked) return "stop"
-          if (input.assistantMessage.error) return "stop"
-          return "continue"
+
+          // Reset circularity state for next process() call but preserve the flag for caller
+          const circularity = circularityDetected
+          circularityDetected = false
+          reasoningHashes.clear()
+
+          if (needsCompaction) return { action: "compact" as const, circularityDetected: circularity }
+          if (blocked) return { action: "stop" as const, circularityDetected: circularity }
+          if (input.assistantMessage.error) return { action: "stop" as const, circularityDetected: circularity }
+          return { action: "continue" as const, circularityDetected: circularity }
         }
       },
     }

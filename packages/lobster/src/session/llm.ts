@@ -39,6 +39,8 @@ export namespace LLM {
     small?: boolean
     tools: Record<string, Tool>
     retries?: number
+    /** Anti-Loop Intelligence: scale factor for thinking budget (0.0-1.0). 1.0 = full budget. */
+    thinkingBudgetScale?: number
   }
 
   export type StreamOutput = StreamTextResult<ToolSet, unknown>
@@ -113,6 +115,13 @@ export namespace LLM {
     )
     if (isCodex) {
       options.instructions = SystemPrompt.instructions()
+    }
+
+    // Anti-Loop Intelligence: scale thinking budget if requested
+    if (input.thinkingBudgetScale !== undefined && input.thinkingBudgetScale < 1.0) {
+      const scale = Math.max(0.1, input.thinkingBudgetScale)
+      applyThinkingBudgetScale(options, scale)
+      l.info("thinking budget scaled", { scale })
     }
 
     const params = await Plugin.trigger(
@@ -318,5 +327,25 @@ export namespace LLM {
       }
     }
     return matrix[a.length][b.length]
+  }
+
+  /** Anti-Loop Intelligence: scale numeric thinking budget values in provider options */
+  function applyThinkingBudgetScale(options: Record<string, any>, scale: number) {
+    // Anthropic: thinking.budgetTokens
+    if (typeof options.thinking?.budgetTokens === "number") {
+      options.thinking.budgetTokens = Math.max(1024, Math.floor(options.thinking.budgetTokens * scale))
+    }
+    // Anthropic: thinking.thinking_budget (GitHub Copilot variant)
+    if (typeof options.thinking?.thinking_budget === "number") {
+      options.thinking.thinking_budget = Math.max(1024, Math.floor(options.thinking.thinking_budget * scale))
+    }
+    // Bedrock: reasoningConfig.budgetTokens
+    if (typeof options.reasoningConfig?.budgetTokens === "number") {
+      options.reasoningConfig.budgetTokens = Math.max(1024, Math.floor(options.reasoningConfig.budgetTokens * scale))
+    }
+    // Google: thinkingConfig.thinkingBudget
+    if (typeof options.thinkingConfig?.thinkingBudget === "number") {
+      options.thinkingConfig.thinkingBudget = Math.max(1024, Math.floor(options.thinkingConfig.thinkingBudget * scale))
+    }
   }
 }
