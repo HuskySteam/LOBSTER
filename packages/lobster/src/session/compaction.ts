@@ -145,7 +145,7 @@ export namespace SessionCompaction {
       { context: [], prompt: undefined },
     )
     const defaultPrompt =
-      "Provide a detailed prompt for continuing our conversation above. Focus on information that would be helpful for continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're going to do next considering new session will not have access to our conversation."
+      "Summarize this conversation for seamless continuation. Use this exact format:\n\n## Original Task\nWhat the user originally asked for (1-2 sentences).\n\n## Approach\nKey decisions made and why (bullet points).\n\n## Files Modified\nList each file changed with a one-line description of what changed.\n\n## Current State\nWhat is done and what is still in progress.\n\n## Remaining Work\nWhat still needs to be done (if anything).\n\n## Critical Context\nImportant details, constraints, or decisions that must not be lost.\n\nBe concise but complete. Focus on what a fresh session needs to continue effectively."
     const promptText = compacting.prompt ?? [defaultPrompt, ...compacting.context].join("\n\n")
     const result = await processor.process({
       user: userMessage,

@@ -1573,6 +1573,24 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       })
     }
 
+    // Verification reminder every 8 tool calls
+    const toolCount = input.messages
+      .flatMap((m) => m.parts)
+      .filter((p) => p.type === "tool")
+      .length
+
+    if (toolCount > 0 && toolCount % 8 === 0 && input.step && input.step > 1) {
+      userMessage.parts.push({
+        id: Identifier.ascending("part"),
+        messageID: userMessage.info.id,
+        sessionID: input.session.id,
+        type: "text",
+        synthetic: true,
+        text: `<system-reminder>\nYou have made ${toolCount} tool calls. Quick check:\n- Are your changes correct? Consider re-reading modified files.\n- Are you still on track with the original task?\n- Should you run tests or typecheck before continuing?\n</system-reminder>`,
+        time: { start: Date.now(), end: Date.now() },
+      })
+    }
+
     return input.messages
   }
 
