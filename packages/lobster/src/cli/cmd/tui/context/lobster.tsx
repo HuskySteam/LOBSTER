@@ -76,6 +76,25 @@ export type PatternInsight = {
   confidence: number
 }
 
+export type ProjectQualityCategory = {
+  score: number
+  findings: string[]
+  suggestions: string[]
+}
+
+export type ProjectQuality = {
+  overall_score: number
+  summary: string
+  categories: {
+    code_structure: ProjectQualityCategory
+    testing: ProjectQualityCategory
+    documentation: ProjectQualityCategory
+    dependencies: ProjectQualityCategory
+    security: ProjectQualityCategory
+  }
+  analyzed_at: number
+}
+
 export const { use: useLobster, provider: LobsterProvider } = createSimpleContext({
   name: "Lobster",
   init: () => {
@@ -86,6 +105,8 @@ export const { use: useLobster, provider: LobsterProvider } = createSimpleContex
     const [findings, setFindings] = createSignal<ReviewFinding[]>([])
     const [memoryIndex, setMemoryIndex] = createSignal<MemoryEntry[]>([])
     const [patterns, setPatterns] = createSignal<PatternInsight[]>([])
+    const [projectQuality, setProjectQuality] = createSignal<ProjectQuality | null>(null)
+    const [analysisRunning, setAnalysisRunning] = createSignal(false)
 
     // Write queue for atomic findings writes
     const writeQueue: Array<ReviewFinding[]> = []
@@ -141,6 +162,9 @@ export const { use: useLobster, provider: LobsterProvider } = createSimpleContex
         "pattern-insights.json": () =>
           Bun.file(path.join(memoryDir, "pattern-insights.json")).json().catch(() => null)
             .then((p) => setPatterns(Array.isArray(p) ? (p as PatternInsight[]) : [])),
+        "project-quality.json": () =>
+          Bun.file(path.join(memoryDir, "project-quality.json")).json().catch(() => null)
+            .then((q) => setProjectQuality(q as ProjectQuality | null)),
       }
     }
 
@@ -152,7 +176,8 @@ export const { use: useLobster, provider: LobsterProvider } = createSimpleContex
         Bun.file(path.join(memoryDir, "review-findings.json")).json().catch(() => null),
         Bun.file(path.join(memoryDir, "index.json")).json().catch(() => null),
         Bun.file(path.join(memoryDir, "pattern-insights.json")).json().catch(() => null),
-      ]).then(([rl, c, b, f, m, p]) => {
+        Bun.file(path.join(memoryDir, "project-quality.json")).json().catch(() => null),
+      ]).then(([rl, c, b, f, m, p, q]) => {
         batch(() => {
           setReviewLoop(rl as ReviewLoopState | null)
           setCost(c as CostTracking | null)
@@ -162,6 +187,7 @@ export const { use: useLobster, provider: LobsterProvider } = createSimpleContex
           }
           setMemoryIndex(Array.isArray(m) ? (m as MemoryEntry[]) : [])
           setPatterns(Array.isArray(p) ? (p as PatternInsight[]) : [])
+          setProjectQuality(q as ProjectQuality | null)
         })
       })
     }
@@ -214,6 +240,8 @@ export const { use: useLobster, provider: LobsterProvider } = createSimpleContex
     })
 
     const qualityScore = createMemo(() => {
+      const pq = projectQuality()
+      if (pq) return pq.overall_score
       const rl = reviewLoop()
       if (!rl?.history || rl.history.length === 0) return 0
       const passes = rl.history.filter((h) => h.verdict === "PASS").length
@@ -301,6 +329,9 @@ export const { use: useLobster, provider: LobsterProvider } = createSimpleContex
       openFindings,
       findingsBySeverity,
       updateFinding,
+      projectQuality,
+      analysisRunning,
+      setAnalysisRunning,
     }
   },
 })

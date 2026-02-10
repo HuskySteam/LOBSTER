@@ -38,7 +38,8 @@ import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
 import { writeHeapSnapshot } from "v8"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
-import { LobsterProvider } from "./context/lobster"
+import { LobsterProvider, useLobster } from "./context/lobster"
+import { Identifier } from "@/id/id"
 import { DialogReviewDashboard } from "@tui/component/dialog-review-dashboard"
 import { DialogReviewResults } from "@tui/component/dialog-review-results"
 import { DialogHealth } from "@tui/component/dialog-health"
@@ -213,6 +214,7 @@ function App() {
   const sync = useSync()
   const exit = useExit()
   const promptRef = usePromptRef()
+  const lobster = useLobster()
 
   // Wire up console copy-to-clipboard via opentui's onCopySelection callback
   renderer.console.onCopySelection = async (text: string) => {
@@ -557,8 +559,60 @@ function App() {
         name: "health",
         aliases: ["project", "overview"],
       },
-      onSelect: () => {
+      onSelect: async () => {
         dialog.replace(() => <DialogHealth />)
+
+        // Skip re-analysis if recent results exist (< 24h)
+        const existing = lobster.projectQuality()
+        if (existing && Date.now() - existing.analyzed_at < 24 * 60 * 60 * 1000) return
+        if (lobster.analysisRunning()) return
+
+        const selectedModel = local.model.current()
+        if (!selectedModel) return
+
+        // Get or create a session for the analysis
+        let sessionID: string
+        if (route.data.type === "session") {
+          sessionID = route.data.sessionID
+        } else {
+          const result = await sdk.client.session.create({})
+          if (!result.data?.id) return
+          sessionID = result.data.id
+          route.navigate({ type: "session", sessionID })
+        }
+
+        const analysisPrompt = `Analyze this project's quality and call the project_quality tool with your assessment.
+
+Instructions:
+1. Use glob to map the directory tree (top-level files and key directories)
+2. Read key files: package.json, tsconfig.json, README.md, any CI config (.github/workflows/*, .gitlab-ci.yml), and sample test files
+3. Score these 5 categories from 0-100:
+   - code_structure: Code organization, patterns, architecture, modularity
+   - testing: Test coverage indicators, test quality, testing practices
+   - documentation: README quality, inline docs, API documentation
+   - dependencies: Dependency health, outdated packages, lock file presence
+   - security: Security practices, no hardcoded secrets, input validation patterns
+4. Call the project_quality tool with your structured results
+
+Calibration guide:
+- 40-59%: Needs significant improvement
+- 60-79%: Well-maintained, typical good project
+- 80-89%: Excellent, above average
+- 90%+: Exceptional, only for truly outstanding projects
+
+Be honest and specific in findings and suggestions.`
+
+        lobster.setAnalysisRunning(true)
+        sdk.client.session.prompt({
+          sessionID,
+          ...selectedModel,
+          messageID: Identifier.ascending("message"),
+          agent: local.agent.current().name,
+          model: selectedModel,
+          parts: [{ id: Identifier.ascending("part"), type: "text", text: analysisPrompt }],
+        }).catch(() => {}).finally(() => {
+          lobster.setAnalysisRunning(false)
+        })
       },
       category: "Lobster",
     },

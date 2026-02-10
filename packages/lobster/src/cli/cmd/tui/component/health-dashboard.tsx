@@ -139,6 +139,9 @@ export function HealthDashboard() {
           <text fg={qualityColor()} attributes={TextAttributes.BOLD}>
             {quality().text}
           </text>
+          <Show when={lobster.projectQuality()}>
+            <text fg={theme.textMuted}>AI-analyzed</text>
+          </Show>
         </box>
         <Show when={reviewLoopInfo()}>
           {(info) => (

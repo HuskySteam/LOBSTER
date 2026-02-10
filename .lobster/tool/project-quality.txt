@@ -1,0 +1,1 @@
+Save a project quality assessment after analyzing code structure, testing, documentation, dependencies, and security. Scores should be calibrated: 60-80% for well-maintained projects, 90%+ only for exceptional ones.

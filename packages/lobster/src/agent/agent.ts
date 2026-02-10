@@ -81,11 +81,12 @@ export namespace Agent {
         options: {},
         permission: PermissionNext.merge(
           defaults,
+          user,
+          // Critical: build agent MUST be able to ask questions and enter plan mode
           PermissionNext.fromConfig({
             question: "allow",
             plan_enter: "allow",
           }),
-          user,
         ),
         mode: "primary",
         native: true,
@@ -97,8 +98,6 @@ export namespace Agent {
         permission: PermissionNext.merge(
           defaults,
           PermissionNext.fromConfig({
-            question: "allow",
-            plan_exit: "allow",
             external_directory: {
               [path.join(Global.Path.data, "plans", "*")]: "allow",
             },
@@ -109,6 +108,12 @@ export namespace Agent {
             },
           }),
           user,
+          // Critical: plan agent MUST be able to launch subagents, ask questions, and exit plan mode
+          PermissionNext.fromConfig({
+            question: "allow",
+            plan_exit: "allow",
+            task: "allow",
+          }),
         ),
         mode: "primary",
         native: true,
@@ -206,6 +211,12 @@ export namespace Agent {
         permission: PermissionNext.merge(
           defaults,
           PermissionNext.fromConfig({
+            todoread: "deny",
+            todowrite: "deny",
+          }),
+          user,
+          // Critical: team members MUST be able to manage tasks and communicate
+          PermissionNext.fromConfig({
             taskcreate: "allow",
             taskupdate: "allow",
             taskget: "allow",
@@ -213,10 +224,7 @@ export namespace Agent {
             sendmessage: "allow",
             teamcreate: "deny",
             teamdelete: "deny",
-            todoread: "deny",
-            todowrite: "deny",
           }),
-          user,
         ),
         prompt: PROMPT_TEAM_MEMBER,
         options: {},

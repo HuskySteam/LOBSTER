@@ -148,9 +148,17 @@ export function DialogHealth() {
 
       {/* Quality Score */}
       <box>
-        <text fg={theme.text} attributes={TextAttributes.BOLD}>
-          Quality Score
-        </text>
+        <box flexDirection="row" gap={1}>
+          <text fg={theme.text} attributes={TextAttributes.BOLD}>
+            Quality Score
+          </text>
+          <Show when={lobster.projectQuality()}>
+            <text fg={theme.textMuted}>(AI-analyzed)</text>
+          </Show>
+          <Show when={lobster.analysisRunning()}>
+            <text fg={theme.accent}>Analyzing...</text>
+          </Show>
+        </box>
         <box flexDirection="row" gap={1}>
           <text fg={qualityColor()}>{progressBar(quality().score)}</text>
           <text fg={theme.text}>{quality().score}%</text>
@@ -158,17 +166,83 @@ export function DialogHealth() {
             {quality().text}
           </text>
         </box>
-        <Show when={reviewLoopInfo()}>
-          {(info) => (
-            <text fg={theme.textMuted}>
-              Task: <span style={{ fg: theme.accent }}>{info().task}</span>
-              {" \u2500 "}
-              {info().lastVerdict === "PASS" ? "passed" : info().lastVerdict.toLowerCase()}{" "}
-              iteration {info().iteration}/{info().maxIterations}
-            </text>
-          )}
+        <Show when={lobster.projectQuality()}>
+          {(pq) => {
+            const age = () => formatTimeAgo(pq().analyzed_at)
+            const stale = () => Date.now() - pq().analyzed_at > 24 * 60 * 60 * 1000
+            return (
+              <text fg={theme.textMuted}>
+                Analyzed {age()}{stale() ? " (stale)" : ""}
+              </text>
+            )
+          }}
+        </Show>
+        <Show when={!lobster.projectQuality() && !lobster.analysisRunning()}>
+          <Show when={reviewLoopInfo()}>
+            {(info) => (
+              <text fg={theme.textMuted}>
+                Task: <span style={{ fg: theme.accent }}>{info().task}</span>
+                {" \u2500 "}
+                {info().lastVerdict === "PASS" ? "passed" : info().lastVerdict.toLowerCase()}{" "}
+                iteration {info().iteration}/{info().maxIterations}
+              </text>
+            )}
+          </Show>
+          <Show when={!reviewLoopInfo()}>
+            <text fg={theme.textMuted}>Run /health to trigger AI analysis</text>
+          </Show>
         </Show>
       </box>
+
+      {/* AI Category Breakdown */}
+      <Show when={lobster.projectQuality()}>
+        {(pq) => {
+          const categories = () => [
+            { key: "code_structure", label: "Code Structure", data: pq().categories.code_structure },
+            { key: "testing", label: "Testing", data: pq().categories.testing },
+            { key: "documentation", label: "Documentation", data: pq().categories.documentation },
+            { key: "dependencies", label: "Dependencies", data: pq().categories.dependencies },
+            { key: "security", label: "Security", data: pq().categories.security },
+          ]
+          const catColor = (score: number) => {
+            if (score >= 80) return theme.success
+            if (score >= 60) return theme.accent
+            if (score >= 40) return theme.warning
+            return theme.error
+          }
+          return (
+            <box>
+              <text fg={theme.text} attributes={TextAttributes.BOLD}>
+                Category Breakdown
+              </text>
+              <For each={categories()}>
+                {(cat) => (
+                  <box>
+                    <box flexDirection="row" gap={1}>
+                      <text fg={theme.text}>{cat.label.padEnd(16)}</text>
+                      <text fg={catColor(cat.data.score)}>{progressBar(cat.data.score, 15)}</text>
+                      <text fg={theme.text}>{cat.data.score}%</text>
+                    </box>
+                    <Show when={cat.data.findings.length > 0}>
+                      <For each={cat.data.findings.slice(0, 2)}>
+                        {(finding) => (
+                          <text fg={theme.textMuted}>  {"\u2022"} {finding}</text>
+                        )}
+                      </For>
+                    </Show>
+                  </box>
+                )}
+              </For>
+              <Show when={pq().summary}>
+                <box marginTop={1}>
+                  <text fg={theme.text} attributes={TextAttributes.BOLD}>Summary</text>
+                  <text fg={theme.textMuted} wrapMode="word">{pq().summary}</text>
+                </box>
+              </Show>
+            </box>
+          )
+        }}
+      </Show>
 
       {/* Review Loop Phase */}
       <Show when={reviewLoopInfo()}>

@@ -101,6 +101,13 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }) {
               <text fg={theme.textMuted}><b>CONTEXT</b></text>
               <text fg={theme.text}>{context()?.tokens ?? 0} tokens · {context()?.percentage ?? 0}%</text>
               <text fg={theme.textMuted}>{cost()} spent</text>
+              <Show when={lobster.projectQuality()}>
+                {(pq) => (
+                  <text fg={pq().overall_score >= 60 ? theme.success : theme.warning}>
+                    Quality: {pq().overall_score}%
+                  </text>
+                )}
+              </Show>
             </box>
             <SectionDivider />
             <Show when={agents().length > 0}>
