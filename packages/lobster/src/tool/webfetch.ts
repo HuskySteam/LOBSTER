@@ -3,7 +3,7 @@ import { Tool } from "./tool"
 import TurndownService from "turndown"
 import DESCRIPTION from "./webfetch.txt"
 import { abortAfterAny } from "../util/abort"
-import { resolve as dnsResolve } from "dns/promises"
+import { lookup as dnsLookup } from "dns/promises"
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
 const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
@@ -62,23 +62,33 @@ async function checkSSRF(urlString: string): Promise<void> {
   const url = new URL(urlString)
   const hostname = url.hostname.replace(/^\[|\]$/g, "")
 
-  // Check if hostname is already an IP
+  // Block if hostname is already a private IP
   if (isPrivateIP(hostname)) {
     throw new Error("Cannot fetch internal/private network addresses")
   }
 
-  // Resolve hostname and check IP
+  // Use OS-level DNS lookup (same resolver as fetch) to check for private IP resolution.
+  // Only block if the hostname successfully resolves to a private/internal IP (SSRF).
+  // If DNS lookup fails, let the request proceed — fetch() will fail naturally
+  // if the domain truly doesn't exist, and blocking on DNS failure breaks
+  // legitimate domains in many environments (Windows, corporate DNS, etc.)
   try {
-    const addresses = await dnsResolve(hostname)
-    for (const addr of addresses) {
-      if (isPrivateIP(addr)) {
-        throw new Error("Cannot fetch internal/private network addresses")
+    const result = await Promise.race([
+      dnsLookup(hostname, { all: true }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+    ])
+    if (result) {
+      for (const entry of result) {
+        if (isPrivateIP(entry.address)) {
+          throw new Error("Cannot fetch internal/private network addresses")
+        }
       }
     }
   } catch (e: any) {
     if (e?.message?.includes("Cannot fetch")) throw e
-    // DNS resolution failed - block to prevent SSRF
-    throw new Error(`DNS resolution failed for ${hostname}. Request blocked for security.`)
+    // DNS lookup failed or timed out — allow the request to proceed.
+    // fetch() uses the same OS resolver and will fail on its own
+    // if the domain is truly unreachable.
   }
 }
 
