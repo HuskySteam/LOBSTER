@@ -7,6 +7,7 @@ import { createStore } from "solid-js/store"
 import { useRoute } from "../../context/route"
 import { useLobster } from "../../context/lobster"
 import { CostTracker } from "../../component/cost-tracker"
+import { EmptyBorder } from "@tui/component/border"
 
 export function Footer() {
   const { theme } = useTheme()
@@ -59,35 +60,47 @@ export function Footer() {
   })
 
   return (
-    <box flexDirection="row" justifyContent="space-between" gap={1} flexShrink={0}>
-      <text fg={theme.textMuted}>{directory()}</text>
-      <box gap={2} flexDirection="row" flexShrink={0}>
-        <Switch>
-          <Match when={store.welcome}>
-            <text fg={theme.text}>
-              Get started <span style={{ fg: theme.textMuted }}>/connect</span>
-            </text>
-          </Match>
-          <Match when={connected()}>
-            <Show when={permissions().length > 0}>
-              <text fg={theme.warning}>
-                <span style={{ fg: theme.warning }}>△</span> {permissions().length} Permission
-                {permissions().length > 1 ? "s" : ""}
+    <box flexShrink={0}>
+      <box border={["top"]} borderColor={theme.borderSubtle} customBorderChars={{...EmptyBorder, horizontal: "─"}} />
+      <box
+        flexDirection="row"
+        justifyContent="space-between"
+        gap={1}
+        backgroundColor={theme.backgroundPanel}
+        paddingLeft={1}
+        paddingRight={1}
+      >
+        <text fg={theme.textMuted} wrapMode="none">{directory()}</text>
+        <box gap={2} flexDirection="row" flexShrink={0}>
+          <Switch>
+            <Match when={store.welcome}>
+              <text fg={theme.text}>
+                Get started <span style={{ fg: theme.textMuted }}>/connect</span>
               </text>
-            </Show>
-            <text fg={theme.textMuted}>{lsp().length} LSP</text>
-            <Show when={mcp()}>
-              <text fg={mcpError() ? theme.error : theme.textMuted}>{mcp()} MCP</text>
-            </Show>
-            <text fg={theme.textMuted}>/status</text>
-            <Show when={sessionID()}>
-              <CostTracker sessionID={sessionID()!} />
-            </Show>
-            <Show when={!sessionID() && sessionCost()}>
-              <text fg={theme.textMuted}>{sessionCost()}</text>
-            </Show>
-          </Match>
-        </Switch>
+            </Match>
+            <Match when={connected()}>
+              <Show when={permissions().length > 0}>
+                <text fg={theme.warning} wrapMode="none">
+                  ⚠ {permissions().length} permission{permissions().length > 1 ? "s" : ""}
+                </text>
+              </Show>
+              <text fg={theme.textMuted} wrapMode="none">
+                <span style={{ fg: theme.success }}>●</span> {lsp().length} LSP
+              </text>
+              <Show when={mcp()}>
+                <text fg={theme.textMuted} wrapMode="none">
+                  <span style={{ fg: mcpError() ? theme.error : theme.success }}>●</span> {mcp()} MCP
+                </text>
+              </Show>
+              <Show when={sessionID()}>
+                <CostTracker sessionID={sessionID()!} />
+              </Show>
+              <Show when={!sessionID() && sessionCost()}>
+                <text fg={theme.textMuted}>{sessionCost()}</text>
+              </Show>
+            </Match>
+          </Switch>
+        </box>
       </box>
     </box>
   )

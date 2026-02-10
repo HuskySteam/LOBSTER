@@ -34,12 +34,16 @@ export function ActivityBar(props: { sessionID: string }) {
       return { text: "Thinking...", count: "" }
     }
 
+    if (running.length > 1) {
+      return { text: `${running.length} tools running...`, count: "" }
+    }
+
     const part = running[0]
     const text = describeToolCall(part.tool, part.state.input)
 
     const total = toolParts.length
     const done = completed.length
-    const count = total > 1 ? ` [${done}/${total}]` : ""
+    const count = total > 1 ? ` ${done}/${total}` : ""
 
     return { text, count }
   })
@@ -48,7 +52,7 @@ export function ActivityBar(props: { sessionID: string }) {
     <Show when={isBusy() && activityInfo()}>
       {(info) => (
         <box flexShrink={0} paddingLeft={2} paddingRight={2}>
-          <Spinner color={theme.accent}>
+          <Spinner color={theme.primary}>
             {info().text}{info().count}
           </Spinner>
         </box>
@@ -60,25 +64,25 @@ export function ActivityBar(props: { sessionID: string }) {
 function describeToolCall(tool: string, input: Record<string, any>): string {
   switch (tool) {
     case "read":
-      return `Reading ${relativePath(input.filePath ?? input.file_path ?? "")}...`
+      return `Reading ${relativePath(input.filePath ?? input.file_path ?? "")}`
     case "write":
-      return `Writing ${relativePath(input.filePath ?? input.file_path ?? "")}...`
+      return `Writing ${relativePath(input.filePath ?? input.file_path ?? "")}`
     case "edit":
-      return `Editing ${relativePath(input.filePath ?? input.file_path ?? "")}...`
+      return `Editing ${relativePath(input.filePath ?? input.file_path ?? "")}`
     case "bash":
-      return `Running: ${truncate(input.command ?? "", 40)}...`
+      return `Running: ${truncate(input.command ?? "", 40)}`
     case "glob":
-      return `Searching for "${input.pattern ?? ""}"...`
+      return `Searching for "${input.pattern ?? ""}"`
     case "grep":
-      return `Searching for "${input.pattern ?? ""}"...`
+      return `Searching for "${input.pattern ?? ""}"`
     case "webfetch":
-      return `Fetching ${truncate(input.url ?? "", 40)}...`
+      return `Fetching ${truncate(input.url ?? "", 40)}`
     case "websearch":
-      return `Searching: "${input.query ?? ""}"...`
+      return `Searching: "${input.query ?? ""}"`
     case "task":
-      return `Delegating ${input.subagent_type ?? input.subagentType ?? "agent"} task...`
+      return `Delegating ${input.subagent_type ?? input.subagentType ?? "agent"} task`
     default:
-      return `Running ${tool}...`
+      return `Running ${tool}`
   }
 }
 

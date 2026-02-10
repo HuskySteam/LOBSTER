@@ -25,6 +25,7 @@ import { Locale } from "@/util/locale"
 import { formatDuration } from "@/util/format"
 import { createColors, createFrames } from "../../ui/spinner.ts"
 import { useDialog } from "@tui/ui/dialog"
+import { RoundedBorder } from "../border"
 import { DialogProvider as DialogProviderConnect } from "../dialog-provider"
 import { DialogAlert } from "../../ui/dialog-alert"
 import { useToast } from "../../ui/toast"
@@ -993,10 +994,16 @@ export function Prompt(props: PromptProps) {
         agentStyleId={agentStyleId}
         promptPartTypeId={() => promptPartTypeId}
       />
-      <box ref={(r) => (anchor = r)} visible={props.visible !== false}>
-        <box>
+      <box ref={(r) => (anchor = r)} visible={props.visible !== false} marginTop={1}>
+        <box
+          border={["top", "bottom", "left", "right"]}
+          borderColor={highlight()}
+          customBorderChars={RoundedBorder}
+          paddingLeft={1}
+          paddingRight={1}
+        >
           <box flexDirection="row">
-            <text fg={highlight()} flexShrink={0}><b>❯❯ </b></text>
+            <text fg={highlight()} flexShrink={0}>{">"} </text>
             <box flexGrow={1}>
               <textarea
                 placeholder={props.sessionID ? undefined : `Ask anything... "${PLACEHOLDERS[store.placeholder]}"`}
@@ -1176,20 +1183,18 @@ export function Prompt(props: PromptProps) {
               />
             </box>
           </box>
-          <box flexDirection="row" flexShrink={0} paddingTop={0} gap={1} paddingLeft={3}>
-            <text fg={highlight()}>
-              {store.mode === "shell" ? "Shell" : Locale.titlecase(local.agent.current().name)}{" "}
+          <box flexDirection="row" flexShrink={0} paddingTop={0} gap={1} paddingLeft={2}>
+            <text fg={theme.textMuted}>
+              {store.mode === "shell" ? "Shell" : local.model.parsed().model}
             </text>
             <Show when={store.mode === "normal"}>
               <box flexDirection="row" gap={1}>
-                <text flexShrink={0} fg={keybind.leader ? theme.textMuted : theme.text}>
-                  {local.model.parsed().model}
-                </text>
-                <text fg={theme.textMuted}>{local.model.parsed().provider}</text>
+                <text fg={theme.textMuted}>·</text>
+                <text fg={theme.textMuted}>{Locale.titlecase(local.agent.current().name)} agent</text>
                 <Show when={showVariant()}>
                   <text fg={theme.textMuted}>·</text>
                   <text>
-                    <span style={{ fg: theme.warning, bold: true }}>{local.model.variant.current()}</span>
+                    <span style={{ fg: theme.warning }}>{local.model.variant.current()}</span>
                   </text>
                 </Show>
               </box>

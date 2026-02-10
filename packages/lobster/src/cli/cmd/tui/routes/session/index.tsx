@@ -161,7 +161,7 @@ export function Session() {
     return false
   })
   const showTimestamps = createMemo(() => timestamps() === "show")
-  const contentWidth = createMemo(() => dimensions().width - (sidebarVisible() ? 42 : 0) - 4)
+  const contentWidth = createMemo(() => dimensions().width - (sidebarVisible() ? 38 : 0) - 4)
 
   const scrollAcceleration = createMemo(() => {
     const tui = sync.data.config.tui
@@ -1143,6 +1143,7 @@ export function Session() {
               />
             </box>
           </Show>
+          <Footer />
           <Toast />
         </box>
         <Show when={sidebarVisible()}>

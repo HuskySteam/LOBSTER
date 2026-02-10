@@ -72,11 +72,11 @@ export function Home() {
         <text fg={theme.text}>
           <Switch>
             <Match when={mcpError()}>
-              <span style={{ fg: theme.error }}>•</span> mcp errors{" "}
+              <span style={{ fg: theme.error }}>●</span> mcp errors{" "}
               <span style={{ fg: theme.textMuted }}>ctrl+x s</span>
             </Match>
             <Match when={true}>
-              <span style={{ fg: theme.success }}>•</span>{" "}
+              <span style={{ fg: theme.success }}>●</span>{" "}
               {Locale.pluralize(connectedMcpCount(), "{} mcp server", "{} mcp servers")}
             </Match>
           </Switch>
@@ -130,12 +130,8 @@ export function Home() {
     <>
       <box flexGrow={1} justifyContent="center" alignItems="center" paddingLeft={2} paddingRight={2}>
         <box
-          border={["top", "bottom", "left", "right"]}
-          borderColor={theme.border}
-          title={` LOBSTER v${Installation.VERSION} `}
-          titleAlignment="center"
           width="100%"
-          maxWidth={80}
+          maxWidth={70}
           paddingLeft={2}
           paddingRight={2}
           paddingTop={1}
@@ -143,45 +139,35 @@ export function Home() {
         >
           <box alignItems="center">
             <Logo />
+            <text fg={theme.textMuted} marginTop={1}>
+              LOBSTER v{Installation.VERSION}
+            </text>
           </box>
-          <box flexDirection="row" gap={4} marginTop={1}>
-            <box flexGrow={1} flexBasis={0}>
-              <text fg={theme.text}><b>Welcome back!</b></text>
-              <text fg={theme.textMuted} marginTop={1}>
-                {local.model.parsed().model} · {local.model.parsed().provider}
-              </text>
-              <text fg={theme.textMuted}>{directory()}</text>
-            </box>
-            <box flexGrow={1} flexBasis={0}>
-              <Show when={hasReviewHistory()} fallback={
-                <>
-                  <text fg={theme.accent}><b>Tips for getting started</b></text>
-                  <box marginTop={1} gap={1}>
-                    <text fg={theme.textMuted}>Ask LOBSTER to create a new app</text>
-                    <text fg={theme.textMuted}>Use /connect to add a provider</text>
-                    <text fg={theme.textMuted}>Try /help for all commands</text>
-                  </box>
-                  <Show when={recentSessions().length > 0}>
-                    <text fg={theme.accent} marginTop={1}><b>Recent activity</b></text>
-                    <For each={recentSessions()}>
-                      {(s) => (
-                        <text fg={theme.textMuted}>
-                          <span style={{ fg: theme.text }}>{s.time}</span>  {s.title}
-                        </text>
-                      )}
-                    </For>
-                  </Show>
-                </>
-              }>
-                <HealthDashboard />
-              </Show>
-            </box>
+          <box alignItems="center" marginTop={2}>
+            <text fg={theme.textMuted}>What can I help you with?</text>
           </box>
+          <Show when={!isFirstTimeUser() && recentSessions().length > 0 && !hasReviewHistory()}>
+            <box marginTop={2} gap={1}>
+              <text fg={theme.textMuted}>Recent sessions</text>
+              <For each={recentSessions().slice(0, 3)}>
+                {(s) => (
+                  <text fg={theme.textMuted}>
+                    <span style={{ fg: theme.text }}>{s.time}</span>  {s.title}
+                  </text>
+                )}
+              </For>
+            </box>
+          </Show>
+          <Show when={hasReviewHistory()}>
+            <box marginTop={2}>
+              <HealthDashboard />
+            </box>
+          </Show>
         </box>
-        <box width="100%" maxWidth={80} paddingTop={1} zIndex={1000}>
+        <box width="100%" maxWidth={70} paddingTop={1} zIndex={1000}>
           <Show when={isFirstTimeUser()}>
             <text fg={theme.textMuted} paddingBottom={1}>
-              Welcome! Connect a provider to get started. Try <span style={{ fg: theme.text }}>/connect</span> or <span style={{ fg: theme.text }}>/help</span>
+              Welcome! Try <span style={{ fg: theme.text }}>/connect</span> or <span style={{ fg: theme.text }}>/help</span> to get started.
             </text>
           </Show>
           <Prompt

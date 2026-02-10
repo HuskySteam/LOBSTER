@@ -9,26 +9,7 @@ import { useKeybind } from "../../context/keybind"
 import { useTerminalDimensions } from "@opentui/solid"
 import { useSessionCost } from "../../hooks/use-session-cost"
 import { useContextTokens } from "../../hooks/use-context-tokens"
-
-const Title = (props: { session: Accessor<Session> }) => {
-  const { theme } = useTheme()
-  return (
-    <text fg={theme.text}>
-      <span style={{ bold: true }}>{props.session().title}</span>
-    </text>
-  )
-}
-
-const ContextInfo = (props: { context: Accessor<string | undefined>; cost: Accessor<string> }) => {
-  const { theme } = useTheme()
-  return (
-    <Show when={props.context()}>
-      <text fg={theme.textMuted} wrapMode="none" flexShrink={0}>
-        {props.context()} ({props.cost()})
-      </text>
-    </Show>
-  )
-}
+import { useLocal } from "../../context/local"
 
 export function Header() {
   const route = useRouteData("session")
@@ -44,6 +25,7 @@ export function Header() {
   const { theme } = useTheme()
   const keybind = useKeybind()
   const command = useCommandDialog()
+  const local = useLocal()
   const [hover, setHover] = createSignal<"parent" | "prev" | "next" | null>(null)
   const dimensions = useTerminalDimensions()
   const narrow = createMemo(() => dimensions().width < 80)
@@ -52,8 +34,9 @@ export function Header() {
     <box flexShrink={0}>
       <box
         paddingTop={1}
-        paddingLeft={2}
+        paddingLeft={1}
         paddingRight={1}
+        paddingBottom={1}
         flexShrink={0}
       >
         <Switch>
@@ -61,10 +44,14 @@ export function Header() {
             <box flexDirection="column" gap={1}>
               <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={narrow() ? 1 : 0}>
                 <text fg={theme.text}>
-                  <b>Subagent session</b>
+                  Subagent session
                 </text>
                 <box flexDirection="row" gap={1} flexShrink={0}>
-                  <ContextInfo context={context} cost={cost} />
+                  <Show when={context()}>
+                    <text fg={theme.textMuted} wrapMode="none" flexShrink={0}>
+                      {local.model.parsed().model} · {context()} · {cost()}
+                    </text>
+                  </Show>
                 </box>
               </box>
               <box flexDirection="row" gap={2}>
@@ -103,15 +90,19 @@ export function Header() {
           </Match>
           <Match when={true}>
             <box flexDirection={narrow() ? "column" : "row"} justifyContent="space-between" gap={1}>
-              <Title session={session} />
+              <text fg={theme.text}>{session()?.title}</text>
               <box flexDirection="row" gap={1} flexShrink={0}>
-                <ContextInfo context={context} cost={cost} />
+                <Show when={context()}>
+                  <text fg={theme.textMuted} wrapMode="none" flexShrink={0}>
+                    {local.model.parsed().model} · {context()} · {cost()}
+                  </text>
+                </Show>
               </box>
             </box>
           </Match>
         </Switch>
       </box>
-      <box border={["top"]} borderColor={theme.border} customBorderChars={{...EmptyBorder, horizontal: "─"}} />
+      <box border={["top"]} borderColor={theme.borderSubtle} customBorderChars={{...EmptyBorder, horizontal: "─"}} />
     </box>
   )
 }
