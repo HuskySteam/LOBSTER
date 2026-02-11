@@ -177,7 +177,7 @@ export namespace SessionCompaction {
         time: {
           created: Date.now(),
         },
-        agent: userMessage.agent,
+        agent: userMessage.agent === "plan" ? "build" : userMessage.agent,
         model: userMessage.model,
       })
       await Session.updatePart({

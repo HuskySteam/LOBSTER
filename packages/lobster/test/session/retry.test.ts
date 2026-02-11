@@ -99,7 +99,8 @@ describe("session.retry.retryable", () => {
 
   test("handles json messages without code", () => {
     const error = wrap(JSON.stringify({ error: { message: "no_kv_space" } }))
-    expect(SessionRetry.retryable(error)).toBeUndefined()
+    // Unrecognized JSON errors are retried as a fallback (backported from OpenCode)
+    expect(SessionRetry.retryable(error)).toBe('{"error":{"message":"no_kv_space"}}')
   })
 
   test("does not throw on numeric error codes", () => {

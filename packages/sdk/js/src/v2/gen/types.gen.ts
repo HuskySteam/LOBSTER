@@ -168,6 +168,14 @@ export type ApiError = {
   }
 }
 
+export type ContextOverflowError = {
+  name: "ContextOverflowError"
+  data: {
+    message: string
+    responseBody?: string
+  }
+}
+
 export type AssistantMessage = {
   id: string
   sessionID: string
@@ -176,7 +184,7 @@ export type AssistantMessage = {
     created: number
     completed?: number
   }
-  error?: ProviderAuthError | UnknownError | MessageOutputLengthError | MessageAbortedError | ApiError
+  error?: ProviderAuthError | UnknownError | MessageOutputLengthError | MessageAbortedError | ApiError | ContextOverflowError
   parentID: string
   modelID: string
   providerID: string
@@ -819,7 +827,7 @@ export type EventSessionError = {
   type: "session.error"
   properties: {
     sessionID?: string
-    error?: ProviderAuthError | UnknownError | MessageOutputLengthError | MessageAbortedError | ApiError
+    error?: ProviderAuthError | UnknownError | MessageOutputLengthError | MessageAbortedError | ApiError | ContextOverflowError
   }
 }
 

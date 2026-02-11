@@ -575,7 +575,7 @@ export namespace SessionPrompt {
       ) {
         await SessionCompaction.create({
           sessionID,
-          agent: lastUser.agent,
+          agent: lastUser.agent === "plan" ? "build" : lastUser.agent,
           model: lastUser.model,
           auto: true,
         })
@@ -757,7 +757,7 @@ export namespace SessionPrompt {
       if (result?.action === "compact") {
         await SessionCompaction.create({
           sessionID,
-          agent: lastUser.agent,
+          agent: lastUser.agent === "plan" ? "build" : lastUser.agent,
           model: lastUser.model,
           auto: true,
         })
@@ -1417,6 +1417,14 @@ export namespace SessionPrompt {
           })
         }
       }
+    }
+
+    // Skip plan mode re-injection after compaction
+    const lastAssistant = input.messages.findLast((m) => m.info.role === "assistant")
+    const justCompacted =
+      lastAssistant?.info.role === "assistant" && (lastAssistant.info as any).summary === true
+    if (justCompacted) {
+      return input.messages
     }
 
     // Original logic when experimental plan mode is disabled

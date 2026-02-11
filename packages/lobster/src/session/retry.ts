@@ -59,6 +59,7 @@ export namespace SessionRetry {
   }
 
   export function retryable(error: ReturnType<NamedError["toObject"]>) {
+    if (MessageV2.ContextOverflowError.isInstance(error)) return undefined
     if (MessageV2.APIError.isInstance(error)) {
       if (!error.data.isRetryable) return undefined
       return error.data.message.includes("Overloaded") ? "Provider is overloaded" : error.data.message
@@ -89,7 +90,7 @@ export namespace SessionRetry {
       if (json.type === "error" && json.error?.code?.includes("rate_limit")) {
         return "Rate Limited"
       }
-      return undefined
+      return JSON.stringify(json)
     } catch {
       return undefined
     }
