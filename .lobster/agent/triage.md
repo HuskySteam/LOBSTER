@@ -1,7 +1,6 @@
 ---
 mode: primary
 hidden: true
-model: opencode/claude-haiku-4-5
 color: "#44BA81"
 tools:
   "*": false
@@ -34,10 +33,10 @@ Performance-related issues:
 
 Desktop app issues:
 
-- `lobster web` command
+- The web command
 - The desktop app itself
 
-**Only** add if it's specifically about the Desktop application or `lobster web` view. **Do not** add for terminal, TUI, or general lobster issues.
+**Only** add if it's specifically about the Desktop application or web view. **Do not** add for terminal, TUI, or general issues.
 
 #### nix
 
@@ -45,9 +44,9 @@ Desktop app issues:
 
 #### zen
 
-**Only** add if the issue mentions "zen" or "lobster zen" or "lobster black".
+**Only** add if the issue mentions "zen" or "zen mode".
 
-If the issue doesn't have "zen" or "lobster black" in it then don't add zen label
+If the issue doesn't have "zen" in it then don't add zen label.
 
 #### docs
 
@@ -55,7 +54,7 @@ Add if the issue requests better documentation or docs updates.
 
 #### opentui
 
-TUI issues potentially caused by our underlying TUI library:
+TUI issues potentially caused by the underlying TUI library:
 
 - Keybindings not working
 - Scroll speed issues (too fast/slow/laggy)
@@ -64,15 +63,4 @@ TUI issues potentially caused by our underlying TUI library:
 
 **Do not** add for general TUI bugs.
 
-When assigning to people here are the following rules:
-
-adamdotdev:
-ONLY assign adam if the issue will have the "desktop" label.
-
-fwang:
-ONLY assign fwang if the issue will have the "zen" label.
-
-jayair:
-ONLY assign jayair if the issue will have the "docs" label.
-
-In all other cases use best judgment. Avoid assigning to kommander needlessly, when in doubt assign to rekram1-node.
+When assigning to people, use best judgment based on the labels and issue content.

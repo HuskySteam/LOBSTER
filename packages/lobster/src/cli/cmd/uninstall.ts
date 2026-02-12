@@ -7,6 +7,7 @@ import { $ } from "bun"
 import fs from "fs/promises"
 import path from "path"
 import os from "os"
+import { logo as logoLines } from "../logo"
 
 interface UninstallArgs {
   keepConfig: boolean
@@ -19,6 +20,16 @@ interface RemovalTargets {
   directories: Array<{ path: string; label: string; keep: boolean }>
   shellConfig: string | null
   binary: string | null
+}
+
+function supportsColor(): boolean {
+  if (process.env.NO_COLOR) return false
+  if (process.env.FORCE_COLOR) return true
+  if (process.platform === "win32") {
+    // Windows Terminal and modern cmd support ANSI, but many contexts don't
+    return !!process.env.WT_SESSION || !!process.env.TERM_PROGRAM || process.stderr.isTTY === true
+  }
+  return process.stderr.isTTY === true
 }
 
 export const UninstallCommand = {
@@ -52,7 +63,13 @@ export const UninstallCommand = {
 
   handler: async (args: UninstallArgs) => {
     UI.empty()
-    UI.println(UI.logo("  "))
+    if (supportsColor()) {
+      UI.println(UI.logo("  "))
+    } else {
+      for (const line of logoLines) {
+        UI.println("  " + line)
+      }
+    }
     UI.empty()
     prompts.intro("Uninstall Lobster")
 
@@ -112,10 +129,12 @@ async function showRemovalSummary(targets: RemovalTargets, method: Installation.
 
     const size = await getDirectorySize(dir.path)
     const sizeStr = formatSize(size)
-    const status = dir.keep ? UI.Style.TEXT_DIM + "(keeping)" : ""
+    const dim = supportsColor() ? UI.Style.TEXT_DIM : ""
+    const reset = supportsColor() ? UI.Style.TEXT_NORMAL : ""
+    const status = dir.keep ? dim + "(keeping)" + reset : ""
     const prefix = dir.keep ? "○" : "✓"
 
-    prompts.log.info(`  ${prefix} ${dir.label}: ${shortenPath(dir.path)} ${UI.Style.TEXT_DIM}(${sizeStr})${status}`)
+    prompts.log.info(`  ${prefix} ${dir.label}: ${shortenPath(dir.path)} ${dim}(${sizeStr})${reset} ${status}`)
   }
 
   if (targets.binary) {
@@ -193,7 +212,7 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
       spinner.start(`Running ${cmd.join(" ")}...`)
       const result =
         method === "choco"
-          ? await $`echo Y | choco uninstall lobster -y -r`.quiet().nothrow()
+          ? await $`choco uninstall lobster -y --no-progress 2>&1`.quiet().nothrow()
           : await $`${cmd}`.quiet().nothrow()
       if (result.exitCode !== 0) {
         spinner.stop(`Package manager uninstall failed: exit code ${result.exitCode}`, 1)

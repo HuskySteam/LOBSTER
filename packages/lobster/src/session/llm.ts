@@ -22,11 +22,16 @@ import { SystemPrompt } from "./system"
 import { Flag } from "@/flag/flag"
 import { PermissionNext } from "@/permission/next"
 import { Auth } from "@/auth"
+import { PromptRegistry } from "./prompt-registry"
 
 export namespace LLM {
   const log = Log.create({ service: "llm" })
 
   export const OUTPUT_TOKEN_MAX = Flag.LOBSTER_EXPERIMENTAL_OUTPUT_TOKEN_MAX || 32_000
+
+  let lastCacheKey: number | undefined
+  let cacheHits = 0
+  let cacheMisses = 0
 
   export type StreamInput = {
     user: MessageV2.User
@@ -65,6 +70,17 @@ export namespace LLM {
       Auth.get(input.model.providerID),
     ])
     const isCodex = provider.id === "openai" && auth?.type === "oauth"
+
+    const currentKey = PromptRegistry.cacheKey()
+    if (currentKey === lastCacheKey) {
+      cacheHits++
+    } else {
+      cacheMisses++
+      lastCacheKey = currentKey
+    }
+    if ((cacheHits + cacheMisses) % 10 === 0) {
+      log.info("prompt cache stats", { hits: cacheHits, misses: cacheMisses, ratio: cacheHits / (cacheHits + cacheMisses) })
+    }
 
     const system = []
     system.push(

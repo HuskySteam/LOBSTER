@@ -24,6 +24,7 @@ import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
 import { Log } from "../util/log"
+import { DelegateMode } from "../session/delegate"
 
 export namespace Agent {
   const log = Log.create({ service: "agent" })
@@ -102,6 +103,7 @@ export namespace Agent {
       external_directory: {
         "*": "ask",
         [Truncate.GLOB]: "allow",
+        [path.join(Global.Path.data, "scratchpad", "*")]: "allow",
         ...Object.fromEntries(skillDirs.map((dir) => [path.join(dir, "*"), "allow"])),
       },
       question: "deny",
@@ -120,7 +122,7 @@ export namespace Agent {
     const result: Record<string, Info> = {
       build: {
         name: "build",
-        description: "The default agent. Executes tools based on configured permissions.",
+        description: "The default agent. Executes tools based on configured permissions. Handles all software engineering tasks.",
         options: {},
         permission: buildPermissions({
           defaults,
@@ -132,7 +134,7 @@ export namespace Agent {
       },
       plan: {
         name: "plan",
-        description: "Plan mode. Explores the codebase and designs implementation plans before code is written.",
+        description: "Software architect agent for designing implementation plans. Explores the codebase and designs approaches for user approval. Read-only access.",
         options: {},
         prompt: PROMPT_PLAN,
         permission: buildPermissions({
@@ -155,7 +157,7 @@ export namespace Agent {
       },
       general: {
         name: "general",
-        description: `General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.`,
+        description: `General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you.`,
         prompt: PROMPT_GENERAL,
         permission: buildPermissions({
           defaults,
@@ -191,7 +193,7 @@ export namespace Agent {
           user,
           capabilities: [],
         }),
-        description: `Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. "src/components/**/*.tsx"), search code for keywords (eg. "API endpoints"), or answer questions about the codebase (eg. "how do API endpoints work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions.`,
+        description: `Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (e.g., "src/components/**/*.tsx"), search code for keywords (e.g., "API endpoints"), or answer questions about the codebase (e.g., "how do API endpoints work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions.`,
         prompt: PROMPT_EXPLORE,
         options: {},
         mode: "subagent",
@@ -242,7 +244,7 @@ export namespace Agent {
       },
       "team-member": {
         name: "team-member",
-        description: "Agent that operates as a team member with access to team task and messaging tools.",
+        description: "Collaborative team member agent with access to task management and messaging tools. Self-coordinates via shared task list and direct agent-to-agent messaging.",
         permission: buildPermissions({
           defaults,
           agentOverrides: PermissionNext.fromConfig({
@@ -298,6 +300,11 @@ export namespace Agent {
         })
       } else {
         item.permission = PermissionNext.merge(item.permission, PermissionNext.fromConfig(value.permission ?? {}))
+      }
+
+      // Delegate mode: merge restrictive permissions that only allow coordination tools
+      if (value.delegate_mode) {
+        item.permission = PermissionNext.merge(item.permission, DelegateMode.permissions())
       }
     }
 

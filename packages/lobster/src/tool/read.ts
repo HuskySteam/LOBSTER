@@ -151,6 +151,16 @@ export const ReadTool = Tool.define("read", {
       output += `\n\n<system-reminder>\n${instructions.map((i) => i.content).join("\n\n")}\n</system-reminder>`
     }
 
+    // Empty file warning
+    if (raw.length === 0 && lines.length <= 1 && (!lines[0] || lines[0].trim() === "")) {
+      output += `\n\n<system-reminder>\nWarning: The file exists but has empty contents.\n</system-reminder>`
+    }
+
+    // Truncation reminder
+    if (truncated) {
+      output += `\n\n<system-reminder>\nThe file was truncated. Use offset/limit to read more, or use Grep to search within.\n</system-reminder>`
+    }
+
     return {
       title,
       output,

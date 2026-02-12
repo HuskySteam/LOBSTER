@@ -50,15 +50,31 @@ export namespace Log {
   export function file() {
     return logpath
   }
+
+  // Buffer log messages until init() is called so nothing leaks to stderr
+  let pendingBuffer: string[] = []
+  let initialized = false
   let write = (msg: any) => {
-    process.stderr.write(msg)
+    pendingBuffer.push(String(msg))
     return msg.length
   }
 
   export async function init(options: Options) {
     if (options.level) level = options.level
     cleanup(Global.Path.log)
-    if (options.print) return
+    if (options.print) {
+      write = (msg: any) => {
+        process.stderr.write(msg)
+        return msg.length
+      }
+      // Flush buffered messages to stderr when --print-logs is used
+      for (const msg of pendingBuffer) {
+        process.stderr.write(msg)
+      }
+      pendingBuffer = []
+      initialized = true
+      return
+    }
     logpath = path.join(
       Global.Path.log,
       options.dev ? "dev.log" : new Date().toISOString().split(".")[0].replace(/:/g, "") + ".log",
@@ -71,6 +87,13 @@ export namespace Log {
       writer.flush()
       return num
     }
+    // Flush buffered messages to log file
+    for (const msg of pendingBuffer) {
+      writer.write(msg)
+    }
+    writer.flush()
+    pendingBuffer = []
+    initialized = true
   }
 
   async function cleanup(dir: string) {

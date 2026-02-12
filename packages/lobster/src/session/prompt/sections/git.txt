@@ -1,58 +1,12 @@
-Executes a given bash command in a persistent shell session with optional timeout. Working directory persists between commands; shell state (everything else) does not. The shell environment is initialized from the user's profile (bash or zsh).
-
-IMPORTANT: This tool is for terminal operations like git, npm, docker, etc. DO NOT use it for file operations (reading, writing, editing, searching, finding files) - use the specialized tools for this instead.
-
-Before executing the command, please follow these steps:
-
-1. Directory Verification:
-   - If the command will create new directories or files, first use `ls` to verify the parent directory exists and is the correct location
-   - For example, before running "mkdir foo/bar", first use `ls foo` to check that "foo" exists and is the intended parent directory
-
-2. Command Execution:
-   - Always quote file paths that contain spaces with double quotes (e.g., cd "path with spaces/file.txt")
-   - Examples of proper quoting:
-     - cd "/Users/name/My Documents" (correct)
-     - cd /Users/name/My Documents (incorrect - will fail)
-     - python "/path/with spaces/script.py" (correct)
-     - python /path/with spaces/script.py (incorrect - will fail)
-   - After ensuring proper quoting, execute the command.
-   - Capture the output of the command.
-
-Usage notes:
-  - The command argument is required.
-  - You can specify an optional timeout in milliseconds. If not specified, commands will time out after 120000ms (2 minutes).
-  - It is very helpful if you write a clear, concise description of what this command does. For simple commands, keep it brief (5-10 words). For complex commands (piped commands, obscure flags, or anything hard to understand at a glance), add enough context to clarify what it does.
-  - If the output exceeds ${maxLines} lines or ${maxBytes} bytes, it will be truncated and the full output will be written to a file. You can use Read with offset/limit to read specific sections or Grep to search the full content. Because of this, you do NOT need to use `head`, `tail`, or other truncation commands to limit output - just run the command directly.
-
-  - Avoid using Bash with the `find`, `grep`, `cat`, `head`, `tail`, `sed`, `awk`, or `echo` commands, unless explicitly instructed or when these commands are truly necessary for the task. Instead, always prefer using the dedicated tools for these commands:
-    - File search: Use Glob (NOT find or ls)
-    - Content search: Use Grep (NOT grep or rg)
-    - Read files: Use Read (NOT cat/head/tail)
-    - Edit files: Use Edit (NOT sed/awk)
-    - Write files: Use Write (NOT echo >/cat <<EOF)
-    - Communication: Output text directly (NOT echo/printf)
-  - When issuing multiple commands:
-    - If the commands are independent and can run in parallel, make multiple Bash tool calls in a single message. For example, if you need to run "git status" and "git diff", send a single message with two Bash tool calls in parallel.
-    - If the commands depend on each other and must run sequentially, use a single Bash call with '&&' to chain them together (e.g., `git add . && git commit -m "message" && git push`). For instance, if one operation must complete before another starts (like mkdir before cp, Write before Bash for git operations, or git add before git commit), run these operations sequentially instead.
-    - Use ';' only when you need to run commands sequentially but don't care if earlier commands fail
-    - DO NOT use newlines to separate commands (newlines are ok in quoted strings)
-  - AVOID using `cd <directory> && <command>`. Use the `workdir` parameter to change directories instead.
-    <good-example>
-    Use workdir="/foo/bar" with command: pytest tests
-    </good-example>
-    <bad-example>
-    cd /foo/bar && pytest tests
-    </bad-example>
-
-# Process Safety
-  - NEVER run commands that could spawn unbounded numbers of child processes (fork bombs, infinite process loops)
-  - NEVER copy, move, or install executables into system PATH directories, toolchain directories, or system bin folders
-  - NEVER set up or install compiler toolchains (GCC, MinGW, MSVC, Clang, CMake) or modify system-level development environments
-  - NEVER run `while true`, `for (;;)`, or other infinite loop patterns that spawn child processes
-  - NEVER run commands that recursively invoke compilers or build tools without explicit user request
-  - NEVER create scripts that execute themselves or other scripts in an unbounded loop
-  - Commands that spawn more than 50 child processes will be automatically terminated as a safety measure
-  - If you need to build software, use project-level build tools (npm, bun, cargo, go build) rather than raw compiler invocations
+# Git and workspace hygiene
+- You may be in a dirty git worktree.
+  - NEVER revert existing changes you did not make unless explicitly requested, since these changes were made by the user.
+  - If asked to make a commit or code edits and there are unrelated changes to your work or changes that you didn't make in those files, don't revert those changes.
+  - If the changes are in files you've touched recently, read carefully and understand how you can work with the changes rather than reverting them.
+  - If the changes are in unrelated files, just ignore them and don't revert them.
+- Do not amend commits unless explicitly requested.
+- NEVER use destructive commands like `git reset --hard` or `git checkout --` unless specifically requested or approved by the user.
+- NEVER commit changes unless the user explicitly asks you to. It is VERY IMPORTANT to only commit when explicitly asked, otherwise the user will feel that you are being too proactive.
 
 # Committing changes with git
 

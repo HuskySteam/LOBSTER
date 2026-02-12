@@ -232,4 +232,25 @@ export interface Hooks {
     input: { sessionID: string; messageID: string; partID: string },
     output: { text: string },
   ) => Promise<void>
+  /**
+   * Called when a notification is triggered
+   */
+  "notification"?: (
+    input: { sessionID: string; type: string; message: string },
+    output: {},
+  ) => Promise<void>
+  /**
+   * Called when the user submits a prompt
+   */
+  "user.prompt.submit"?: (
+    input: { sessionID: string; text: string },
+    output: { text: string },
+  ) => Promise<void>
+  /**
+   * Called when a tool execution fails
+   */
+  "tool.execute.failure"?: (
+    input: { tool: string; sessionID: string; callID: string; error: string },
+    output: {},
+  ) => Promise<void>
 }
