@@ -350,6 +350,30 @@ export namespace Session {
     }
   }
 
+  export async function search(query: string): Promise<Info[]> {
+    const sessions: Info[] = []
+    for await (const session of list()) {
+      sessions.push(session)
+    }
+    if (!query.trim()) return sessions
+    const lower = query.toLowerCase()
+    const results: Info[] = []
+    for (const session of sessions) {
+      if (session.title.toLowerCase().includes(lower)) {
+        results.push(session)
+        continue
+      }
+      const msgs = await messages({ sessionID: session.id }).catch(() => [])
+      const hasMatch = msgs.some((msg) =>
+        msg.parts.some((p) =>
+          p.type === "text" && (p as any).text?.toLowerCase().includes(lower)
+        )
+      )
+      if (hasMatch) results.push(session)
+    }
+    return results
+  }
+
   export const children = fn(Identifier.schema("session"), async (parentID) => {
     const project = Instance.project
     const result = [] as Session.Info[]

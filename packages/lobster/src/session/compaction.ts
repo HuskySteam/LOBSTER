@@ -41,12 +41,17 @@ export namespace SessionCompaction {
   export const PRUNE_MINIMUM = 20_000
   export const PRUNE_PROTECT = 40_000
 
+  export function adaptivePruneMinimum(usageRatio: number): number {
+    if (usageRatio > 0.8) return 10_000
+    return PRUNE_MINIMUM
+  }
+
   const PRUNE_PROTECTED_TOOLS = ["skill"]
 
   // goes backwards through parts until there are 40_000 tokens worth of tool
   // calls. then erases output of previous tool calls. idea is to throw away old
   // tool calls that are no longer relevant.
-  export async function prune(input: { sessionID: string }) {
+  export async function prune(input: { sessionID: string; usageRatio?: number }) {
     const config = await Config.get()
     if (config.compaction?.prune === false) return
     log.info("pruning")
@@ -55,6 +60,7 @@ export namespace SessionCompaction {
     let pruned = 0
     const toPrune = []
     let turns = 0
+    const pruneMin = adaptivePruneMinimum(input.usageRatio ?? 0)
 
     loop: for (let msgIndex = msgs.length - 1; msgIndex >= 0; msgIndex--) {
       const msg = msgs[msgIndex]
@@ -78,7 +84,7 @@ export namespace SessionCompaction {
       }
     }
     log.info("found", { pruned, total })
-    if (pruned > PRUNE_MINIMUM) {
+    if (pruned > pruneMin) {
       for (const part of toPrune) {
         if (part.state.status === "completed") {
           part.state.time.compacted = Date.now()

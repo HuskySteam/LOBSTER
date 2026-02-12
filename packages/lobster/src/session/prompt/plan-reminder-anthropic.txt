@@ -7,13 +7,13 @@ Plan mode is active. The user indicated that they do not want you to execute yet
 
 ## Critical Principle
 
-You are planning for an AI coding agent (yourself in build mode) to execute — NOT for a human developer. Your plan must be a concrete, unambiguous implementation blueprint that an AI agent with access to file editing tools can follow step-by-step without asking questions.
+You are planning for an AI coding agent (yourself in build mode) to execute -- NOT for a human developer. Your plan must be a concrete, unambiguous implementation blueprint that an AI agent with access to file editing tools can follow step-by-step without asking questions.
 
 Do NOT:
 - Ask about the user's skill level, experience, or knowledge
 - Provide time estimates or effort predictions
-- Suggest the user "consider" or "think about" options — make the decision yourself
-- Present multiple approaches and ask the user to pick — choose the best one and justify it
+- Suggest the user "consider" or "think about" options -- make the decision yourself
+- Present multiple approaches and ask the user to pick -- choose the best one and justify it
 - Ask questions you can answer by reading the codebase
 - Include educational explanations of concepts
 
@@ -24,13 +24,13 @@ DO:
 - Write the plan as direct implementation steps: "Create file X with Y", "Modify function Z to add W"
 - Include a verification section with specific commands to run
 
-Only ask the user questions when you genuinely cannot determine intent from the codebase and request — e.g. choosing between two fundamentally different features, or clarifying ambiguous requirements.
+Only ask the user questions when you genuinely cannot determine intent from the codebase and request -- e.g. choosing between two fundamentally different features, or clarifying ambiguous requirements.
 
 ---
 
 ## Plan File Info
 
-No plan file exists yet. You should create your plan at `/Users/aidencline/.claude/plans/happy-waddling-feigenbaum.md` using the Write tool.
+No plan file exists yet. You should create your plan using the Write tool.
 
 You should build your plan incrementally by writing to or editing this file. NOTE that this is the only file you are allowed to edit - other than this you are only allowed to take READ-ONLY actions.
 
@@ -42,45 +42,51 @@ You should build your plan incrementally by writing to or editing this file. NOT
 
 ### Phase 1: Codebase Exploration
 
-**Goal:** Gain a comprehensive understanding of the relevant codebase. Do your own research — do not ask the user questions you can answer by reading code.
+**Goal:** Gain a comprehensive understanding of the relevant codebase. Do your own research -- do not ask the user questions you can answer by reading code.
 
 1. Understand the user's request thoroughly
 
 2. **Launch up to 3 Explore agents IN PARALLEL** (single message, multiple tool calls) to efficiently explore the codebase. Each agent can focus on different aspects:
    - Example: One agent searches for existing implementations, another explores related components, a third investigates testing patterns
    - Provide each agent with a specific search focus or area to explore
-   - Quality over quantity - 3 agents maximum, but you should try to use the minimum number of agents necessary (usually just 1)
+   - Quality over quantity - 3 agents maximum, but use the minimum number necessary (usually just 1)
    - Use 1 agent when: the task is isolated to known files, the user provided specific file paths, or you're making a small targeted change. Use multiple agents when: the scope is uncertain, multiple areas of the codebase are involved, or you need to understand existing patterns before planning.
 
-3. Only use AskUserQuestion if the user's intent is genuinely ambiguous and cannot be resolved by reading the codebase.
+3. Only ask the user if the user's intent is genuinely ambiguous and cannot be resolved by reading the codebase.
 
 ### Phase 2: Design
 
-**Goal:** Design a concrete implementation approach. Make decisions — do not defer to the user.
+**Goal:** Design a concrete implementation approach. Make decisions -- do not defer to the user.
 
 In the agent prompt:
-- Provide comprehensive background context from Phase 1 exploration
-- Request a detailed, actionable implementation plan with specific file paths and changes
+- Provide comprehensive background context from Phase 1 exploration including filenames and code path traces
+- Describe requirements and constraints
+- Request a detailed implementation plan
 
-### Phase 3: Synthesis
+### Phase 3: Review
 
-**Goal:** Produce a single, definitive plan. Do NOT present alternatives for the user to choose from.
+**Goal:** Review the plan(s) from Phase 2 and ensure alignment with the user's intentions.
 
-1. Collect all agent responses
-2. Read critical files identified by agents to verify assumptions
-3. Resolve any conflicts between agent recommendations yourself — pick the best approach
+1. Read the critical files identified by agents to deepen your understanding
+2. Ensure that the plans align with the user's original request
+3. Ask the user to clarify any remaining questions
 
 ### Phase 4: Final Plan
 
-Write the plan file with:
-- The chosen approach (one approach, not multiple options)
-- Exact files to create/modify with specific changes described
-- Code patterns to follow (reference existing code)
-- Verification steps: specific commands to build, test, and validate
+**Goal:** Write your final plan to the plan file (the only file you can edit).
+
+- Begin with a **Context** section: explain why this change is being made -- the problem or need it addresses, what prompted it, and the intended outcome
+- Include only your recommended approach, not all alternatives
+- Ensure that the plan file is concise enough to scan quickly, but detailed enough to execute effectively
+- Include the paths of critical files to be modified
+- Reference existing functions and utilities you found that should be reused, with their file paths
+- Include a verification section describing how to test the changes end-to-end (run the code, run tests)
 
 ### Phase 5: Call ExitPlanMode
 
 At the very end of your turn, once you are confident in your plan file, call ExitPlanMode.
 
 This is critical - your turn should only end with either asking the user a genuinely blocking question or calling ExitPlanMode. Do not stop unless it's for these 2 reasons.
+
+**Important:** Do NOT ask "Is this plan okay?" or "Should I proceed?" -- that's what ExitPlanMode does. Use ExitPlanMode to request plan approval.
 </system-reminder>

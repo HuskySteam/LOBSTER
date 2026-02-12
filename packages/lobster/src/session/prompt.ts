@@ -48,6 +48,7 @@ import { Shell } from "@/shell/shell"
 import { Truncate } from "@/tool/truncation"
 import { filterEnv } from "@/tool/bash"
 import { TeamManager } from "../team/manager"
+import { GitSnapshot } from "./git-snapshot"
 import { MemoryManager } from "../memory/manager"
 import { Memory } from "../memory/memory"
 import { SmartContext } from "../context/smart"
@@ -57,6 +58,9 @@ import { Verification } from "../tool/verification"
 import { ToolCache } from "../tool/cache"
 import { MemoryExtractor } from "../memory/extractor"
 import { AgentRouter } from "../agent/router"
+import { DelegateMode } from "./delegate"
+import { Scratchpad } from "./scratchpad"
+import { Todo } from "./todo"
 
 // Suppress AI SDK warnings that pollute stdout. The AI SDK checks this global
 // to decide whether to log warnings. See: https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
@@ -182,6 +186,19 @@ export namespace SessionPrompt {
       await Session.update(session.id, (draft) => {
         draft.permission = permissions
       })
+    }
+
+    // Trigger user.prompt.submit hook
+    const userText = input.parts
+      .filter((p) => p.type === "text")
+      .map((p) => p.text)
+      .join(" ")
+    if (userText.trim()) {
+      await Plugin.trigger(
+        "user.prompt.submit",
+        { sessionID: input.sessionID, text: userText },
+        { text: userText },
+      ).catch(() => {})
     }
 
     if (input.noReply === true) {
@@ -399,6 +416,34 @@ export namespace SessionPrompt {
           abort,
         })
 
+      // Git status snapshot on first step
+      if (step === 1) {
+        const gitSnapshot = await GitSnapshot.get()
+        if (gitSnapshot) {
+          const lastUserIdx = msgs.findLastIndex((m) => m.info.role === "user")
+          if (lastUserIdx >= 0) {
+            msgs = msgs.map((m, i) =>
+              i === lastUserIdx
+                ? {
+                    ...m,
+                    parts: [
+                      ...m.parts,
+                      {
+                        id: Identifier.ascending("part"),
+                        messageID: m.info.id,
+                        sessionID: m.info.sessionID,
+                        type: "text" as const,
+                        text: `<system-reminder>\n${GitSnapshot.toReminder(gitSnapshot)}\n</system-reminder>`,
+                        synthetic: true,
+                      },
+                    ],
+                  }
+                : m,
+            )
+          }
+        }
+      }
+
       const model = await Provider.getModel(lastUser.model.providerID, lastUser.model.modelID)
       const task = tasks.pop()
 
@@ -586,6 +631,26 @@ export namespace SessionPrompt {
         continue
       }
 
+      // proactive compaction: trigger early when context exceeds 90%
+      if (
+        lastFinished &&
+        lastFinished.summary !== true &&
+        model.limit.context > 0
+      ) {
+        const totalTokens = lastFinished.tokens.input + lastFinished.tokens.cache.read + lastFinished.tokens.output
+        const usageRatio = totalTokens / model.limit.context
+        if (usageRatio > 0.9) {
+          log.info("proactive compaction triggered", { usageRatio, sessionID })
+          await SessionCompaction.create({
+            sessionID,
+            agent: lastUser.agent === "plan" ? "build" : lastUser.agent,
+            model: lastUser.model,
+            auto: true,
+          })
+          continue
+        }
+      }
+
       // context overflow, needs compaction
       if (
         lastFinished &&
@@ -611,6 +676,11 @@ export namespace SessionPrompt {
           agentName: agent.name,
           enteredAt: Date.now(),
         })
+      }
+
+      // Initialize scratchpad directory on first step
+      if (step === 1) {
+        Scratchpad.create(sessionID).catch(() => {})
       }
 
       // Smart context: auto-find relevant files (opt-out via smart_context: false)
@@ -1489,6 +1559,20 @@ export namespace SessionPrompt {
     const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
     if (!userMessage) return input.messages
 
+    // Delegate mode reminder
+    const cfg = await Config.get()
+    const agentConfig = cfg.agent?.[input.agent.name]
+    if (agentConfig?.delegate_mode) {
+      userMessage.parts.push({
+        id: Identifier.ascending("part"),
+        messageID: userMessage.info.id,
+        sessionID: userMessage.info.sessionID,
+        type: "text",
+        text: DelegateMode.REMINDER,
+        synthetic: true,
+      })
+    }
+
     // Inject relevant memories if memory feature is enabled
     if (Flag.LOBSTER_EXPERIMENTAL_MEMORY) {
       const userText = userMessage.parts
@@ -1720,6 +1804,139 @@ This is critical - your turn should only end with either asking the user a genui
         text: `<system-reminder>\nYou have made ${toolCount} tool calls. Quick check:\n- Are your changes correct? Consider re-reading modified files.\n- Are you still on track with the original task?\n- Should you run tests or typecheck before continuing?\n</system-reminder>`,
         time: { start: Date.now(), end: Date.now() },
       })
+    }
+
+    // Token usage display every 10 tool calls
+    if (toolCount > 0 && toolCount % 10 === 0 && input.step && input.step > 1) {
+      const lastAssistantMsg = input.messages.findLast((m) => m.info.role === "assistant")
+      if (lastAssistantMsg?.info.role === "assistant") {
+        const assistantInfo = lastAssistantMsg.info as MessageV2.Assistant
+        const tokens = assistantInfo.tokens
+        const used = (tokens.input ?? 0) + (tokens.output ?? 0) + (tokens.cache?.read ?? 0)
+        const model = await Provider.getModel(assistantInfo.providerID, assistantInfo.modelID).catch(() => undefined)
+        if (model && model.limit.context > 0) {
+          const total = model.limit.context
+          const percent = Math.round((used / total) * 100)
+          const remaining = total - used
+          userMessage.parts.push({
+            id: Identifier.ascending("part"),
+            messageID: userMessage.info.id,
+            sessionID: input.session.id,
+            type: "text",
+            synthetic: true,
+            text: `<system-reminder>\nToken usage: ${used.toLocaleString()}/${total.toLocaleString()} (${percent}%). ${remaining.toLocaleString()} tokens remaining.\n</system-reminder>`,
+          })
+        }
+      }
+    }
+
+    // File modified externally detection
+    if (input.step && input.step > 1) {
+      const writtenFiles = new Set<string>()
+      for (const msg of input.messages) {
+        for (const part of msg.parts) {
+          if (part.type === "tool" && part.state.status === "completed") {
+            if (["write", "edit", "multiedit", "apply_patch"].includes(part.tool)) {
+              const filepath = part.state.input?.file_path ?? part.state.input?.filePath ?? part.state.input?.path
+              if (typeof filepath === "string") writtenFiles.add(filepath)
+            }
+          }
+        }
+      }
+      for (const filepath of writtenFiles) {
+        const lastReadTime = FileTime.get(input.session.id, filepath)
+        if (lastReadTime) {
+          const stat = await Bun.file(filepath).stat().catch(() => undefined)
+          if (stat && stat.mtime && stat.mtime.getTime() > lastReadTime.getTime() + 1000) {
+            userMessage.parts.push({
+              id: Identifier.ascending("part"),
+              messageID: userMessage.info.id,
+              sessionID: input.session.id,
+              type: "text",
+              synthetic: true,
+              text: `<system-reminder>\nThe file ${filepath} was modified externally since you last edited it. Read it again before making further changes.\n</system-reminder>`,
+            })
+          }
+        }
+      }
+    }
+
+    // New diagnostics detected after writes
+    if (input.step && input.step > 1) {
+      const lastMsg = input.messages.at(-1)
+      const hadWrites = lastMsg?.parts.some(
+        (p) => p.type === "tool" && p.state.status === "completed" && ["write", "edit", "multiedit", "apply_patch"].includes(p.tool),
+      )
+      if (hadWrites) {
+        const diags = await LSP.diagnostics().catch(() => ({}))
+        const errors: string[] = []
+        for (const [file, fileDiags] of Object.entries(diags)) {
+          for (const d of fileDiags) {
+            if (d.severity && d.severity <= 2) {
+              errors.push(`  ${path.relative(Instance.worktree, file)}:${d.range.start.line + 1}: ${d.message}`)
+            }
+          }
+        }
+        if (errors.length > 0) {
+          userMessage.parts.push({
+            id: Identifier.ascending("part"),
+            messageID: userMessage.info.id,
+            sessionID: input.session.id,
+            type: "text",
+            synthetic: true,
+            text: `<system-reminder>\nNew diagnostics detected:\n${errors.slice(0, 20).join("\n")}${errors.length > 20 ? `\n... and ${errors.length - 20} more` : ""}\n</system-reminder>`,
+          })
+        }
+      }
+    }
+
+    // Todo list state reminder after TodoWrite
+    if (input.step && input.step > 1) {
+      const lastMsg = input.messages.at(-1)
+      const hadTodoWrite = lastMsg?.parts.some(
+        (p) => p.type === "tool" && p.state.status === "completed" && p.tool === "todowrite",
+      )
+      if (hadTodoWrite) {
+        const todos = await Todo.get(input.session.id)
+        if (todos.length > 0) {
+          const summary = todos.map((t) => `  [${t.status}] ${t.content}`).join("\n")
+          userMessage.parts.push({
+            id: Identifier.ascending("part"),
+            messageID: userMessage.info.id,
+            sessionID: input.session.id,
+            type: "text",
+            synthetic: true,
+            text: `<system-reminder>\nCurrent todo list:\n${summary}\n</system-reminder>`,
+          })
+        }
+      }
+    }
+
+    // Session continuation reminder
+    if (input.step === 1 && input.session.parentID) {
+      userMessage.parts.push({
+        id: Identifier.ascending("part"),
+        messageID: userMessage.info.id,
+        sessionID: input.session.id,
+        type: "text",
+        synthetic: true,
+        text: `<system-reminder>\nThis session was continued from a previous conversation. The working directory may have changed. Re-read any files you need before making changes.\n</system-reminder>`,
+      })
+    }
+
+    // Output token limit exceeded detection
+    if (input.step && input.step > 1) {
+      const prevAssistant = input.messages.findLast((m) => m.info.role === "assistant")
+      if (prevAssistant?.info.role === "assistant" && (prevAssistant.info as MessageV2.Assistant).finish === "length") {
+        userMessage.parts.push({
+          id: Identifier.ascending("part"),
+          messageID: userMessage.info.id,
+          sessionID: input.session.id,
+          type: "text",
+          synthetic: true,
+          text: `<system-reminder>\nYour previous response was cut off due to output token limits. Continue from where you left off.\n</system-reminder>`,
+        })
+      }
     }
 
     return input.messages

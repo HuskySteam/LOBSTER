@@ -287,6 +287,17 @@ export namespace SessionProcessor {
                       },
                     })
 
+                    await Plugin.trigger(
+                      "tool.execute.failure",
+                      {
+                        tool: value.toolName ?? match?.tool ?? "unknown",
+                        sessionID: input.sessionID,
+                        callID: value.toolCallId,
+                        error: (value.error as any).toString(),
+                      },
+                      {},
+                    ).catch(() => {})
+
                     if (
                       value.error instanceof PermissionNext.RejectedError ||
                       value.error instanceof Question.RejectedError

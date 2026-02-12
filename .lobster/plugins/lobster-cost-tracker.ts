@@ -33,6 +33,7 @@ interface CostData {
 
 interface BudgetConfig {
   budget_usd: number
+  budget_tokens?: number
   alert_threshold: number
   set_at: string
 }
@@ -51,6 +52,18 @@ function calculateTotalCost(data: CostData): number {
       const usage = session.tools[name]
       total += (usage.input_tokens / 1_000_000) * DEFAULT_INPUT_RATE
       total += (usage.output_tokens / 1_000_000) * DEFAULT_OUTPUT_RATE
+    }
+  }
+  return total
+}
+
+function calculateTotalTokens(data: CostData): number {
+  let total = 0
+  for (const sid of Object.keys(data.sessions)) {
+    const session = data.sessions[sid]
+    for (const name of Object.keys(session.tools)) {
+      const usage = session.tools[name]
+      total += usage.input_tokens + usage.output_tokens
     }
   }
   return total
@@ -129,28 +142,48 @@ const plugin: Plugin = async (input) => {
       }
 
       const totalSpend = calculateTotalCost(costData)
-      const alertAmount = budget.budget_usd * budget.alert_threshold
+      const totalTokens = calculateTotalTokens(costData)
+      const usdAlertAmount = budget.budget_usd * budget.alert_threshold
+      const usdTriggered = totalSpend >= usdAlertAmount
+      const tokenTriggered = budget.budget_tokens != null && totalTokens >= budget.budget_tokens * budget.alert_threshold
 
-      if (totalSpend < alertAmount) {
+      if (!usdTriggered && !tokenTriggered) {
         return
       }
 
-      const remaining = budget.budget_usd - totalSpend
-      const exceeded = totalSpend >= budget.budget_usd
+      const lines: string[] = ["<system-reminder>"]
 
-      const block = [
-        "<lobster-cost-alert>",
-        exceeded
-          ? `BUDGET EXCEEDED! Spent $${totalSpend.toFixed(4)} of $${budget.budget_usd.toFixed(2)} budget.`
-          : `Budget alert: Spent $${totalSpend.toFixed(4)} of $${budget.budget_usd.toFixed(2)} budget (${(budget.alert_threshold * 100).toFixed(0)}% threshold reached).`,
-        `Remaining: $${remaining.toFixed(4)}`,
-        exceeded
-          ? "Consider stopping or switching to a cheaper model."
-          : "Be mindful of token usage to stay within budget.",
-        "</lobster-cost-alert>",
-      ]
+      if (usdTriggered) {
+        const remaining = budget.budget_usd - totalSpend
+        const exceeded = totalSpend >= budget.budget_usd
+        lines.push(
+          exceeded
+            ? `BUDGET EXCEEDED! Spent $${totalSpend.toFixed(4)} of $${budget.budget_usd.toFixed(2)} budget.`
+            : `Budget alert: Spent $${totalSpend.toFixed(4)} of $${budget.budget_usd.toFixed(2)} budget (${(budget.alert_threshold * 100).toFixed(0)}% threshold reached).`,
+          `Remaining: $${remaining.toFixed(4)}`,
+        )
+        if (exceeded) {
+          lines.push("Consider stopping or switching to a cheaper model.")
+        }
+      }
 
-      output.system.push(block.join("\n"))
+      if (tokenTriggered && budget.budget_tokens != null) {
+        const remainingTokens = budget.budget_tokens - totalTokens
+        const exceededTokens = totalTokens >= budget.budget_tokens
+        lines.push(
+          exceededTokens
+            ? `TOKEN BUDGET EXCEEDED! Used ${totalTokens.toLocaleString()} of ${budget.budget_tokens.toLocaleString()} token budget.`
+            : `Token budget alert: Used ${totalTokens.toLocaleString()} of ${budget.budget_tokens.toLocaleString()} tokens (${(budget.alert_threshold * 100).toFixed(0)}% threshold reached).`,
+          `Remaining tokens: ${remainingTokens.toLocaleString()}`,
+        )
+      }
+
+      if (!usdTriggered || (totalSpend < budget.budget_usd && (!tokenTriggered || totalTokens < (budget.budget_tokens ?? Infinity)))) {
+        lines.push("Be mindful of token usage to stay within budget.")
+      }
+
+      lines.push("</system-reminder>")
+      output.system.push(lines.join("\n"))
     },
   }
 }

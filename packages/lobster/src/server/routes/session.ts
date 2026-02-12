@@ -48,11 +48,24 @@ export const SessionRoutes = lazy(() =>
             .optional()
             .meta({ description: "Filter sessions updated on or after this timestamp (milliseconds since epoch)" }),
           search: z.string().optional().meta({ description: "Filter sessions by title (case-insensitive)" }),
+          search_content: z.string().optional().meta({ description: "Filter sessions by searching message content (case-insensitive)" }),
           limit: z.coerce.number().optional().meta({ description: "Maximum number of sessions to return" }),
         }),
       ),
       async (c) => {
         const query = c.req.valid("query")
+
+        if (query.search_content) {
+          const results = await Session.search(query.search_content)
+          const filtered = results.filter((session) => {
+            if (query.directory !== undefined && session.directory !== query.directory) return false
+            if (query.roots && session.parentID) return false
+            if (query.start !== undefined && session.time.updated < query.start) return false
+            return true
+          })
+          return c.json(query.limit ? filtered.slice(0, query.limit) : filtered)
+        }
+
         const term = query.search?.toLowerCase()
         const sessions: Session.Info[] = []
         for await (const session of Session.list()) {

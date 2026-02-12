@@ -756,6 +756,7 @@ export namespace Config {
         .describe("Maximum number of agentic iterations before forcing text-only response"),
       maxSteps: z.number().int().positive().optional().describe("@deprecated Use 'steps' field instead."),
       permission: Permission.optional(),
+      delegate_mode: z.boolean().optional().describe("Enable delegate mode - only allows coordination tools, no file operations"),
       capabilities: z.array(z.enum(["question", "plan_enter", "plan_exit", "task", "team", "memory"])).optional()
         .describe("Capabilities to automatically configure permissions for. E.g., ['task', 'memory'] auto-grants task launching and memory access."),
     })
@@ -777,6 +778,7 @@ export namespace Config {
         "options",
         "permission",
         "disable",
+        "delegate_mode",
         "tools",
         "capabilities",
       ])
@@ -1110,6 +1112,12 @@ export namespace Config {
         .describe(
           "Default agent to use when none is specified. Must be a primary agent. Falls back to 'build' if not set or if the specified agent is invalid.",
         ),
+      output_style: z
+        .enum(["concise", "verbose", "structured", "educational"])
+        .optional()
+        .describe(
+          "Output style for model responses: concise, verbose, structured, or educational",
+        ),
       username: z
         .string()
         .optional()
@@ -1271,6 +1279,8 @@ export namespace Config {
             .boolean()
             .optional()
             .describe("Automatically route messages to the best agent based on content"),
+          scratchpad: z.boolean().optional().describe("Enable scratchpad directory for temporary files (default: true)"),
+          scratchpad_cleanup: z.boolean().optional().describe("Auto-cleanup scratchpad on session end (default: true)"),
         })
         .optional(),
     })
