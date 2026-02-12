@@ -816,12 +816,15 @@ export function Prompt(props: PromptProps) {
           })),
       })
     } else {
+      const agentExplicit = local.agent.wasExplicitlySet()
+      local.agent.resetExplicit()
       sdk.client.session
         .prompt({
           sessionID,
           ...selectedModel,
           messageID,
           agent: local.agent.current().name,
+          agentExplicit,
           model: selectedModel,
           variant,
           parts: [
@@ -835,7 +838,7 @@ export function Prompt(props: PromptProps) {
               ...x,
             })),
           ],
-        })
+        } as any)
         .catch(() => {})
     }
     history.append({

@@ -55,6 +55,14 @@ export namespace Server {
   let _url: URL | undefined
   let _corsWhitelist: string[] = []
 
+  // SECURITY: Session token generated at startup to protect privileged endpoints
+  // from unauthorized local processes when no explicit password is configured.
+  // The TUI gets this token in-process; headless clients use LOBSTER_SERVER_PASSWORD instead.
+  const _sessionToken = crypto.randomUUID()
+  export function sessionToken() {
+    return _sessionToken
+  }
+
   export function url(): URL {
     return _url ?? new URL("http://localhost:4096")
   }
@@ -82,11 +90,29 @@ export namespace Server {
             status: 500,
           })
         })
-        .use((c, next) => {
+        .use(async (c, next) => {
           const password = Flag.LOBSTER_SERVER_PASSWORD
-          if (!password) return next()
-          const username = Flag.LOBSTER_SERVER_USERNAME ?? "lobster"
-          return basicAuth({ username, password })(c, next)
+          if (password) {
+            const username = Flag.LOBSTER_SERVER_USERNAME ?? "lobster"
+            return basicAuth({ username, password })(c, next)
+          }
+          // SECURITY: When no explicit password is configured, require session token
+          // for privileged endpoints (shell, PTY, file operations).
+          // Non-privileged endpoints (SSE events, read-only queries) remain open for
+          // seamless TUI in-process connectivity.
+          const privilegedPrefixes = ["/session/", "/pty"]
+          const privilegedSuffixes = ["/shell", "/command"]
+          const reqPath = c.req.path
+          const isPrivileged =
+            privilegedPrefixes.some((p) => reqPath.startsWith(p) && privilegedSuffixes.some((s) => reqPath.endsWith(s))) ||
+            reqPath.startsWith("/pty")
+          if (isPrivileged) {
+            const token = c.req.header("x-lobster-token")
+            if (token !== _sessionToken) {
+              return c.json({ error: "Unauthorized: session token required" }, { status: 401 })
+            }
+          }
+          return next()
         })
         .use(bodyLimit({ maxSize: 10 * 1024 * 1024 }))
         .use(async (c, next) => {

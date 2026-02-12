@@ -292,9 +292,12 @@ export namespace Config {
 
     // Install any additional dependencies defined in the package.json
     // This allows local plugins and custom tools to use external packages
+    // SECURITY: --ignore-scripts prevents untrusted lifecycle scripts from running
+    // when opening projects with .lobster directories containing malicious package.json
     await BunProc.run(
       [
         "install",
+        "--ignore-scripts",
         // TODO: get rid of this case (see: https://github.com/oven-sh/bun/issues/19936)
         ...(proxied() ? ["--no-cache"] : []),
       ],
@@ -1260,6 +1263,14 @@ export namespace Config {
             .positive()
             .optional()
             .describe("Max lifetime in minutes for background team agents (default: 30)"),
+          verification: z
+            .union([z.boolean(), z.string()])
+            .optional()
+            .describe("Enable project-wide typecheck verification after edits. Set to true for auto-detect or a string for custom command"),
+          auto_agent_routing: z
+            .boolean()
+            .optional()
+            .describe("Automatically route messages to the best agent based on content"),
         })
         .optional(),
     })

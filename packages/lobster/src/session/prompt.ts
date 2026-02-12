@@ -53,6 +53,10 @@ import { Memory } from "../memory/memory"
 import { SmartContext } from "../context/smart"
 import { Config } from "../config/config"
 import { AgentState } from "../agent/state"
+import { Verification } from "../tool/verification"
+import { ToolCache } from "../tool/cache"
+import { MemoryExtractor } from "../memory/extractor"
+import { AgentRouter } from "../agent/router"
 
 // Suppress AI SDK warnings that pollute stdout. The AI SDK checks this global
 // to decide whether to log warnings. See: https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
@@ -99,6 +103,7 @@ export namespace SessionPrompt {
       })
       .optional(),
     agent: z.string().optional(),
+    agentExplicit: z.boolean().optional(),
     noReply: z.boolean().optional(),
     tools: z
       .record(z.string(), z.boolean())
@@ -261,6 +266,7 @@ export namespace SessionPrompt {
       return
     }
     match.abort.abort()
+    ToolCache.clear(sessionID)
     const callbacks = match.callbacks
     delete s[sessionID]
     for (const cb of callbacks) {
@@ -283,7 +289,20 @@ export namespace SessionPrompt {
       })
     }
 
-    using _ = defer(() => cancel(sessionID))
+    using _ = defer(() => {
+      Plugin.trigger("session.stop", { sessionID }, {}).catch(() => {})
+      // Auto-extract memories from session (fire-and-forget)
+      if (Flag.LOBSTER_EXPERIMENTAL_MEMORY) {
+        MessageV2.filterCompacted(MessageV2.stream(sessionID))
+          .then((msgs) => MemoryExtractor.extract({ sessionID, messages: msgs }))
+          .catch(() => {})
+      }
+      cancel(sessionID)
+    })
+
+    await Plugin.trigger("session.start", { sessionID }, {}).catch((e) =>
+      log.warn("session.start hook failed", { error: e }),
+    )
 
     let step = 0
     const session = await Session.get(sessionID)
@@ -594,10 +613,10 @@ export namespace SessionPrompt {
         })
       }
 
-      // Smart context: auto-find relevant files if enabled
+      // Smart context: auto-find relevant files (opt-out via smart_context: false)
       if (step === 1) {
         const config = await Config.get()
-        if (config.experimental?.smart_context) {
+        if (config.experimental?.smart_context !== false) {
           const lastUserIdx = msgs.findLastIndex((m) => m.info.role === "user")
           const lastUserMsg = lastUserIdx >= 0 ? msgs[lastUserIdx] : undefined
           const hasUserFiles = lastUserMsg?.parts.some((p) => p.type === "file") ?? false
@@ -607,7 +626,7 @@ export namespace SessionPrompt {
               .map((p) => p.text)
               .join(" ")
             if (userText.trim().length > 0) {
-              const relevantFiles = await SmartContext.findRelevant(userText).catch(() => [] as string[])
+              const relevantFiles = await SmartContext.findRelevant(userText).catch(() => [] as SmartContext.SmartResult[])
               if (relevantFiles.length > 0) {
                 // Clone the message to avoid mutating the original
                 msgs = msgs.map((m, i) =>
@@ -617,7 +636,7 @@ export namespace SessionPrompt {
                         messageID: m.info.id,
                         sessionID: m.info.sessionID,
                         type: "text" as const,
-                        text: `<system-reminder>\nRelevant files detected:\n${relevantFiles.map((f) => `- ${f}`).join("\n")}\n</system-reminder>`,
+                        text: `<system-reminder>\nRelevant files detected:\n${relevantFiles.map((f) => `- ${f.path} (${f.reason})`).join("\n")}\n</system-reminder>`,
                         synthetic: true,
                       }] }
                     : m,
@@ -743,6 +762,32 @@ export namespace SessionPrompt {
         thinkingBudgetScale: thinkingScale < 1.0 ? thinkingScale : undefined,
       })
 
+      // Verification: run project-wide typecheck after writes
+      if (result?.hadWrites && result.action !== "stop") {
+        const config = await Config.get()
+        if (config.experimental?.verification) {
+          const verificationErrors = await Verification.run(abort).catch(() => null)
+          if (verificationErrors) {
+            // Inject errors as ephemeral system-reminder on last user message
+            const lastUserIdx = msgs.findLastIndex((m) => m.info.role === "user")
+            if (lastUserIdx >= 0) {
+              msgs = msgs.map((m, i) =>
+                i === lastUserIdx
+                  ? { ...m, parts: [...m.parts, {
+                      id: Identifier.ascending("part"),
+                      messageID: m.info.id,
+                      sessionID: m.info.sessionID,
+                      type: "text" as const,
+                      text: `<system-reminder>\nProject-wide typecheck errors detected after your edits. Please fix these:\n${verificationErrors}\n</system-reminder>`,
+                      synthetic: true,
+                    }] }
+                  : m,
+              )
+            }
+          }
+        }
+      }
+
       // Anti-Loop Intelligence: track circularity across iterations
       if (result) {
         circularityDetected = result.circularityDetected
@@ -851,6 +896,23 @@ export namespace SessionPrompt {
         inputSchema: jsonSchema(schema as any),
         async execute(args, options) {
           const ctx = context(args, options)
+
+          // Tool result caching: return cached result for read-only tools
+          const cached = ToolCache.get(ctx.sessionID, item.id, args)
+          if (cached !== undefined) {
+            await Plugin.trigger(
+              "tool.execute.before",
+              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
+              { args },
+            )
+            await Plugin.trigger(
+              "tool.execute.after",
+              { tool: item.id, sessionID: ctx.sessionID, callID: ctx.callID },
+              { ...cached, metadata: { ...cached.metadata, cached: true } },
+            )
+            return { ...cached, metadata: { ...cached.metadata, cached: true } }
+          }
+
           await Plugin.trigger(
             "tool.execute.before",
             {
@@ -863,6 +925,12 @@ export namespace SessionPrompt {
             },
           )
           const result = await item.execute(args, ctx)
+
+          // Cache read-only tool results
+          ToolCache.set(ctx.sessionID, item.id, args, result)
+          // Invalidate cache after mutating tools
+          ToolCache.invalidateAfterTool(ctx.sessionID, item.id, args)
+
           await Plugin.trigger(
             "tool.execute.after",
             {
@@ -1000,7 +1068,31 @@ export namespace SessionPrompt {
   }
 
   async function createUserMessage(input: PromptInput) {
-    const agent = await Agent.get(input.agent ?? (await Agent.defaultAgent()))
+    let agentName = input.agent ?? (await Agent.defaultAgent())
+
+    // Agent auto-routing: classify message and route to best agent if not explicitly set
+    if (input.agentExplicit !== true && Flag.LOBSTER_EXPERIMENTAL_AUTO_AGENT_ROUTING) {
+      const config = await Config.get()
+      if (config.experimental?.auto_agent_routing) {
+        const userText = input.parts
+          .filter((p) => p.type === "text")
+          .map((p) => (p as any).text ?? "")
+          .join(" ")
+        if (userText.trim()) {
+          const route = AgentRouter.classify(userText)
+          // Only override for built-in agents with sufficient confidence
+          if (route.confidence >= 0.7 && ["build", "plan", "explore"].includes(route.agent)) {
+            const available = await Agent.get(route.agent).catch(() => null)
+            if (available) {
+              log.info("auto-routing", { from: agentName, to: route.agent, confidence: route.confidence, reason: route.reason })
+              agentName = route.agent
+            }
+          }
+        }
+      }
+    }
+
+    const agent = await Agent.get(agentName)
 
     const model = input.model ?? agent.model ?? (await lastModel(input.sessionID))
     const variant =
@@ -1403,11 +1495,20 @@ export namespace SessionPrompt {
         .filter((p) => p.type === "text" && !p.synthetic)
         .map((p) => (p as MessageV2.TextPart).text)
         .join(" ")
-      if (userText.trim()) {
-        const memories = await MemoryManager.relevant(userText).catch(() => [] as Memory.Entry[])
+      const projectName = path.basename(Instance.worktree)
+      const searchQuery = userText.trim() ? `${projectName} ${userText}` : projectName
+      if (searchQuery.trim()) {
+        const memories = await MemoryManager.relevant(searchQuery, 5).catch(() => [] as Memory.Entry[])
         if (memories.length > 0) {
+          // Touch retrieved memories to track usage
+          for (const m of memories) {
+            MemoryManager.touch(m.id).catch(() => {})
+          }
           const memoryText = memories
-            .map((m) => `- [${m.category}] ${m.content}` + (m.tags.length ? ` (tags: ${m.tags.join(", ")})` : ""))
+            .map((m) => {
+              const conf = Math.round((m.confidence ?? 0.5) * 100)
+              return `- [${m.category}] (${conf}%) ${m.content}` + (m.tags.length ? ` (tags: ${m.tags.join(", ")})` : "")
+            })
             .join("\n")
           userMessage.parts.push({
             id: Identifier.ascending("part"),
@@ -1648,6 +1749,16 @@ This is critical - your turn should only end with either asking the user a genui
       await SessionRevert.cleanup(session)
     }
     const agent = await Agent.get(input.agent)
+
+    // Permission check: respect agent's bash permission ruleset
+    await PermissionNext.ask({
+      sessionID: input.sessionID,
+      permission: "bash",
+      patterns: [input.command],
+      always: [input.command],
+      metadata: { source: "shell" },
+      ruleset: PermissionNext.merge(agent.permission, session.permission ?? []),
+    })
     const model = input.model ?? agent.model ?? (await lastModel(input.sessionID))
     const userMsg: MessageV2.User = {
       id: Identifier.ascending("message"),
@@ -1927,6 +2038,19 @@ This is critical - your turn should only end with either asking the user a genui
 
     const shell = ConfigMarkdown.shell(template)
     if (shell.length > 0) {
+      // Permission check: command template shell fragments require approval
+      const cmdAgent = await Agent.get(agentName)
+      const cmdSession = await Session.get(input.sessionID)
+      for (const [, cmd] of shell) {
+        await PermissionNext.ask({
+          sessionID: input.sessionID,
+          permission: "bash",
+          patterns: [cmd],
+          always: [cmd],
+          metadata: { source: "command_template" },
+          ruleset: PermissionNext.merge(cmdAgent.permission, cmdSession.permission ?? []),
+        })
+      }
       const results = await Promise.all(
         shell.map(async ([, cmd]) => {
           try {

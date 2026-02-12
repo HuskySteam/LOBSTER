@@ -53,6 +53,11 @@ export const MemoryRecallTool = Tool.define("memoryrecall", {
       }
     }
 
+    // Touch retrieved memories to track usage
+    for (const entry of results) {
+      MemoryManager.touch(entry.id).catch(() => {})
+    }
+
     const formatted = results
       .map(
         (entry) =>

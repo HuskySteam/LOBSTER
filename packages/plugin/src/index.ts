@@ -203,6 +203,14 @@ export interface Hooks {
       }[]
     },
   ) => Promise<void>
+  "session.start"?: (
+    input: { sessionID: string },
+    output: {},
+  ) => Promise<void>
+  "session.stop"?: (
+    input: { sessionID: string },
+    output: {},
+  ) => Promise<void>
   "experimental.chat.system.transform"?: (
     input: { sessionID?: string; model: Model },
     output: {

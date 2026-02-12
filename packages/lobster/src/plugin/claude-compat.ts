@@ -149,19 +149,25 @@ export namespace ClaudeCompat {
       hooks.tool = tools
     }
 
-    // 3. Load agents from agents/**/*.md
+    // 3. Load agents from agents/**/*.md — register as real Lobster agents via config hook
     const agents = await loadAgents(dir)
     if (agents.length > 0) {
-      hooks["experimental.chat.system.transform"] = async (_input, output) => {
+      const prevConfig = hooks.config
+      hooks.config = async (config) => {
+        if (prevConfig) await prevConfig(config)
+        const agentConfig = (config as any).agent ?? {}
         for (const agent of agents) {
-          output.system.push(
-            [
-              `<plugin_agent name="${agent.name}" source="${pluginName}">`,
-              agent.prompt,
-              `</plugin_agent>`,
-            ].join("\n"),
-          )
+          const sanitized = agent.name.replace(/[^a-zA-Z0-9_-]/g, "_")
+          if (agentConfig[sanitized]) continue // don't override existing
+          agentConfig[sanitized] = {
+            name: agent.name,
+            description: agent.description || `Agent from ${pluginName}`,
+            prompt: agent.prompt,
+            mode: "all",
+          }
+          log.info("registered CC agent", { name: sanitized, plugin: pluginName })
         }
+        ;(config as any).agent = agentConfig
       }
     }
 
@@ -213,6 +219,34 @@ export namespace ClaudeCompat {
               })
             } catch (e) {
               log.warn("UserPromptSubmit shell hook failed", { command: hook.command, error: e })
+            }
+          }
+        }
+      }
+
+      if (shellHooks.SessionStart && shellHooks.SessionStart.length > 0) {
+        hooks["session.start"] = async (input) => {
+          for (const hook of shellHooks.SessionStart!) {
+            try {
+              await executeShellHook(hook.command, dir, {
+                session_id: input.sessionID,
+              })
+            } catch (e) {
+              log.warn("SessionStart shell hook failed", { command: hook.command, error: e })
+            }
+          }
+        }
+      }
+
+      if (shellHooks.Stop && shellHooks.Stop.length > 0) {
+        hooks["session.stop"] = async (input) => {
+          for (const hook of shellHooks.Stop!) {
+            try {
+              await executeShellHook(hook.command, dir, {
+                session_id: input.sessionID,
+              })
+            } catch (e) {
+              log.warn("Stop shell hook failed", { command: hook.command, error: e })
             }
           }
         }

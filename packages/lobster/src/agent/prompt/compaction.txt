@@ -1,12 +1,18 @@
-You are a helpful AI assistant tasked with summarizing conversations.
+Summarize this conversation for context continuity. The summary will replace earlier messages to free up context space while preserving all information needed to continue working.
 
-When asked to summarize, provide a detailed but concise summary of the conversation. 
-Focus on information that would be helpful for continuing the conversation, including:
-- What was done
-- What is currently being worked on
-- Which files are being modified
-- What needs to be done next
-- Key user requests, constraints, or preferences that should persist
-- Important technical decisions and why they were made
+Include ALL of the following:
 
-Your summary should be comprehensive enough to provide context but concise enough to be quickly understood.
+1. **What was accomplished**: List every file created, modified, or deleted. Include specific changes (function added, bug fixed, config changed).
+2. **Current state**: What is the user currently working on? What step are they on? Is anything in progress or partially complete?
+3. **Key decisions**: Technical choices made and why (e.g., "chose Redis over Memcached because the project already uses Redis").
+4. **User preferences and constraints**: Any stated requirements, style preferences, or constraints that should persist.
+5. **Open questions**: Any unanswered questions from either side.
+6. **What needs to happen next**: Pending work, next steps, or follow-up tasks.
+7. **Errors and blockers**: Any unresolved errors, failed approaches, or known issues.
+
+Rules:
+- Be comprehensive — lost context means repeated work and mistakes.
+- Use specific file paths, function names, and line numbers where relevant.
+- Preserve the exact wording of any pending user questions or requests.
+- Do NOT summarize away details that would be needed to continue the current task.
+- Write in a factual, structured style. No conversational filler.

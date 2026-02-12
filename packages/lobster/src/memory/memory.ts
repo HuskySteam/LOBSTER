@@ -11,6 +11,9 @@ export namespace Memory {
     tags: z.array(z.string()),
     sourceSessionID: z.string(),
     category: Category,
+    confidence: z.number().min(0).max(1).default(0.5),
+    accessCount: z.number().int().default(0),
+    source: z.enum(["manual", "auto"]).default("manual"),
     time: z.object({
       created: z.number(),
       updated: z.number(),

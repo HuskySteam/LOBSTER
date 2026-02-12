@@ -1,9 +1,16 @@
 import path from "path"
+import fs from "fs/promises"
 import { Instance } from "../project/instance"
+import { Ripgrep } from "../file/ripgrep"
 import { Log } from "../util/log"
 
 export namespace SmartContext {
   const log = Log.create({ service: "context.smart" })
+
+  export interface SmartResult {
+    path: string
+    reason: string
+  }
 
   const STOP_WORDS = new Set([
     "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
@@ -28,12 +35,8 @@ export namespace SmartContext {
 
   function extractKeywords(query: string): string[] {
     const words: string[] = []
-
-    // Split camelCase and PascalCase
     const camelSplit = query.replace(/([a-z])([A-Z])/g, "$1 $2")
-    // Split snake_case
     const snakeSplit = camelSplit.replace(/_/g, " ")
-    // Split on non-alphanumeric
     const tokens = snakeSplit.split(/[^a-zA-Z0-9.]+/)
 
     for (const token of tokens) {
@@ -45,6 +48,66 @@ export namespace SmartContext {
     }
 
     return [...new Set(words)]
+  }
+
+  export function extractReferences(query: string): { paths: string[]; classNames: string[]; functionNames: string[] } {
+    const paths: string[] = []
+    const classNames: string[] = []
+    const functionNames: string[] = []
+
+    // File paths: src/foo/bar.ts pattern
+    const pathRegex = /(?:^|\s)((?:[\w.-]+\/)+[\w.-]+\.\w+)/g
+    let match
+    while ((match = pathRegex.exec(query)) !== null) {
+      paths.push(match[1])
+    }
+
+    // PascalCase class names: SessionPrompt, ToolCache
+    const classRegex = /\b([A-Z][a-z]+(?:[A-Z][a-z]+)+)\b/g
+    while ((match = classRegex.exec(query)) !== null) {
+      classNames.push(match[1])
+    }
+
+    // Function calls: findRelevant(), detectCommand()
+    const funcRegex = /\b([a-z][a-zA-Z]*)\(\)/g
+    while ((match = funcRegex.exec(query)) !== null) {
+      functionNames.push(match[1])
+    }
+
+    return { paths, classNames, functionNames }
+  }
+
+  async function searchContents(keywords: string[], root: string): Promise<Map<string, number>> {
+    const hitMap = new Map<string, number>()
+    const searchKeywords = keywords.slice(0, 5)
+
+    for (const keyword of searchKeywords) {
+      const results = await Ripgrep.search({
+        cwd: root,
+        pattern: keyword,
+        limit: 20,
+        glob: ["!node_modules/**", "!.git/**", "!dist/**", "!build/**"],
+      }).catch(() => [])
+
+      for (const result of results) {
+        const filePath = result.path.text
+        const absPath = path.isAbsolute(filePath) ? filePath : path.join(root, filePath)
+        const count = hitMap.get(absPath) ?? 0
+        hitMap.set(absPath, count + 1)
+      }
+    }
+
+    return hitMap
+  }
+
+  async function resolveExplicitPaths(paths: string[], root: string): Promise<Set<string>> {
+    const resolved = new Set<string>()
+    for (const p of paths) {
+      const abs = path.isAbsolute(p) ? p : path.resolve(root, p)
+      const exists = await fs.access(abs).then(() => true).catch(() => false)
+      if (exists) resolved.add(abs)
+    }
+    return resolved
   }
 
   function buildGlobPatterns(keywords: string[]): string[] {
@@ -64,42 +127,22 @@ export namespace SmartContext {
     return [...new Set(patterns)]
   }
 
-  function scoreFile(filepath: string, keywords: string[]): number {
-    const basename = path.basename(filepath).toLowerCase()
-    const relative = filepath.toLowerCase()
-
-    let score = 0
-
-    for (const kw of keywords) {
-      if (basename.includes(kw)) score += 3
-      else if (relative.includes(kw)) score += 1
-    }
-
-    if (/\.(ts|tsx|js|jsx|py|go|rs|java|c|cpp|h|hpp)$/.test(basename)) {
-      score += 1
-    }
-
-    if (basename.includes("test") || basename.includes("spec")) {
-      score -= 1
-    }
-
-    const normalized = path.normalize(relative).toLowerCase()
-    if (normalized.includes("node_modules") || normalized.includes(`${path.sep}dist${path.sep}`) || normalized.includes(`${path.sep}build${path.sep}`)) {
-      return 0
-    }
-
-    return Math.max(0, score)
-  }
-
-  export async function findRelevant(query: string, limit = 5): Promise<string[]> {
+  export async function findRelevant(query: string, limit = 10): Promise<SmartResult[]> {
     const keywords = extractKeywords(query)
     if (keywords.length === 0) return []
 
     log.info("smart context keywords", { keywords })
 
-    const patterns = buildGlobPatterns(keywords)
     const root = Instance.worktree
+    const refs = extractReferences(query)
+    const explicitPaths = await resolveExplicitPaths(refs.paths, root)
+    const contentHits = await searchContents(
+      [...keywords, ...refs.classNames, ...refs.functionNames].slice(0, 5),
+      root,
+    )
 
+    // Glob-based candidates
+    const patterns = buildGlobPatterns(keywords)
     const candidates = new Set<string>()
     for (const pattern of patterns.slice(0, 10)) {
       const glob = new Bun.Glob(pattern)
@@ -116,15 +159,113 @@ export namespace SmartContext {
       if (candidates.size > 200) break
     }
 
+    // Add content hit files as candidates
+    for (const file of contentHits.keys()) {
+      candidates.add(file)
+    }
+
+    // Add explicit paths
+    for (const p of explicitPaths) {
+      candidates.add(p)
+    }
+
     if (candidates.size === 0) return []
 
-    const scored: { file: string; score: number }[] = []
+    const now = Date.now()
+    const ONE_HOUR = 60 * 60 * 1000
+    const ONE_DAY = 24 * 60 * 60 * 1000
+
+    // Filter out excluded directories first (cheap string check)
+    const filtered: string[] = []
     for (const file of candidates) {
-      const s = scoreFile(file, keywords)
-      if (s > 0) scored.push({ file, score: s })
+      const normalized = path.normalize(file).toLowerCase()
+      if (normalized.includes("node_modules") || normalized.includes(`${path.sep}dist${path.sep}`) || normalized.includes(`${path.sep}build${path.sep}`)) {
+        continue
+      }
+      filtered.push(file)
+    }
+
+    // Batch recency stats with bounded concurrency (skip if too many candidates)
+    const RECENCY_THRESHOLD = 100
+    const STAT_CONCURRENCY = 16
+    const mtimeMap = new Map<string, number>()
+    if (filtered.length <= RECENCY_THRESHOLD) {
+      for (let i = 0; i < filtered.length; i += STAT_CONCURRENCY) {
+        const batch = filtered.slice(i, i + STAT_CONCURRENCY)
+        const stats = await Promise.all(
+          batch.map((file) => fs.stat(file).then((s) => ({ file, mtime: s.mtimeMs })).catch(() => null)),
+        )
+        for (const s of stats) {
+          if (s) mtimeMap.set(s.file, s.mtime)
+        }
+      }
+    }
+
+    const scored: { file: string; score: number; reasons: string[] }[] = []
+    for (const file of filtered) {
+      const basename = path.basename(file).toLowerCase()
+      const relative = file.toLowerCase()
+
+      let score = 0
+      const reasons: string[] = []
+
+      // Explicit reference
+      if (explicitPaths.has(file)) {
+        score += 10
+        reasons.push("explicit reference")
+      }
+
+      // Filename match
+      for (const kw of keywords) {
+        if (basename.includes(kw)) {
+          score += 3
+          reasons.push(`name match: ${kw}`)
+          break
+        } else if (relative.includes(kw)) {
+          score += 1
+          reasons.push(`path match: ${kw}`)
+          break
+        }
+      }
+
+      // Content match
+      const hits = contentHits.get(file) ?? 0
+      if (hits > 0) {
+        const contentScore = Math.min(hits * 2, 6)
+        score += contentScore
+        reasons.push(`content: ${hits} hits`)
+      }
+
+      // Recency (only when stats were collected)
+      const mtime = mtimeMap.get(file)
+      if (mtime !== undefined) {
+        const age = now - mtime
+        if (age < ONE_HOUR) {
+          score += 3
+          reasons.push("modified <1h")
+        } else if (age < ONE_DAY) {
+          score += 1
+          reasons.push("modified <1d")
+        }
+      }
+
+      // Source file bonus
+      if (/\.(ts|tsx|js|jsx|py|go|rs|java|c|cpp|h|hpp)$/.test(basename)) {
+        score += 1
+      }
+
+      // Test file penalty
+      if (basename.includes("test") || basename.includes("spec")) {
+        score -= 1
+      }
+
+      if (score > 0) scored.push({ file, score, reasons })
     }
 
     scored.sort((a, b) => b.score - a.score)
-    return scored.slice(0, limit).map((s) => path.relative(root, s.file).replace(/\\/g, "/"))
+    return scored.slice(0, limit).map((s) => ({
+      path: path.relative(root, s.file).replace(/\\/g, "/"),
+      reason: s.reasons.join(", "),
+    }))
   }
 }

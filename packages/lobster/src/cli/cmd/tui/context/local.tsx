@@ -1,5 +1,5 @@
 import { createStore } from "solid-js/store"
-import { batch, createEffect, createMemo } from "solid-js"
+import { batch, createEffect, createMemo, createSignal } from "solid-js"
 import { useSync } from "@tui/context/sync"
 import { useTheme } from "@tui/context/theme"
 import { uniqueBy } from "remeda"
@@ -41,6 +41,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       }>({
         current: agents()[0]?.name ?? "default",
       })
+      const [explicit, setExplicit] = createSignal(false)
       const { theme } = useTheme()
       const colors = createMemo(() => [
         theme.secondary,
@@ -66,6 +67,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
               duration: 3000,
             })
           setAgentStore("current", name)
+          setExplicit(true)
         },
         move(direction: 1 | -1) {
           batch(() => {
@@ -74,7 +76,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
             if (next >= agents().length) next = 0
             const value = agents()[next]
             setAgentStore("current", value.name)
+            setExplicit(true)
           })
+        },
+        wasExplicitlySet() {
+          return explicit()
+        },
+        resetExplicit() {
+          setExplicit(false)
         },
         color(name: string) {
           const index = visibleAgents().findIndex((x) => x.name === name)

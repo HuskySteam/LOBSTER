@@ -128,13 +128,17 @@ export const TuiThreadCommand = cmd({
     let url: string
     let customFetch: typeof fetch | undefined
     let events: EventSource | undefined
+    let tokenHeaders: Record<string, string> | undefined
 
     if (shouldStartServer) {
       // Start HTTP server for external access
       const server = await client.call("server", networkOpts)
       url = server.url
+      // Pass session token so TUI can authenticate to privileged endpoints
+      tokenHeaders = { "x-lobster-token": server.token }
     } else {
       // Use direct RPC communication (no HTTP)
+      // Token is injected by worker's rpc.fetch(), no header needed here
       url = "http://lobster.internal"
       customFetch = createWorkerFetch(client)
       events = createEventSource(client)
@@ -144,6 +148,7 @@ export const TuiThreadCommand = cmd({
       url,
       fetch: customFetch,
       events,
+      headers: tokenHeaders,
       args: {
         continue: args.continue,
         sessionID: args.session,

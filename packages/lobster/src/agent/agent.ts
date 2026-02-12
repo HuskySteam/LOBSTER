@@ -11,6 +11,8 @@ import { ProviderTransform } from "../provider/transform"
 import PROMPT_GENERATE from "./generate.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
+import PROMPT_GENERAL from "./prompt/general.txt"
+import PROMPT_PLAN from "./prompt/plan.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import PROMPT_TEAM_MEMBER from "./prompt/team-member.txt"
@@ -130,8 +132,9 @@ export namespace Agent {
       },
       plan: {
         name: "plan",
-        description: "Plan mode. Disallows all edit tools.",
+        description: "Plan mode. Explores the codebase and designs implementation plans before code is written.",
         options: {},
+        prompt: PROMPT_PLAN,
         permission: buildPermissions({
           defaults,
           agentOverrides: PermissionNext.fromConfig({
@@ -153,6 +156,7 @@ export namespace Agent {
       general: {
         name: "general",
         description: `General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.`,
+        prompt: PROMPT_GENERAL,
         permission: buildPermissions({
           defaults,
           agentOverrides: PermissionNext.fromConfig({

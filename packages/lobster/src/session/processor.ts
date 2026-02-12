@@ -525,10 +525,10 @@ export namespace SessionProcessor {
             part.type === "tool" || (part.type === "text" && part.text.trim().length > 0),
           )
 
-          if (needsCompaction) return { action: "compact" as const, circularityDetected: circularity, hasOutput }
-          if (blocked) return { action: "stop" as const, circularityDetected: circularity, hasOutput }
-          if (input.assistantMessage.error) return { action: "stop" as const, circularityDetected: circularity, hasOutput }
-          return { action: "continue" as const, circularityDetected: circularity, hasOutput }
+          if (needsCompaction) return { action: "compact" as const, circularityDetected: circularity, hasOutput, hadWrites: hasWriteTools }
+          if (blocked) return { action: "stop" as const, circularityDetected: circularity, hasOutput, hadWrites: hasWriteTools }
+          if (input.assistantMessage.error) return { action: "stop" as const, circularityDetected: circularity, hasOutput, hadWrites: hasWriteTools }
+          return { action: "continue" as const, circularityDetected: circularity, hasOutput, hadWrites: hasWriteTools }
         }
       },
     }

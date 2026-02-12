@@ -240,7 +240,9 @@ export namespace Session {
       info: result,
     })
     const cfg = await Config.get()
-    if (!result.parentID && (Flag.LOBSTER_AUTO_SHARE || cfg.share === "auto"))
+    // Only auto-share when user explicitly sets share: "auto" in config.
+    // Environment flag alone is not sufficient — requires explicit consent.
+    if (!result.parentID && cfg.share === "auto")
       share(result.id)
         .then((share) => {
           update(result.id, (draft) => {

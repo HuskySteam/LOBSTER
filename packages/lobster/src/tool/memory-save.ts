@@ -36,6 +36,8 @@ export const MemorySaveTool = Tool.define("memorysave", {
       tags: params.tags,
       category: params.category,
       sessionID: ctx.sessionID,
+      source: "manual",
+      confidence: 0.8,
     })
 
     return {

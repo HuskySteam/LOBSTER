@@ -103,6 +103,10 @@ export const rpc = {
     if (auth && !headers["authorization"] && !headers["Authorization"]) {
       headers["Authorization"] = auth
     }
+    // Inject session token for privileged endpoint auth when no password is set
+    if (!auth && !headers["x-lobster-token"]) {
+      headers["x-lobster-token"] = Server.sessionToken()
+    }
     const request = new Request(input.url, {
       method: input.method,
       headers,
@@ -119,7 +123,10 @@ export const rpc = {
   async server(input: { port: number; hostname: string; mdns?: boolean; cors?: string[] }) {
     if (server) await server.stop(true)
     server = Server.listen(input)
-    return { url: server.url.toString() }
+    return { url: server.url.toString(), token: Server.sessionToken() }
+  },
+  async getToken() {
+    return { token: Server.sessionToken() }
   },
   async checkUpgrade(input: { directory: string }) {
     await Instance.provide({
