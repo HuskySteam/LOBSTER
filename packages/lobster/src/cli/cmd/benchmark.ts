@@ -7,7 +7,7 @@ export const BenchmarkCommand = cmd({
   command: "benchmark",
   describe: "run coding benchmark challenges to evaluate agent performance",
   builder: (yargs: Argv) => yargs,
-  handler: async () => {
+  handler: async (args) => {
     await bootstrap(process.cwd(), async () => {
       const results = await BenchmarkRunner.run()
       BenchmarkRunner.report(results)

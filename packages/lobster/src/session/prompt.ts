@@ -724,7 +724,9 @@ export namespace SessionPrompt {
         agent,
         abort,
         sessionID,
-        system: [...(await SystemPrompt.environment(model)), ...(await InstructionPrompt.system())],
+        system: agent.prompt && !agent.prompt.includes("{{base_prompt}}")
+          ? [...(await SystemPrompt.environment(model)), agent.prompt]
+          : [...(await SystemPrompt.environment(model)), ...(await InstructionPrompt.system())],
         messages: [
           ...MessageV2.toModelMessages(sessionMessages, model),
           ...(isLastStep
