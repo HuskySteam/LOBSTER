@@ -5,8 +5,10 @@ import { Instance } from "../project/instance"
 import { Identifier } from "../id/id"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
+import PROMPT_CONTINUE from "./template/continue.txt"
 import { MCP } from "../mcp"
 import { Skill } from "../skill"
+import { SessionResume } from "../session/resume"
 
 export namespace Command {
   export const Event = {
@@ -54,6 +56,7 @@ export namespace Command {
   export const Default = {
     INIT: "init",
     REVIEW: "review",
+    CONTINUE: "continue",
   } as const
 
   const state = Instance.state(async () => {
@@ -78,6 +81,19 @@ export namespace Command {
         },
         subtask: true,
         hints: hints(PROMPT_REVIEW),
+      },
+      [Default.CONTINUE]: {
+        name: Default.CONTINUE,
+        description: "resume previous session context",
+        source: "command",
+        get template() {
+          return new Promise<string>((resolve) => {
+            SessionResume.prompt().then((context) => {
+              resolve(context + "\n\n$ARGUMENTS")
+            }).catch(() => resolve(PROMPT_CONTINUE))
+          })
+        },
+        hints: hints(PROMPT_CONTINUE),
       },
     }
 

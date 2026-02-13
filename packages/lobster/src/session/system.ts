@@ -7,6 +7,10 @@ import { OutputStyle } from "./output-style"
 import { Scratchpad } from "./scratchpad"
 import { Config } from "../config/config"
 import { PromptRegistry } from "./prompt-registry"
+import { CodebaseIndex } from "@/index/indexer"
+import { Convention } from "@/convention"
+import { Bus } from "@/bus"
+import { FileWatcher } from "@/file/watcher"
 import SECTION_SYSTEM from "./prompt/sections/system.txt"
 import SECTION_DOING_TASKS from "./prompt/sections/doing-tasks.txt"
 import SECTION_TONE from "./prompt/sections/tone.txt"
@@ -25,6 +29,10 @@ export namespace SystemPrompt {
       PromptRegistry.register("actions-with-care", SECTION_ACTIONS)
       PromptRegistry.register("git", SECTION_GIT)
       PromptRegistry.register("security", SECTION_SECURITY)
+      const indexSummary = CodebaseIndex.summary()
+      if (indexSummary) {
+        PromptRegistry.register("codebase-index", indexSummary)
+      }
     }
   }
 
@@ -38,7 +46,15 @@ export namespace SystemPrompt {
     return [PromptRegistry.assemble()]
   }
 
+  const watcherSubscribed = Instance.state(() => {
+    const unsubscribe = Bus.subscribe(FileWatcher.Event.Updated, async (evt) => {
+      await CodebaseIndex.update([evt.properties.file])
+    })
+    return { active: true, unsubscribe }
+  })
+
   export async function environment(model: Provider.Model) {
+    watcherSubscribed()
     const project = Instance.project
     const today = new Date().toISOString().split("T")[0]
 
@@ -88,6 +104,12 @@ export namespace SystemPrompt {
     const styleInstruction = await OutputStyle.instruction()
     if (styleInstruction) {
       lines.push(``, `# Response Style`, styleInstruction)
+    }
+
+    // Convention detection
+    const conventions = await Convention.get().catch(() => null)
+    if (conventions) {
+      PromptRegistry.register("conventions", Convention.toPrompt(conventions))
     }
 
     return [lines.join("\n")]

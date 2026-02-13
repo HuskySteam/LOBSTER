@@ -36,7 +36,7 @@
     },
     "packages/lobster": {
       "name": "lobster",
-      "version": "2.1.5",
+      "version": "4.5.0",
       "bin": {
         "lobster": "./bin/lobster",
       },
@@ -139,7 +139,7 @@
     },
     "packages/plugin": {
       "name": "@lobster-ai/plugin",
-      "version": "1.5.5",
+      "version": "4.5.0",
       "dependencies": {
         "@lobster-ai/sdk": "workspace:*",
         "zod": "catalog:",
@@ -153,14 +153,14 @@
     },
     "packages/script": {
       "name": "@lobster-ai/script",
-      "version": "1.5.5",
+      "version": "4.5.0",
       "devDependencies": {
         "@types/bun": "catalog:",
       },
     },
     "packages/sdk/js": {
       "name": "@lobster-ai/sdk",
-      "version": "1.5.5",
+      "version": "4.5.0",
       "devDependencies": {
         "@hey-api/openapi-ts": "0.90.10",
         "@tsconfig/node22": "catalog:",
@@ -184,7 +184,7 @@
     },
     "packages/util": {
       "name": "@lobster-ai/util",
-      "version": "1.5.5",
+      "version": "4.5.0",
       "dependencies": {
         "zod": "catalog:",
       },

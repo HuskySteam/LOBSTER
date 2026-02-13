@@ -28,6 +28,7 @@ import { LSP } from "../lsp"
 import { ReadTool } from "../tool/read"
 import { ListTool } from "../tool/ls"
 import { FileTime } from "../file/time"
+import { DiagnosticsReminder } from "../tool/diagnostics-reminder"
 import { Flag } from "../flag/flag"
 import { ulid } from "ulid"
 import { spawn } from "child_process"
@@ -61,6 +62,7 @@ import { AgentRouter } from "../agent/router"
 import { DelegateMode } from "./delegate"
 import { Scratchpad } from "./scratchpad"
 import { Todo } from "./todo"
+import { TestAssociation } from "../test/association"
 
 // Suppress AI SDK warnings that pollute stdout. The AI SDK checks this global
 // to decide whether to log warnings. See: https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
@@ -70,6 +72,17 @@ globalThis.AI_SDK_LOG_WARNINGS = false
 export namespace SessionPrompt {
   const log = Log.create({ service: "session.prompt" })
   export const OUTPUT_TOKEN_MAX = Flag.LOBSTER_EXPERIMENTAL_OUTPUT_TOKEN_MAX || 32_000
+
+  function syntheticTextPart(text: string, messageID: string, sessionID: string) {
+    return {
+      id: Identifier.ascending("part"),
+      messageID,
+      sessionID,
+      type: "text" as const,
+      synthetic: true as const,
+      text,
+    }
+  }
 
   const state = Instance.state(
     () => {
@@ -1864,28 +1877,31 @@ This is critical - your turn should only end with either asking the user a genui
     // New diagnostics detected after writes
     if (input.step && input.step > 1) {
       const lastMsg = input.messages.at(-1)
-      const hadWrites = lastMsg?.parts.some(
-        (p) => p.type === "tool" && p.state.status === "completed" && ["write", "edit", "multiedit", "apply_patch"].includes(p.tool),
-      )
-      if (hadWrites) {
-        const diags = await LSP.diagnostics().catch(() => ({}))
-        const errors: string[] = []
-        for (const [file, fileDiags] of Object.entries(diags)) {
-          for (const d of fileDiags) {
-            if (d.severity && d.severity <= 2) {
-              errors.push(`  ${path.relative(Instance.worktree, file)}:${d.range.start.line + 1}: ${d.message}`)
-            }
+      if (lastMsg && DiagnosticsReminder.hadRecentEdits(lastMsg.parts)) {
+        const errors = await DiagnosticsReminder.getErrors()
+        const text = DiagnosticsReminder.format(errors)
+        if (text) {
+          userMessage.parts.push(syntheticTextPart(text, userMessage.info.id, input.session.id))
+        }
+      }
+    }
+
+    // Test suggestion after source file edits
+    if (input.step && input.step > 1) {
+      const lastMsg = input.messages.at(-1)
+      const editedFiles: string[] = []
+      if (lastMsg) {
+        for (const part of lastMsg.parts) {
+          if (part.type === "tool" && part.state.status === "completed" && (DiagnosticsReminder.EDIT_TOOLS as readonly string[]).includes(part.tool)) {
+            const filepath = part.state.input?.file_path ?? part.state.input?.filePath ?? part.state.input?.path
+            if (typeof filepath === "string") editedFiles.push(filepath)
           }
         }
-        if (errors.length > 0) {
-          userMessage.parts.push({
-            id: Identifier.ascending("part"),
-            messageID: userMessage.info.id,
-            sessionID: input.session.id,
-            type: "text",
-            synthetic: true,
-            text: `<system-reminder>\nNew diagnostics detected:\n${errors.slice(0, 20).join("\n")}${errors.length > 20 ? `\n... and ${errors.length - 20} more` : ""}\n</system-reminder>`,
-          })
+      }
+      if (editedFiles.length > 0) {
+        const suggestion = await TestAssociation.suggestion(editedFiles)
+        if (suggestion) {
+          userMessage.parts.push(syntheticTextPart(`<system-reminder>\n${suggestion}\n</system-reminder>`, userMessage.info.id, input.session.id))
         }
       }
     }
@@ -1900,42 +1916,21 @@ This is critical - your turn should only end with either asking the user a genui
         const todos = await Todo.get(input.session.id)
         if (todos.length > 0) {
           const summary = todos.map((t) => `  [${t.status}] ${t.content}`).join("\n")
-          userMessage.parts.push({
-            id: Identifier.ascending("part"),
-            messageID: userMessage.info.id,
-            sessionID: input.session.id,
-            type: "text",
-            synthetic: true,
-            text: `<system-reminder>\nCurrent todo list:\n${summary}\n</system-reminder>`,
-          })
+          userMessage.parts.push(syntheticTextPart(`<system-reminder>\nCurrent todo list:\n${summary}\n</system-reminder>`, userMessage.info.id, input.session.id))
         }
       }
     }
 
     // Session continuation reminder
     if (input.step === 1 && input.session.parentID) {
-      userMessage.parts.push({
-        id: Identifier.ascending("part"),
-        messageID: userMessage.info.id,
-        sessionID: input.session.id,
-        type: "text",
-        synthetic: true,
-        text: `<system-reminder>\nThis session was continued from a previous conversation. The working directory may have changed. Re-read any files you need before making changes.\n</system-reminder>`,
-      })
+      userMessage.parts.push(syntheticTextPart(`<system-reminder>\nThis session was continued from a previous conversation. The working directory may have changed. Re-read any files you need before making changes.\n</system-reminder>`, userMessage.info.id, input.session.id))
     }
 
     // Output token limit exceeded detection
     if (input.step && input.step > 1) {
       const prevAssistant = input.messages.findLast((m) => m.info.role === "assistant")
       if (prevAssistant?.info.role === "assistant" && (prevAssistant.info as MessageV2.Assistant).finish === "length") {
-        userMessage.parts.push({
-          id: Identifier.ascending("part"),
-          messageID: userMessage.info.id,
-          sessionID: input.session.id,
-          type: "text",
-          synthetic: true,
-          text: `<system-reminder>\nYour previous response was cut off due to output token limits. Continue from where you left off.\n</system-reminder>`,
-        })
+        userMessage.parts.push(syntheticTextPart(`<system-reminder>\nYour previous response was cut off due to output token limits. Continue from where you left off.\n</system-reminder>`, userMessage.info.id, input.session.id))
       }
     }
 

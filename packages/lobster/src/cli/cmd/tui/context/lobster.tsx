@@ -235,8 +235,19 @@ export const { use: useLobster, provider: LobsterProvider } = createSimpleContex
 
     const totalCost = createMemo(() => {
       const c = cost()
-      if (!c?.sessions) return 0
-      return Object.values(c.sessions).reduce((sum: number, s) => sum + (s?.total_cost || 0), 0)
+      if (c?.sessions) {
+        const pluginCost = Object.values(c.sessions).reduce((sum: number, s) => sum + (s?.total_cost || 0), 0)
+        if (pluginCost > 0) return pluginCost
+      }
+      // Fallback: compute from session messages
+      const allMessages = sync.data.message
+      let total = 0
+      for (const msgs of Object.values(allMessages)) {
+        for (const msg of msgs) {
+          if (msg.role === "assistant") total += msg.cost
+        }
+      }
+      return total
     })
 
     const qualityScore = createMemo(() => {

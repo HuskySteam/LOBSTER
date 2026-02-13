@@ -14,6 +14,7 @@ import { fn } from "@/util/fn"
 import { Agent } from "@/agent/agent"
 import { Plugin } from "@/plugin"
 import { Config } from "@/config/config"
+import { CompactionWeights } from "./compaction-weights"
 
 export namespace SessionCompaction {
   const log = Log.create({ service: "session.compaction" })
@@ -57,33 +58,46 @@ export namespace SessionCompaction {
     log.info("pruning")
     const msgs = await Session.messages({ sessionID: input.sessionID })
     let total = 0
-    let pruned = 0
-    const toPrune = []
-    let turns = 0
+    const candidates: Array<{ part: MessageV2.ToolPart; score: number; tokens: number }> = []
+    let userTurns = 0
     const pruneMin = adaptivePruneMinimum(input.usageRatio ?? 0)
 
     loop: for (let msgIndex = msgs.length - 1; msgIndex >= 0; msgIndex--) {
       const msg = msgs[msgIndex]
-      if (msg.info.role === "user") turns++
-      if (turns < 2) continue
+      if (msg.info.role === "user") userTurns++
+      if (userTurns < 2) continue
       if (msg.info.role === "assistant" && msg.info.summary) break loop
       for (let partIndex = msg.parts.length - 1; partIndex >= 0; partIndex--) {
         const part = msg.parts[partIndex]
-        if (part.type === "tool")
-          if (part.state.status === "completed") {
-            if (PRUNE_PROTECTED_TOOLS.includes(part.tool)) continue
-
-            if (part.state.time.compacted) break loop
-            const estimate = Token.estimate(part.state.output)
-            total += estimate
-            if (total > PRUNE_PROTECT) {
-              pruned += estimate
-              toPrune.push(part)
-            }
-          }
+        if (part.type === "tool" && part.state.status === "completed") {
+          if (PRUNE_PROTECTED_TOOLS.includes(part.tool)) continue
+          if (part.state.time.compacted) break loop
+          const estimate = Token.estimate(part.state.output)
+          total += estimate
+          const weight = CompactionWeights.score(part, msgIndex, msgs.length)
+          candidates.push({ part, score: weight, tokens: estimate })
+        }
       }
     }
-    log.info("found", { pruned, total })
+
+    // Sort by score ascending — prune lowest importance first
+    candidates.sort((a, b) => a.score - b.score)
+
+    const target = total - PRUNE_PROTECT
+    if (target <= pruneMin) {
+      log.info("not enough to prune", { total, target, pruneMin })
+      return
+    }
+
+    let pruned = 0
+    const toPrune: MessageV2.ToolPart[] = []
+    for (const candidate of candidates) {
+      if (pruned >= target) break
+      pruned += candidate.tokens
+      toPrune.push(candidate.part)
+    }
+
+    log.info("found", { pruned, total, candidates: candidates.length })
     if (pruned > pruneMin) {
       for (const part of toPrune) {
         if (part.state.status === "completed") {
