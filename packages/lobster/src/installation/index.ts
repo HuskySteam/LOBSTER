@@ -162,8 +162,21 @@ export namespace Installation {
       }
     }
 
-    // Replace binary
-    const newBin = path.join(tmpDir, isWindows ? "lobster.exe" : "lobster")
+    // Find the binary — may be at root or nested inside extracted directory (e.g. lobster-windows-x64/bin/)
+    const binName = isWindows ? "lobster.exe" : "lobster"
+    const candidates = [
+      path.join(tmpDir, binName),
+      path.join(tmpDir, assetName.replace(/\.(zip|tar\.gz)$/, ""), "bin", binName),
+      path.join(tmpDir, assetName.replace(/\.(zip|tar\.gz)$/, ""), binName),
+    ]
+    const newBin = await (async () => {
+      for (const p of candidates) {
+        const exists = await Bun.file(p).exists()
+        if (exists) return p
+      }
+      return undefined
+    })()
+    if (!newBin) throw new UpgradeFailedError({ stderr: `Binary not found after extraction. Checked: ${candidates.join(", ")}` })
     const currentBin = process.execPath
     if (isWindows) {
       // Windows can't replace running exe directly — move old, copy new, schedule cleanup
