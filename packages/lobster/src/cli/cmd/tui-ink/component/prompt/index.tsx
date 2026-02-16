@@ -12,6 +12,9 @@ import { useDialog } from "../../ui/dialog"
 import { DialogModel } from "../dialog-model"
 import { DialogAgent } from "../dialog-agent"
 import { DialogSessionList } from "../dialog-session-list"
+import { DialogCommand } from "../dialog-command"
+import { DialogProvider } from "../dialog-provider"
+import { DialogKeybinds } from "../dialog-keybinds"
 import { Spinner } from "../spinner"
 
 interface PromptProps {
@@ -96,6 +99,24 @@ export function Prompt(props: PromptProps) {
       dialog.replace(<DialogSessionList />)
       return
     }
+
+    // Ctrl+P: command palette
+    if (key.ctrl && ch === "p") {
+      dialog.replace(<DialogCommand />)
+      return
+    }
+
+    // Ctrl+O: connect provider
+    if (key.ctrl && ch === "o") {
+      dialog.replace(<DialogProvider />)
+      return
+    }
+
+    // Ctrl+/: keybinds reference
+    if (ch === "\x1F") {
+      dialog.replace(<DialogKeybinds />)
+      return
+    }
   })
 
   // Auto-submit piped prompt on mount
@@ -147,6 +168,8 @@ export function Prompt(props: PromptProps) {
           <Text color={theme.textMuted} dimColor>tab agent</Text>
           <Text color={theme.textMuted} dimColor>^M model</Text>
           <Text color={theme.textMuted} dimColor>^S sessions</Text>
+          <Text color={theme.textMuted} dimColor>^P commands</Text>
+          <Text color={theme.textMuted} dimColor>^O connect</Text>
         </Box>
       )}
     </Box>
