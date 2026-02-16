@@ -187,14 +187,31 @@ export namespace ToolRegistry {
     return all().then((x) => x.map((t) => t.id))
   }
 
+  // Lazy tool loading tiers: exploration-only tools vs full tool set
+  // Step 1 gets exploration tools only (read, grep, glob, bash, websearch, task, question, plan)
+  // Step 2+ adds write tools (edit, write, apply_patch, etc.)
+  const EXPLORATION_TOOLS = new Set([
+    "invalid", "question", "bash", "read", "glob", "grep",
+    "task", "webfetch", "websearch", "codesearch", "skill",
+    "todo_write", "plan_enter", "plan_exit", "lsp",
+    // Team tools always available
+    "team_create", "team_delete", "team_task_create", "team_task_update",
+    "team_task_get", "team_task_list", "team_send_message",
+    // Memory tools
+    "memory_save", "memory_recall",
+  ])
+
   export async function tools(
     model: {
       providerID: string
       modelID: string
     },
     agent?: Agent.Info,
+    options?: { step?: number },
   ) {
-    const cacheKey = `${agent?.name ?? ""}:${model.providerID}:${model.modelID}:${initCacheVersion}`
+    const step = options?.step ?? 2 // default to full tools
+    const tier = step <= 1 ? "explore" : "full"
+    const cacheKey = `${agent?.name ?? ""}:${model.providerID}:${model.modelID}:${initCacheVersion}:${tier}`
     const cached = initCache.get(cacheKey)
     if (cached) return cached
 
@@ -202,6 +219,15 @@ export namespace ToolRegistry {
     const result = await Promise.all(
       tools
         .filter((t) => {
+          // Lazy loading: step 1 only loads exploration tools
+          if (tier === "explore" && !EXPLORATION_TOOLS.has(t.id)) {
+            // Custom/plugin tools always load (they may be critical)
+            const isBuiltIn = [
+              "edit", "write", "apply_patch", "batch",
+            ].includes(t.id)
+            if (isBuiltIn) return false
+          }
+
           // Enable websearch/codesearch for zen users OR via enable flag
           if (t.id === "codesearch" || t.id === "websearch") {
             return Flag.LOBSTER_ENABLE_EXA

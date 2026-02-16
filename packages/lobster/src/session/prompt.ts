@@ -63,6 +63,11 @@ import { DelegateMode } from "./delegate"
 import { Scratchpad } from "./scratchpad"
 import { Todo } from "./todo"
 import { TestAssociation } from "../test/association"
+import { ContextWindow } from "./context-window"
+import { SystemCache } from "./system-cache"
+import { ToolResolveCache } from "@/tool/resolve-cache"
+import { TokenBudget } from "./budget"
+import { AgentDelegator } from "@/agent/delegator"
 
 // Suppress AI SDK warnings that pollute stdout. The AI SDK checks this global
 // to decide whether to log warnings. See: https://github.com/vercel/ai/blob/2dc67e0ef538307f21368db32d5a12345d98831b/packages/ai/src/logger/log-warnings.ts#L85
@@ -644,7 +649,7 @@ export namespace SessionPrompt {
         continue
       }
 
-      // proactive compaction: trigger early when context exceeds 90%
+      // proactive compaction: trigger early when context exceeds 60% (was 90%)
       if (
         lastFinished &&
         lastFinished.summary !== true &&
@@ -652,7 +657,7 @@ export namespace SessionPrompt {
       ) {
         const totalTokens = lastFinished.tokens.input + lastFinished.tokens.cache.read + lastFinished.tokens.output
         const usageRatio = totalTokens / model.limit.context
-        if (usageRatio > 0.9) {
+        if (usageRatio > 0.6) {
           log.info("proactive compaction triggered", { usageRatio, sessionID })
           await SessionCompaction.create({
             sessionID,
@@ -696,41 +701,24 @@ export namespace SessionPrompt {
         Scratchpad.create(sessionID).catch(() => {})
       }
 
-      // Smart context: auto-find relevant files (opt-out via smart_context: false)
-      if (step === 1) {
-        const config = await Config.get()
-        if (config.experimental?.smart_context !== false) {
-          const lastUserIdx = msgs.findLastIndex((m) => m.info.role === "user")
-          const lastUserMsg = lastUserIdx >= 0 ? msgs[lastUserIdx] : undefined
-          const hasUserFiles = lastUserMsg?.parts.some((p) => p.type === "file") ?? false
-          if (lastUserMsg && !hasUserFiles) {
-            const userText = lastUserMsg.parts
-              .filter((p): p is MessageV2.TextPart => p.type === "text" && !p.synthetic)
-              .map((p) => p.text)
-              .join(" ")
-            if (userText.trim().length > 0) {
-              const relevantFiles = await SmartContext.findRelevant(userText).catch(() => [] as SmartContext.SmartResult[])
-              if (relevantFiles.length > 0) {
-                // Clone the message to avoid mutating the original
-                msgs = msgs.map((m, i) =>
-                  i === lastUserIdx
-                    ? { ...m, parts: [...m.parts, {
-                        id: Identifier.ascending("part"),
-                        messageID: m.info.id,
-                        sessionID: m.info.sessionID,
-                        type: "text" as const,
-                        text: `<system-reminder>\nRelevant files detected:\n${relevantFiles.map((f) => `- ${f.path} (${f.reason})`).join("\n")}\n</system-reminder>`,
-                        synthetic: true,
-                      }] }
-                    : m,
-                )
-              }
-            }
-          }
-        }
-      }
+      // Smart context: disabled — model discovers relevant files via tools (grep/glob/read)
+      // This saves 500-2000 tokens per turn that were spent on synthetic file list injection
 
-      const maxSteps = agent.steps ?? Infinity
+      // Smart delegation: classify task complexity on first step to set adaptive limits
+      const delegation = step === 1
+        ? AgentDelegator.classify(
+            lastUser ? msgs
+              .filter((m) => m.info.id === lastUser.id)
+              .flatMap((m) => m.parts)
+              .filter((p) => p.type === "text" && !p.synthetic)
+              .map((p) => (p as any).text ?? "")
+              .join(" ") : "",
+            step,
+          )
+        : undefined
+
+      const delegatedMaxSteps = delegation?.suggestedMaxSteps ?? Infinity
+      const maxSteps = Math.min(agent.steps ?? Infinity, delegatedMaxSteps)
       const isLastStep = step >= maxSteps
       msgs = await insertReminders({
         messages: msgs,
@@ -783,6 +771,7 @@ export namespace SessionPrompt {
         processor,
         bypassAgentCheck,
         messages: msgs,
+        step,
       })
 
       if (step === 1) {
@@ -792,7 +781,15 @@ export namespace SessionPrompt {
         })
       }
 
-      const sessionMessages = clone(msgs)
+      // Apply context window to fit messages within budget
+      const windowedMessages = ContextWindow.build({
+        messages: msgs,
+        model,
+        agent,
+        step,
+        sessionID,
+      })
+      const sessionMessages = clone(windowedMessages)
 
       // Ephemerally wrap queued user messages with a reminder to stay on track
       if (step > 1 && lastFinished) {
@@ -821,14 +818,21 @@ export namespace SessionPrompt {
       if (circularityDetected) thinkingScale *= 0.75
       if (consecutiveEmptySteps >= 3) thinkingScale *= 0.75
 
+      // System prompt caching — avoid rebuilding every iteration
+      let system = SystemCache.get(sessionID, agent.name)
+      if (!system) {
+        system = agent.prompt && !agent.prompt.includes("{{base_prompt}}")
+          ? [...(await SystemPrompt.environment(model)), agent.prompt]
+          : [...(await SystemPrompt.environment(model)), ...(await InstructionPrompt.system())]
+        SystemCache.set(sessionID, agent.name, system)
+      }
+
       const result = await processor.process({
         user: lastUser,
         agent,
         abort,
         sessionID,
-        system: agent.prompt && !agent.prompt.includes("{{base_prompt}}")
-          ? [...(await SystemPrompt.environment(model)), agent.prompt]
-          : [...(await SystemPrompt.environment(model)), ...(await InstructionPrompt.system())],
+        system,
         messages: [
           ...MessageV2.toModelMessages(sessionMessages, model),
           ...(isLastStep
@@ -928,8 +932,17 @@ export namespace SessionPrompt {
     processor: SessionProcessor.Info
     bypassAgentCheck: boolean
     messages: MessageV2.WithParts[]
+    step?: number
   }) {
     using _ = log.time("resolveTools")
+
+    // Tool resolution caching — avoid re-resolving all tools every iteration
+    // Note: step 1 gets a different (smaller) tool set, so only cache step 2+
+    if (input.step && input.step > 1) {
+      const cachedTools = ToolResolveCache.get(input.session.id, input.agent.name)
+      if (cachedTools) return cachedTools
+    }
+
     const tools: Record<string, AITool> = {}
 
     const context = (args: any, options: ToolCallOptions): Tool.Context => ({
@@ -971,6 +984,7 @@ export namespace SessionPrompt {
     for (const item of await ToolRegistry.tools(
       { modelID: input.model.api.id, providerID: input.model.providerID },
       input.agent,
+      { step: input.step },
     )) {
       const schema = ProviderTransform.schema(input.model, z.toJSONSchema(item.parameters))
       tools[item.id] = tool({
@@ -1147,6 +1161,8 @@ export namespace SessionPrompt {
       tools[key] = item
     }
 
+    // Cache resolved tools for subsequent iterations
+    ToolResolveCache.set(input.session.id, input.agent.name, tools)
     return tools
   }
 
@@ -1586,8 +1602,8 @@ export namespace SessionPrompt {
       })
     }
 
-    // Inject relevant memories if memory feature is enabled
-    if (Flag.LOBSTER_EXPERIMENTAL_MEMORY) {
+    // Inject relevant memories only on step 1 (avoid re-injecting every turn)
+    if (Flag.LOBSTER_EXPERIMENTAL_MEMORY && (!input.step || input.step <= 1)) {
       const userText = userMessage.parts
         .filter((p) => p.type === "text" && !p.synthetic)
         .map((p) => (p as MessageV2.TextPart).text)
@@ -1801,47 +1817,8 @@ This is critical - your turn should only end with either asking the user a genui
       })
     }
 
-    // Verification reminder every 8 tool calls
-    const toolCount = input.messages
-      .flatMap((m) => m.parts)
-      .filter((p) => p.type === "tool")
-      .length
-
-    if (toolCount > 0 && toolCount % 8 === 0 && input.step && input.step > 1) {
-      userMessage.parts.push({
-        id: Identifier.ascending("part"),
-        messageID: userMessage.info.id,
-        sessionID: input.session.id,
-        type: "text",
-        synthetic: true,
-        text: `<system-reminder>\nYou have made ${toolCount} tool calls. Quick check:\n- Are your changes correct? Consider re-reading modified files.\n- Are you still on track with the original task?\n- Should you run tests or typecheck before continuing?\n</system-reminder>`,
-        time: { start: Date.now(), end: Date.now() },
-      })
-    }
-
-    // Token usage display every 10 tool calls
-    if (toolCount > 0 && toolCount % 10 === 0 && input.step && input.step > 1) {
-      const lastAssistantMsg = input.messages.findLast((m) => m.info.role === "assistant")
-      if (lastAssistantMsg?.info.role === "assistant") {
-        const assistantInfo = lastAssistantMsg.info as MessageV2.Assistant
-        const tokens = assistantInfo.tokens
-        const used = (tokens.input ?? 0) + (tokens.output ?? 0) + (tokens.cache?.read ?? 0)
-        const model = await Provider.getModel(assistantInfo.providerID, assistantInfo.modelID).catch(() => undefined)
-        if (model && model.limit.context > 0) {
-          const total = model.limit.context
-          const percent = Math.round((used / total) * 100)
-          const remaining = total - used
-          userMessage.parts.push({
-            id: Identifier.ascending("part"),
-            messageID: userMessage.info.id,
-            sessionID: input.session.id,
-            type: "text",
-            synthetic: true,
-            text: `<system-reminder>\nToken usage: ${used.toLocaleString()}/${total.toLocaleString()} (${percent}%). ${remaining.toLocaleString()} tokens remaining.\n</system-reminder>`,
-          })
-        }
-      }
-    }
+    // Removed: Verification reminder every 8 tool calls (token waste — model already knows to verify)
+    // Removed: Token usage display every 10 tool calls (UI concern, not model concern)
 
     // File modified externally detection
     if (input.step && input.step > 1) {
@@ -1906,20 +1883,7 @@ This is critical - your turn should only end with either asking the user a genui
       }
     }
 
-    // Todo list state reminder after TodoWrite
-    if (input.step && input.step > 1) {
-      const lastMsg = input.messages.at(-1)
-      const hadTodoWrite = lastMsg?.parts.some(
-        (p) => p.type === "tool" && p.state.status === "completed" && p.tool === "todowrite",
-      )
-      if (hadTodoWrite) {
-        const todos = await Todo.get(input.session.id)
-        if (todos.length > 0) {
-          const summary = todos.map((t) => `  [${t.status}] ${t.content}`).join("\n")
-          userMessage.parts.push(syntheticTextPart(`<system-reminder>\nCurrent todo list:\n${summary}\n</system-reminder>`, userMessage.info.id, input.session.id))
-        }
-      }
-    }
+    // Removed: Todo list state reminder (model tracks its own todos, saves tokens)
 
     // Session continuation reminder
     if (input.step === 1 && input.session.parentID) {

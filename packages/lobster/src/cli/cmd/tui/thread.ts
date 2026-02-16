@@ -71,6 +71,12 @@ export const TuiThreadCommand = cmd({
       .option("agent", {
         type: "string",
         describe: "agent to use",
+      })
+      .option("ui", {
+        type: "string",
+        describe: "UI framework: opentui (default) or ink",
+        choices: ["opentui", "ink"] as const,
+        default: "opentui",
       }),
   handler: async (args) => {
     // Resolve relative paths against PWD to preserve behavior when using --cwd flag
@@ -144,22 +150,29 @@ export const TuiThreadCommand = cmd({
       events = createEventSource(client)
     }
 
-    const tuiPromise = tui({
+    const tuiArgs = {
+      continue: args.continue,
+      sessionID: args.session,
+      agent: args.agent,
+      model: args.model,
+      prompt,
+    }
+
+    const tuiOptions = {
       url,
       fetch: customFetch,
       events,
       headers: tokenHeaders,
-      args: {
-        continue: args.continue,
-        sessionID: args.session,
-        agent: args.agent,
-        model: args.model,
-        prompt,
-      },
+      args: tuiArgs,
       onExit: async () => {
         await client.call("shutdown", undefined)
       },
-    })
+    }
+
+    // Select UI framework
+    const tuiPromise = args.ui === "ink"
+      ? import("@tui-ink/app").then((m) => m.tui(tuiOptions))
+      : tui(tuiOptions)
 
     setTimeout(() => {
       client.call("checkUpgrade", { directory: cwd }).catch(() => {})

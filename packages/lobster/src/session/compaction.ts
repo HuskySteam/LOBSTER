@@ -39,8 +39,8 @@ export namespace SessionCompaction {
     return count > usable
   }
 
-  export const PRUNE_MINIMUM = 20_000
-  export const PRUNE_PROTECT = 40_000
+  export const PRUNE_MINIMUM = 5_000  // was 20_000 — prune earlier to save tokens
+  export const PRUNE_PROTECT = 15_000 // was 40_000 — keep less old data in context
 
   export function adaptivePruneMinimum(usageRatio: number): number {
     if (usageRatio > 0.8) return 10_000

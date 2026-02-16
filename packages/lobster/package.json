@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "4.6.0",
+  "version": "5.0.0",
   "name": "lobster",
   "type": "module",
   "license": "MIT",
@@ -31,6 +31,7 @@
     "@tsconfig/bun": "catalog:",
     "@types/babel__core": "7.20.5",
     "@types/bun": "catalog:",
+    "@types/react": "18.3.1",
     "@types/turndown": "5.0.5",
     "@types/yargs": "17.0.33",
     "@typescript/native-preview": "catalog:",
@@ -96,11 +97,16 @@
     "hono": "catalog:",
     "hono-openapi": "catalog:",
     "ignore": "7.0.5",
+    "ink": "5.2.1",
+    "ink-select-input": "6.0.0",
+    "ink-spinner": "5.0.0",
+    "ink-text-input": "6.0.0",
     "jsonc-parser": "3.3.1",
     "minimatch": "10.0.3",
     "open": "10.1.2",
     "opentui-spinner": "0.0.6",
     "partial-json": "0.1.7",
+    "react": "18.3.1",
     "remeda": "catalog:",
     "solid-js": "catalog:",
     "strip-ansi": "7.1.2",
@@ -112,6 +118,7 @@
     "xdg-basedir": "5.1.0",
     "yargs": "18.0.0",
     "zod": "catalog:",
-    "zod-to-json-schema": "3.24.5"
+    "zod-to-json-schema": "3.24.5",
+    "zustand": "5.0.5"
   }
 }

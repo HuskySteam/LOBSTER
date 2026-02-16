@@ -24,6 +24,12 @@ export const AttachCommand = cmd({
         alias: ["p"],
         type: "string",
         describe: "basic auth password (defaults to LOBSTER_SERVER_PASSWORD)",
+      })
+      .option("ui", {
+        type: "string",
+        describe: "UI framework: opentui (default) or ink",
+        choices: ["opentui", "ink"] as const,
+        default: "opentui",
       }),
   handler: async (args) => {
     const directory = (() => {
@@ -42,11 +48,17 @@ export const AttachCommand = cmd({
       const auth = `Basic ${Buffer.from(`lobster:${password}`).toString("base64")}`
       return { Authorization: auth }
     })()
-    await tui({
+    const tuiOptions = {
       url: args.url,
       args: { sessionID: args.session },
       directory,
       headers,
-    })
+    }
+    if (args.ui === "ink") {
+      const { tui: inkTui } = await import("@tui-ink/app")
+      await inkTui(tuiOptions)
+    } else {
+      await tui(tuiOptions)
+    }
   },
 })
