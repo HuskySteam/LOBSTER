@@ -74,9 +74,9 @@ export const TuiThreadCommand = cmd({
       })
       .option("ui", {
         type: "string",
-        describe: "UI framework: opentui (default) or ink",
-        choices: ["opentui", "ink"] as const,
-        default: "opentui",
+        describe: "UI framework: ink (default) or opentui",
+        choices: ["ink", "opentui"] as const,
+        default: "ink",
       }),
   handler: async (args) => {
     // Resolve relative paths against PWD to preserve behavior when using --cwd flag
