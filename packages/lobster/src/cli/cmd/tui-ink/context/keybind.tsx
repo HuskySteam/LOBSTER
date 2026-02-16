@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import React, { createContext, useContext, useCallback, useState, useRef, useEffect, type ReactNode } from "react"
+import React, { createContext, useContext, useCallback, useMemo, useState, useRef, useEffect, type ReactNode } from "react"
 import { useInput, useApp } from "ink"
 import { useRoute } from "./route"
 import { useSDK } from "./sdk"
@@ -80,8 +80,13 @@ export function KeybindProvider(props: { children: ReactNode }) {
     }
   })
 
+  const value = useMemo<KeybindContextValue>(
+    () => ({ dialogOpen, setDialogOpen, register, unregister }),
+    [dialogOpen, register, unregister],
+  )
+
   return (
-    <KeybindContext.Provider value={{ dialogOpen, setDialogOpen, register, unregister }}>
+    <KeybindContext.Provider value={value}>
       {props.children}
     </KeybindContext.Provider>
   )

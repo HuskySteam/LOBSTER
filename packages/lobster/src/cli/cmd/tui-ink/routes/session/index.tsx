@@ -37,7 +37,7 @@ export function Session(props: { sessionID: string }) {
       action: () => setShowSidebar((prev) => !prev),
     })
     return () => keybind.unregister("toggle-sidebar")
-  }, [keybind])
+  }, [keybind.register, keybind.unregister])
 
   // Sync session data on mount
   useEffect(() => {
