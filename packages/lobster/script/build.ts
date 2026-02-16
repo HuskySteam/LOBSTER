@@ -5,6 +5,56 @@ import path from "path"
 import fs from "fs"
 import { $ } from "bun"
 import { fileURLToPath } from "url"
+import type { BunPlugin } from "bun"
+import { transformAsync } from "@babel/core"
+// @ts-expect-error - Types not important
+import babelTs from "@babel/preset-typescript"
+// @ts-expect-error - Types not important
+import babelSolid from "babel-preset-solid"
+// @ts-expect-error - Types not important
+import babelReactJsx from "@babel/plugin-transform-react-jsx"
+
+// Wrap solidPlugin to skip tui-ink files (React/Ink components).
+// The solid plugin applies SolidJS JSX transform to ALL .tsx/.jsx files,
+// which breaks React class components and Ink components.
+// tui-ink files use /** @jsxImportSource react */ and need React's JSX transform.
+const solidPluginExceptInk: BunPlugin = {
+  name: "solid-plugin-except-ink",
+  setup(build) {
+    build.onLoad({ filter: /\/node_modules\/solid-js\/dist\/server\.js$/ }, async (args) => {
+      const p = args.path.replace("server.js", "solid.js")
+      return { contents: await Bun.file(p).text(), loader: "js" }
+    })
+    build.onLoad({ filter: /\/node_modules\/solid-js\/store\/dist\/server\.js$/ }, async (args) => {
+      const p = args.path.replace("server.js", "store.js")
+      return { contents: await Bun.file(p).text(), loader: "js" }
+    })
+    build.onLoad({ filter: /\.(js|ts)x$/ }, async (args) => {
+      const normalized = args.path.replaceAll("\\", "/")
+      const code = await Bun.file(args.path).text()
+
+      if (normalized.includes("/tui-ink/")) {
+        // Transform tui-ink files with React JSX (not SolidJS)
+        const result = await transformAsync(code, {
+          filename: args.path,
+          presets: [[babelTs]],
+          plugins: [[babelReactJsx, { runtime: "automatic", importSource: "react" }]],
+        })
+        return { contents: result?.code ?? "", loader: "js" }
+      }
+
+      // Use babel with solid preset for everything else (OpenTUI components)
+      const result = await transformAsync(code, {
+        filename: args.path,
+        presets: [
+          [babelSolid, { moduleName: "@opentui/solid", generate: "universal" }],
+          [babelTs],
+        ],
+      })
+      return { contents: result?.code ?? "", loader: "js" }
+    })
+  },
+}
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -110,7 +160,7 @@ for (const item of targets) {
   await Bun.build({
     conditions: ["browser"],
     tsconfig: "./tsconfig.json",
-    plugins: [solidPlugin],
+    plugins: [solidPluginExceptInk],
     sourcemap: "external",
     compile: {
       autoloadBunfig: false,
