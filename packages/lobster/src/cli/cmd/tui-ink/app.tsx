@@ -84,7 +84,9 @@ export async function tui(input: {
   }
 
   const app = render(
-    <ErrorBoundary onExit={onExit} mode={mode}>
+    React.createElement(
+      ErrorBoundary,
+      { onExit, mode },
       <ArgsProvider {...input.args}>
         <ExitProvider onExit={onExit}>
           <RouteProvider>
@@ -109,8 +111,8 @@ export async function tui(input: {
             </SDKProvider>
           </RouteProvider>
         </ExitProvider>
-      </ArgsProvider>
-    </ErrorBoundary>,
+      </ArgsProvider>,
+    ),
   )
 
   await app.waitUntilExit()
@@ -138,9 +140,10 @@ function App() {
   )
 }
 
-// React error boundary
+// React error boundary — uses React.createElement to bypass SolidJS JSX transform
+// which would call class components as functions (without `new`)
 class ErrorBoundary extends React.Component<
-  { children: ReactNode; onExit: () => Promise<void>; mode?: "dark" | "light" },
+  { children?: ReactNode; onExit: () => Promise<void>; mode?: "dark" | "light" },
   { error: Error | null }
 > {
   override state = { error: null as Error | null }
@@ -152,25 +155,16 @@ class ErrorBoundary extends React.Component<
   override render() {
     if (this.state.error) {
       const isLight = this.props.mode === "light"
-      return (
-        <Box flexDirection="column" padding={1}>
-          <Text color={isLight ? "#3b7dd8" : "#fab283"} bold>
-            A fatal error occurred!
-          </Text>
-          <Text color={isLight ? "#8a8a8a" : "#808080"}>
-            {this.state.error.message}
-          </Text>
-          <Box marginTop={1}>
-            <Text color={isLight ? "#8a8a8a" : "#808080"}>
-              {this.state.error.stack?.slice(0, 500)}
-            </Text>
-          </Box>
-          <Box marginTop={1}>
-            <Text color={isLight ? "#1a1a1a" : "#eeeeee"}>
-              Please report an issue at https://github.com/HuskySteam/LOBSTER/issues
-            </Text>
-          </Box>
-        </Box>
+      const e = React.createElement
+      return e(Box, { flexDirection: "column", padding: 1 },
+        e(Text, { color: isLight ? "#3b7dd8" : "#fab283", bold: true }, "A fatal error occurred!"),
+        e(Text, { color: isLight ? "#8a8a8a" : "#808080" }, this.state.error.message),
+        e(Box, { marginTop: 1 },
+          e(Text, { color: isLight ? "#8a8a8a" : "#808080" }, this.state.error.stack?.slice(0, 500)),
+        ),
+        e(Box, { marginTop: 1 },
+          e(Text, { color: isLight ? "#1a1a1a" : "#eeeeee" }, "Please report an issue at https://github.com/HuskySteam/LOBSTER/issues"),
+        ),
       )
     }
     return this.props.children
