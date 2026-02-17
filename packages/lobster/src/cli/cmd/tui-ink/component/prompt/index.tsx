@@ -1,13 +1,14 @@
 /** @jsxImportSource react */
 import { Box, Text, useInput } from "ink"
 import TextInput from "ink-text-input"
-import React, { useState, useCallback, useRef, useEffect } from "react"
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import { useTheme } from "../../theme"
 import { useAppStore } from "../../store"
 import { useSDK } from "../../context/sdk"
 import { useArgs } from "../../context/args"
 import { useExit } from "../../context/exit"
 import { useLocal } from "../../context/local"
+import { useKeybind } from "../../context/keybind"
 import { useDialog } from "../../ui/dialog"
 import { DialogModel } from "../dialog-model"
 import { DialogAgent } from "../dialog-agent"
@@ -15,7 +16,12 @@ import { DialogSessionList } from "../dialog-session-list"
 import { DialogCommand } from "../dialog-command"
 import { DialogProvider } from "../dialog-provider"
 import { DialogKeybinds } from "../dialog-keybinds"
+import { DialogStatus } from "../dialog-status"
+import { DialogThemeList } from "../dialog-theme-list"
+import { DialogMcp } from "../dialog-mcp"
+import { DialogPlugin } from "../dialog-plugin"
 import { Spinner } from "../spinner"
+import { Autocomplete, type AutocompleteOption } from "./autocomplete"
 
 interface PromptProps {
   sessionID?: string
@@ -29,22 +35,204 @@ export function Prompt(props: PromptProps) {
   const args = useArgs()
   const local = useLocal()
   const dialog = useDialog()
+  const keybind = useKeybind()
 
   const [input, setInput] = useState(args.prompt ?? "")
-  const [focused, setFocused] = useState(true)
   const [interruptCount, setInterruptCount] = useState(0)
+  const isDialogOpen = dialog.content !== null
+
+  // Autocomplete state
+  const [acMode, setAcMode] = useState<false | "/" | "@">(false)
+  const [acIndex, setAcIndex] = useState(0)
+  const [acTriggerPos, setAcTriggerPos] = useState(0)
+  const [fileResults, setFileResults] = useState<string[]>([])
 
   const sessionStatus = useAppStore((s) =>
     props.sessionID ? s.session_status[props.sessionID] : undefined,
   )
+  const commands = useAppStore((s) => s.command)
+  const agents = useAppStore((s) => s.agent)
 
   const isBusy = sessionStatus?.type === "busy"
   const currentAgent = local.agent.current()
   const currentModel = local.model.current()
   const modelParsed = local.model.parsed()
 
+  // Suppress global keybindings while autocomplete is open
+  useEffect(() => {
+    keybind.setDialogOpen(!!acMode || isDialogOpen)
+    return () => keybind.setDialogOpen(false)
+  }, [!!acMode, isDialogOpen])
+
+  // Reset selection on mode change
+  const prevModeRef = useRef<false | "/" | "@">(false)
+  useEffect(() => {
+    if (prevModeRef.current !== acMode) {
+      setAcIndex(0)
+      prevModeRef.current = acMode
+    }
+  }, [acMode])
+
+  // Debounced file search for "@" mode
+  const fileSearchTimer = useRef<ReturnType<typeof setTimeout>>()
+  const searchFiles = useCallback(
+    (query: string) => {
+      if (fileSearchTimer.current) clearTimeout(fileSearchTimer.current)
+      if (!query) {
+        setFileResults([])
+        return
+      }
+      fileSearchTimer.current = setTimeout(async () => {
+        const result = await sync.client.find.files({ query, limit: 20 }).catch(() => null)
+        if (result?.data) {
+          setFileResults(Array.isArray(result.data) ? result.data : [])
+        }
+      }, 150)
+    },
+    [sync],
+  )
+
+  // Command options for "/" mode
+  const commandOptions = useMemo<AutocompleteOption[]>(() => {
+    const builtIn: AutocompleteOption[] = [
+      { label: "/connect", value: "__connect", description: "Connect a provider" },
+      { label: "/model", value: "__model", description: "Switch model" },
+      { label: "/agent", value: "__agent", description: "Switch agent" },
+      { label: "/sessions", value: "__sessions", description: "Browse sessions" },
+      { label: "/status", value: "__status", description: "System status" },
+      { label: "/keybinds", value: "__keybinds", description: "Keyboard shortcuts" },
+      { label: "/plugins", value: "__plugins", description: "Manage plugins" },
+      { label: "/mcp", value: "__mcp", description: "MCP servers" },
+      { label: "/theme", value: "__theme", description: "Switch theme" },
+    ]
+    const sdkCmds = commands.map((c) => ({
+      label: "/" + c.name,
+      value: c.name,
+      description: c.description ?? "",
+    }))
+    return [...builtIn, ...sdkCmds]
+  }, [commands])
+
+  // Agent + file options for "@" mode
+  const mentionOptions = useMemo<AutocompleteOption[]>(() => {
+    const agentOpts: AutocompleteOption[] = agents
+      .filter((a) => !a.hidden && a.mode !== "subagent")
+      .map((a) => ({
+        label: "@" + a.name,
+        value: "agent:" + a.name,
+        description: a.description ?? "agent",
+      }))
+    const fileOpts: AutocompleteOption[] = fileResults.map((f) => ({
+      label: "@" + f,
+      value: "file:" + f,
+      description: "file",
+    }))
+    return [...agentOpts, ...fileOpts]
+  }, [agents, fileResults])
+
+  // Filtered options based on current filter text
+  const filteredOptions = useMemo(() => {
+    if (!acMode) return []
+    const source = acMode === "/" ? commandOptions : mentionOptions
+    const filterStart = acMode === "/" ? 1 : acTriggerPos + 1
+    const filterText = input.slice(filterStart).toLowerCase()
+    if (!filterText) return source
+    return source.filter(
+      (opt) =>
+        opt.label.toLowerCase().includes(filterText) ||
+        (opt.description?.toLowerCase().includes(filterText) ?? false),
+    )
+  }, [acMode, input, acTriggerPos, commandOptions, mentionOptions])
+
+  // Clamp selected index when options change
+  useEffect(() => {
+    if (acIndex >= filteredOptions.length && filteredOptions.length > 0) {
+      setAcIndex(filteredOptions.length - 1)
+    }
+  }, [filteredOptions.length])
+
+  // Trigger "@" file search
+  useEffect(() => {
+    if (acMode === "@") {
+      const filterText = input.slice(acTriggerPos + 1)
+      searchFiles(filterText)
+    }
+  }, [acMode, input, acTriggerPos])
+
+  // Handle selecting an autocomplete option
+  const selectOption = useCallback(
+    (option: AutocompleteOption) => {
+      if (acMode === "/") {
+        const builtInActions: Record<string, () => void> = {
+          __connect: () => dialog.replace(<DialogProvider />),
+          __model: () => dialog.replace(<DialogModel />),
+          __agent: () => dialog.replace(<DialogAgent />),
+          __sessions: () => dialog.replace(<DialogSessionList />),
+          __status: () => dialog.replace(<DialogStatus />),
+          __keybinds: () => dialog.replace(<DialogKeybinds />),
+          __plugins: () => dialog.replace(<DialogPlugin />),
+          __mcp: () => dialog.replace(<DialogMcp />),
+          __theme: () => dialog.replace(<DialogThemeList />),
+        }
+        const action = builtInActions[option.value]
+        if (action) {
+          setInput("")
+          setAcMode(false)
+          action()
+        } else {
+          setInput("/" + option.value + " ")
+          setAcMode(false)
+        }
+      } else if (acMode === "@") {
+        const before = input.slice(0, acTriggerPos)
+        const name = option.value.startsWith("agent:")
+          ? option.value.slice(6)
+          : option.value.startsWith("file:")
+            ? option.value.slice(5)
+            : option.value
+        setInput(before + "@" + name + " ")
+        setAcMode(false)
+      }
+    },
+    [acMode, acTriggerPos, input, dialog],
+  )
+
+  // Detect triggers on input change
+  const handleInputChange = useCallback((value: string) => {
+    setInput(value)
+
+    // "/" trigger: starts with "/" and no spaces yet
+    if (value.startsWith("/") && !value.includes(" ")) {
+      setAcMode("/")
+      setAcTriggerPos(0)
+      return
+    }
+
+    // "@" trigger: find last "@" preceded by whitespace or at start, no space after
+    const lastAt = value.lastIndexOf("@")
+    if (lastAt >= 0) {
+      const charBefore = lastAt === 0 ? undefined : value[lastAt - 1]
+      const textAfter = value.slice(lastAt + 1)
+      if ((charBefore === undefined || /\s/.test(charBefore)) && !textAfter.includes(" ")) {
+        setAcMode("@")
+        setAcTriggerPos(lastAt)
+        return
+      }
+    }
+
+    // No trigger
+    setAcMode(false)
+  }, [])
+
   const handleSubmit = useCallback(
     (value: string) => {
+      // Autocomplete selection on Enter
+      if (acMode && filteredOptions.length > 0) {
+        const selected = filteredOptions[acIndex]
+        if (selected) selectOption(selected)
+        return
+      }
+
       const text = value.trim()
       if (!text) return
       if (isBusy) return
@@ -56,10 +244,31 @@ export function Prompt(props: PromptProps) {
       })
       setInput("")
     },
-    [isBusy, currentAgent, currentModel, props.onSubmit],
+    [acMode, acIndex, filteredOptions, selectOption, isBusy, currentAgent, currentModel, props.onSubmit],
   )
 
   useInput((ch, key) => {
+    // Autocomplete navigation when visible
+    if (acMode && filteredOptions.length > 0) {
+      if (key.upArrow) {
+        setAcIndex((prev) => (prev <= 0 ? filteredOptions.length - 1 : prev - 1))
+        return
+      }
+      if (key.downArrow) {
+        setAcIndex((prev) => (prev >= filteredOptions.length - 1 ? 0 : prev + 1))
+        return
+      }
+      if (key.tab) {
+        const selected = filteredOptions[acIndex]
+        if (selected) selectOption(selected)
+        return
+      }
+      if (key.escape) {
+        setAcMode(false)
+        return
+      }
+    }
+
     // Ctrl+C: interrupt or exit
     if (key.ctrl && ch === "c") {
       if (isBusy && props.sessionID) {
@@ -76,8 +285,11 @@ export function Prompt(props: PromptProps) {
       return
     }
 
-    // Tab: cycle agent
-    if (key.tab) {
+    // When a dialog is open, suppress all hotkeys except Ctrl+C above
+    if (isDialogOpen) return
+
+    // Tab: cycle agent (only when autocomplete not active)
+    if (key.tab && !acMode) {
       local.agent.move(1)
       return
     }
@@ -144,6 +356,11 @@ export function Prompt(props: PromptProps) {
         )}
       </Box>
 
+      {/* Autocomplete dropdown */}
+      {acMode && filteredOptions.length > 0 && !isBusy && (
+        <Autocomplete options={filteredOptions} selected={acIndex} />
+      )}
+
       {/* Input line */}
       <Box paddingLeft={1}>
         <Text color={theme.accent}>{"> "}</Text>
@@ -154,22 +371,29 @@ export function Prompt(props: PromptProps) {
         ) : (
           <TextInput
             value={input}
-            onChange={setInput}
+            onChange={handleInputChange}
             onSubmit={handleSubmit}
-            placeholder="Type a message..."
-            focus={focused}
+            placeholder="Type a message... (/ commands, @ mentions)"
+            focus={!isDialogOpen}
           />
         )}
       </Box>
 
       {/* Hint line */}
-      {!isBusy && (
+      {!isBusy && !acMode && (
         <Box paddingLeft={2} gap={2}>
           <Text color={theme.textMuted} dimColor>tab agent</Text>
           <Text color={theme.textMuted} dimColor>^M model</Text>
           <Text color={theme.textMuted} dimColor>^S sessions</Text>
           <Text color={theme.textMuted} dimColor>^P commands</Text>
           <Text color={theme.textMuted} dimColor>^O connect</Text>
+        </Box>
+      )}
+      {!isBusy && acMode && (
+        <Box paddingLeft={2} gap={2}>
+          <Text color={theme.textMuted} dimColor>{"↑↓ navigate"}</Text>
+          <Text color={theme.textMuted} dimColor>enter/tab select</Text>
+          <Text color={theme.textMuted} dimColor>esc dismiss</Text>
         </Box>
       )}
     </Box>
