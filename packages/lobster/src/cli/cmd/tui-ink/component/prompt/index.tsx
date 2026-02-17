@@ -97,6 +97,7 @@ export function Prompt(props: PromptProps) {
   const [acIndex, setAcIndex] = useState(0)
   const [acTriggerPos, setAcTriggerPos] = useState(0)
   const [fileResults, setFileResults] = useState<string[]>([])
+  const keybindDialogOpenRef = useRef<boolean | null>(null)
 
   const sessionStatus = useAppStore((s) =>
     props.sessionID ? s.session_status[props.sessionID] : undefined,
@@ -121,43 +122,73 @@ export function Prompt(props: PromptProps) {
   const modelParsed = local.model.parsed()
 
   useEffect(() => {
-    setDialogOpen(!!acMode || isDialogOpen)
+    const next = !!acMode || isDialogOpen
+    if (keybindDialogOpenRef.current === next) return
+    keybindDialogOpenRef.current = next
+    setDialogOpen(next)
   }, [acMode, isDialogOpen, setDialogOpen])
 
   useEffect(() => {
-    return () => setDialogOpen(false)
+    return () => {
+      if (keybindDialogOpenRef.current !== false) {
+        keybindDialogOpenRef.current = false
+        setDialogOpen(false)
+      }
+    }
   }, [setDialogOpen])
 
-  const prevModeRef = useRef<false | "/" | "@">(false)
-  useEffect(() => {
-    if (prevModeRef.current !== acMode) {
-      setAcIndex(0)
-      prevModeRef.current = acMode
-    }
-  }, [acMode])
-
   const fileSearchTimer = useRef<ReturnType<typeof setTimeout>>()
+  const fileSearchQuery = useRef("")
+  const fileSearchRun = useRef(0)
+  const areSameResults = useCallback((prev: string[], next: string[]) => {
+    if (prev === next) return true
+    if (prev.length !== next.length) return false
+    for (let i = 0; i < prev.length; i++) {
+      if (prev[i] !== next[i]) return false
+    }
+    return true
+  }, [])
+
   const searchFiles = useCallback(
     (query: string) => {
       if (fileSearchTimer.current) clearTimeout(fileSearchTimer.current)
+      if (query === fileSearchQuery.current) return
+      fileSearchQuery.current = query
+
       if (!query) {
-        setFileResults([])
+        fileSearchRun.current++
+        setFileResults((prev) => (prev.length > 0 ? [] : prev))
         return
       }
+
+      const run = ++fileSearchRun.current
       fileSearchTimer.current = setTimeout(async () => {
         const result = await sync.client.find.files({ query, limit: 20 }).catch(() => null)
+        if (run !== fileSearchRun.current) return
         if (result?.data) {
-          setFileResults(Array.isArray(result.data) ? result.data : [])
+          const next = Array.isArray(result.data) ? result.data : []
+          setFileResults((prev) => (areSameResults(prev, next) ? prev : next))
         }
       }, 150)
     },
-    [sync],
+    [sync, areSameResults],
   )
+
+  useEffect(() => {
+    return () => {
+      if (fileSearchTimer.current) clearTimeout(fileSearchTimer.current)
+      fileSearchRun.current++
+    }
+  }, [])
 
   const clearInput = useCallback(() => {
     setInput("")
     setAcMode(false)
-    setFileResults([])
+    setAcIndex(0)
+    fileSearchQuery.current = ""
+    fileSearchRun.current++
+    if (fileSearchTimer.current) clearTimeout(fileSearchTimer.current)
+    setFileResults((prev) => (prev.length > 0 ? [] : prev))
   }, [])
 
   const createTranscript = useCallback((): string | null => {
@@ -613,10 +644,11 @@ export function Prompt(props: PromptProps) {
     )
   }, [acMode, input, acTriggerPos, commandOptions, mentionOptions])
 
-  useEffect(() => {
-    if (acIndex >= filteredOptions.length && filteredOptions.length > 0) {
-      setAcIndex(filteredOptions.length - 1)
-    }
+  const safeAcIndex = useMemo(() => {
+    if (filteredOptions.length <= 0) return 0
+    if (acIndex < 0) return 0
+    if (acIndex >= filteredOptions.length) return filteredOptions.length - 1
+    return acIndex
   }, [filteredOptions.length, acIndex])
 
   useEffect(() => {
@@ -661,6 +693,7 @@ export function Prompt(props: PromptProps) {
     if (value.startsWith("/") && !value.includes(" ")) {
       setAcMode("/")
       setAcTriggerPos(0)
+      setAcIndex(0)
       return
     }
 
@@ -671,6 +704,7 @@ export function Prompt(props: PromptProps) {
       if ((charBefore === undefined || /\s/.test(charBefore)) && !textAfter.includes(" ")) {
         setAcMode("@")
         setAcTriggerPos(lastAt)
+        setAcIndex(0)
         return
       }
     }
@@ -681,7 +715,7 @@ export function Prompt(props: PromptProps) {
   const handleSubmit = useCallback(
     (value: string) => {
       if (acMode && filteredOptions.length > 0) {
-        const selected = filteredOptions[acIndex]
+        const selected = filteredOptions[safeAcIndex]
         if (selected) selectOption(selected)
         return
       }
@@ -716,12 +750,12 @@ export function Prompt(props: PromptProps) {
     [
       acMode,
       filteredOptions,
-      acIndex,
+      safeAcIndex,
       selectOption,
       isBusy,
       currentAgent,
       currentModel,
-      props,
+      props.onSubmit,
       exit,
       clearInput,
       runBuiltInCommand,
@@ -743,15 +777,21 @@ export function Prompt(props: PromptProps) {
   useInput((ch, key) => {
     if (acMode && filteredOptions.length > 0) {
       if (key.upArrow) {
-        setAcIndex((prev) => (prev <= 0 ? filteredOptions.length - 1 : prev - 1))
+        setAcIndex((prev) => {
+          const next = prev <= 0 ? filteredOptions.length - 1 : prev - 1
+          return next
+        })
         return
       }
       if (key.downArrow) {
-        setAcIndex((prev) => (prev >= filteredOptions.length - 1 ? 0 : prev + 1))
+        setAcIndex((prev) => {
+          const next = prev >= filteredOptions.length - 1 ? 0 : prev + 1
+          return next
+        })
         return
       }
       if (key.tab) {
-        const selected = filteredOptions[acIndex]
+        const selected = filteredOptions[safeAcIndex]
         if (selected) selectOption(selected)
         return
       }
@@ -838,7 +878,7 @@ export function Prompt(props: PromptProps) {
       </Box>
 
       {acMode && filteredOptions.length > 0 && !isBusy && (
-        <Autocomplete options={filteredOptions} selected={acIndex} />
+        <Autocomplete options={filteredOptions} selected={safeAcIndex} />
       )}
 
       <Box paddingLeft={1}>
