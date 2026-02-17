@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import React, { createContext, useContext, useCallback, useMemo, useState, useRef, useEffect, type ReactNode } from "react"
+import React, { createContext, useContext, useCallback, useMemo, useRef, type ReactNode } from "react"
 import { useInput, useApp } from "ink"
 import { useRoute } from "./route"
 import { useSDK } from "./sdk"
@@ -15,8 +15,6 @@ export interface KeybindAction {
 }
 
 interface KeybindContextValue {
-  /** Whether a dialog is currently open (suppresses global bindings) */
-  dialogOpen: boolean
   setDialogOpen: (open: boolean) => void
   /** Register a global keybinding */
   register: (id: string, binding: KeybindAction) => void
@@ -30,7 +28,7 @@ export function KeybindProvider(props: { children: ReactNode }) {
   const { exit } = useApp()
   const route = useRoute()
   const { sync } = useSDK()
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const dialogOpenRef = useRef(false)
   const bindingsRef = useRef<Map<string, KeybindAction>>(new Map())
 
   const register = useCallback((id: string, binding: KeybindAction) => {
@@ -39,6 +37,10 @@ export function KeybindProvider(props: { children: ReactNode }) {
 
   const unregister = useCallback((id: string) => {
     bindingsRef.current.delete(id)
+  }, [])
+
+  const setDialogOpen = useCallback((open: boolean) => {
+    dialogOpenRef.current = open
   }, [])
 
   // Global keyboard handler
@@ -58,7 +60,7 @@ export function KeybindProvider(props: { children: ReactNode }) {
     }
 
     // Skip other global bindings when dialog is open
-    if (dialogOpen) return
+    if (dialogOpenRef.current) return
 
     // Escape: go back to home from session
     if (key.escape && route.data.type === "session") {
@@ -81,8 +83,8 @@ export function KeybindProvider(props: { children: ReactNode }) {
   })
 
   const value = useMemo<KeybindContextValue>(
-    () => ({ dialogOpen, setDialogOpen, register, unregister }),
-    [dialogOpen, register, unregister],
+    () => ({ setDialogOpen, register, unregister }),
+    [setDialogOpen, register, unregister],
   )
 
   return (
