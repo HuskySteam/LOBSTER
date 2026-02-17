@@ -15,7 +15,7 @@ export interface KeybindAction {
 }
 
 interface KeybindContextValue {
-  setDialogOpen: (open: boolean) => void
+  setBlocker: (id: string, open: boolean) => void
   /** Register a global keybinding */
   register: (id: string, binding: KeybindAction) => void
   /** Unregister a global keybinding */
@@ -28,7 +28,7 @@ export function KeybindProvider(props: { children: ReactNode }) {
   const { exit } = useApp()
   const route = useRoute()
   const { sync } = useSDK()
-  const dialogOpenRef = useRef(false)
+  const blockersRef = useRef<Map<string, true>>(new Map())
   const bindingsRef = useRef<Map<string, KeybindAction>>(new Map())
 
   const register = useCallback((id: string, binding: KeybindAction) => {
@@ -39,8 +39,13 @@ export function KeybindProvider(props: { children: ReactNode }) {
     bindingsRef.current.delete(id)
   }, [])
 
-  const setDialogOpen = useCallback((open: boolean) => {
-    dialogOpenRef.current = open
+  const setBlocker = useCallback((id: string, open: boolean) => {
+    if (!id) return
+    if (open) {
+      blockersRef.current.set(id, true)
+      return
+    }
+    blockersRef.current.delete(id)
   }, [])
 
   // Global keyboard handler
@@ -60,7 +65,7 @@ export function KeybindProvider(props: { children: ReactNode }) {
     }
 
     // Skip other global bindings when dialog is open
-    if (dialogOpenRef.current) return
+    if (blockersRef.current.size > 0) return
 
     // Escape: go back to home from session
     if (key.escape && route.data.type === "session") {
@@ -83,8 +88,8 @@ export function KeybindProvider(props: { children: ReactNode }) {
   })
 
   const value = useMemo<KeybindContextValue>(
-    () => ({ setDialogOpen, register, unregister }),
-    [setDialogOpen, register, unregister],
+    () => ({ setBlocker, register, unregister }),
+    [setBlocker, register, unregister],
   )
 
   return (

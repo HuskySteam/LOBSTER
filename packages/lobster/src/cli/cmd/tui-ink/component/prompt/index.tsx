@@ -86,7 +86,7 @@ export function Prompt(props: PromptProps) {
   const local = useLocal()
   const lobster = useLobster()
   const dialog = useDialog()
-  const { setDialogOpen } = useKeybind()
+  const { setBlocker } = useKeybind()
   const toast = useToast()
 
   const [input, setInput] = useState(args.prompt ?? "")
@@ -97,7 +97,6 @@ export function Prompt(props: PromptProps) {
   const [acIndex, setAcIndex] = useState(0)
   const [acTriggerPos, setAcTriggerPos] = useState(0)
   const [fileResults, setFileResults] = useState<string[]>([])
-  const keybindDialogOpenRef = useRef<boolean | null>(null)
 
   const sessionStatus = useAppStore((s) =>
     props.sessionID ? s.session_status[props.sessionID] : undefined,
@@ -122,20 +121,9 @@ export function Prompt(props: PromptProps) {
   const modelParsed = local.model.parsed()
 
   useEffect(() => {
-    const next = !!acMode || isDialogOpen
-    if (keybindDialogOpenRef.current === next) return
-    keybindDialogOpenRef.current = next
-    setDialogOpen(next)
-  }, [acMode, isDialogOpen, setDialogOpen])
-
-  useEffect(() => {
-    return () => {
-      if (keybindDialogOpenRef.current !== false) {
-        keybindDialogOpenRef.current = false
-        setDialogOpen(false)
-      }
-    }
-  }, [setDialogOpen])
+    setBlocker("prompt-autocomplete", !!acMode)
+    return () => setBlocker("prompt-autocomplete", false)
+  }, [acMode, setBlocker])
 
   const fileSearchTimer = useRef<ReturnType<typeof setTimeout>>()
   const fileSearchQuery = useRef("")
@@ -651,13 +639,6 @@ export function Prompt(props: PromptProps) {
     return acIndex
   }, [filteredOptions.length, acIndex])
 
-  useEffect(() => {
-    if (acMode === "@") {
-      const filterText = input.slice(acTriggerPos + 1)
-      searchFiles(filterText)
-    }
-  }, [acMode, input, acTriggerPos, searchFiles])
-
   const selectOption = useCallback(
     (option: AutocompleteOption) => {
       if (acMode === "/") {
@@ -694,6 +675,7 @@ export function Prompt(props: PromptProps) {
       setAcMode("/")
       setAcTriggerPos(0)
       setAcIndex(0)
+      searchFiles("")
       return
     }
 
@@ -705,12 +687,14 @@ export function Prompt(props: PromptProps) {
         setAcMode("@")
         setAcTriggerPos(lastAt)
         setAcIndex(0)
+        searchFiles(textAfter)
         return
       }
     }
 
     setAcMode(false)
-  }, [])
+    searchFiles("")
+  }, [searchFiles])
 
   const handleSubmit = useCallback(
     (value: string) => {

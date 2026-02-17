@@ -2,6 +2,7 @@
 import { Box, Text } from "ink"
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from "react"
 import { useTheme } from "../theme"
+import { useKeybind } from "../context/keybind"
 
 interface DialogContextValue {
   content: ReactNode | null
@@ -13,9 +14,15 @@ const DialogContext = createContext<DialogContextValue | undefined>(undefined)
 
 export function DialogProvider(props: { children: ReactNode }) {
   const [content, setContent] = useState<ReactNode | null>(null)
+  const { setBlocker } = useKeybind()
 
   const replace = useCallback((node: ReactNode) => setContent(node), [])
   const clear = useCallback(() => setContent(null), [])
+
+  React.useEffect(() => {
+    setBlocker("dialog", content !== null)
+    return () => setBlocker("dialog", false)
+  }, [content, setBlocker])
 
   return (
     <DialogContext.Provider value={{ content, replace, clear }}>
