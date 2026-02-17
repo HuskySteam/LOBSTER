@@ -86,7 +86,7 @@ export function Prompt(props: PromptProps) {
   const local = useLocal()
   const lobster = useLobster()
   const dialog = useDialog()
-  const keybind = useKeybind()
+  const { setDialogOpen } = useKeybind()
   const toast = useToast()
 
   const [input, setInput] = useState(args.prompt ?? "")
@@ -121,9 +121,12 @@ export function Prompt(props: PromptProps) {
   const modelParsed = local.model.parsed()
 
   useEffect(() => {
-    keybind.setDialogOpen(!!acMode || isDialogOpen)
-    return () => keybind.setDialogOpen(false)
-  }, [acMode, isDialogOpen, keybind])
+    setDialogOpen(!!acMode || isDialogOpen)
+  }, [acMode, isDialogOpen, setDialogOpen])
+
+  useEffect(() => {
+    return () => setDialogOpen(false)
+  }, [setDialogOpen])
 
   const prevModeRef = useRef<false | "/" | "@">(false)
   useEffect(() => {
