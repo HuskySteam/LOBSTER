@@ -11,6 +11,7 @@ import { useAppStore } from "./store"
 import { ToastProvider } from "./ui/toast"
 import { DialogProvider } from "./ui/dialog"
 import { LocalProvider } from "./context/local"
+import { LobsterProvider } from "./context/lobster"
 import { KeybindProvider } from "./context/keybind"
 import { Home } from "./routes/home"
 import { Session } from "./routes/session"
@@ -60,13 +61,15 @@ export async function tui(input: {
             >
               <ThemeProvider mode={mode}>
                 <LocalProvider>
-                  <KeybindProvider>
-                    <ToastProvider>
-                      <DialogProvider>
-                        <App />
-                      </DialogProvider>
-                    </ToastProvider>
-                  </KeybindProvider>
+                  <LobsterProvider>
+                    <KeybindProvider>
+                      <ToastProvider>
+                        <DialogProvider>
+                          <App />
+                        </DialogProvider>
+                      </ToastProvider>
+                    </KeybindProvider>
+                  </LobsterProvider>
                 </LocalProvider>
               </ThemeProvider>
             </SDKProvider>

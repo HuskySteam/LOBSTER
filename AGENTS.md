@@ -1,131 +1,155 @@
-# LOBSTER - AI Coding Agent
+# LOBSTER Agent Guide
 
-LOBSTER is a terminal-based AI coding agent. It reads, writes, and refactors code, runs shell commands, searches codebases, manages files, and coordinates multi-agent tasks -- all through natural language.
+This file is for coding agents working in this repository.
 
-## How It Works
+## Mission
 
-LOBSTER combines a core agentic coding engine (40+ built-in tools, multi-provider LLM support, TUI/CLI/API interfaces) with a plugin layer that adds multi-agent review, persistent memory, cost tracking, automatic context injection, and team coordination.
+LOBSTER is a Bun-based AI coding agent platform (CLI + TUI + API server) in a monorepo.
+Core runtime lives in `packages/lobster`.
 
-The plugin layer works through **lifecycle hooks**:
-- `experimental.chat.system.transform` -- plugins inject XML context blocks into the system prompt before the AI sees your message
-- `tool.execute.after` -- plugins track tool execution for cost monitoring
+## Repo Map
 
-All persistent data (memories, review state, cost tracking, team sessions, plans) is stored as JSON and markdown files in `.lobster/memory/`.
+- `packages/lobster`: core product (CLI, TUI, session loop, tools, providers, server)
+- `packages/lobster/src`: runtime source
+- `packages/lobster/test`: primary test suite (domain mirrors `src`)
+- `packages/plugin`: `@lobster-ai/plugin` SDK for custom plugins/tools
+- `packages/sdk/js`: generated client SDK and OpenAPI artifacts
+- `packages/util`: shared utilities
+- `packages/script`: build/release helpers
+- `packages/slack`: Slack integration
+- `.lobster/`: project-local extensions (plugins, tools, agents, skills, commands, memory)
 
-## Core Capabilities
+## Core Runtime Landmarks
 
-### 1. Agentic Coding
-Full tool access to the development environment:
-- **File operations**: `read`, `write`, `edit`, `multiedit`, `apply_patch`, `glob`, `ls`
-- **Search**: `grep`, `codesearch`, `websearch`, `webfetch`
-- **Execution**: `bash`, `task`, `batch`
-- **Planning**: `plan`, `todo`
-- **Code intelligence**: `lsp` (go-to-definition, references, diagnostics)
+- CLI entrypoint: `packages/lobster/src/index.ts`
+- CLI bootstrap/lifecycle: `packages/lobster/src/cli/bootstrap.ts`
+- Session engine: `packages/lobster/src/session/processor.ts`
+- Prompt/tool resolution: `packages/lobster/src/session/llm.ts`
+- Tool registry: `packages/lobster/src/tool/registry.ts`
+- Agent definitions + permissions: `packages/lobster/src/agent/agent.ts`
+- Config loading/merging: `packages/lobster/src/config/config.ts`
+- Provider loading: `packages/lobster/src/provider/provider.ts`
+- Server + routes: `packages/lobster/src/server/server.ts`, `packages/lobster/src/server/routes/`
+- TUI app shell: `packages/lobster/src/cli/cmd/tui/app.tsx`
 
-### 2. Auto-Context Injection
-Every message is automatically enriched with relevant project context:
-- Task type classification (bug_fix, new_feature, refactor, test, docs, config)
-- Tech stack detection from `package.json`
-- TF-IDF file relevance scoring (top 8 files for your query)
-- Recent git history on relevant files
-- 30-second file index cache for fast follow-up messages
+## Important Commands
 
-### 3. Multi-Agent Review Loop
-Iterative code quality loop: coder -> reviewer -> tester -> fix -> repeat.
-- `review_loop` tool orchestrates the cycle
-- Review state tracked in `review-loop-state.json` with phase, iteration, and verdict history
-- Orchestrator plugin injects current loop state into system prompt
-- Reviewer and architect agents have **read-only access** to prevent conflicts of interest
-- Structured findings recorded with severity levels via `review_findings`
-- Loop ends on PASS from all agents or max iterations (default 3)
+Use from repo root unless noted.
 
-### 4. Persistent Memory
-Store and recall project knowledge across sessions:
-- `memory_store` -- save with category, title, tags. Stored as markdown with YAML frontmatter.
-- `memory_retrieve` -- get memories by category
-- `memory_search` -- search by keyword
-- Memory plugin auto-injects 10 most recent memories into system prompt
-- Pattern warnings from `pattern-insights.json` also injected to prevent recurring mistakes
+```bash
+# install
+bun install
 
-### 5. Smart Pattern Detection
-Analyzes review findings across iterations:
-- Groups similar findings by title (2+ occurrences = recurring antipattern)
-- Compares early vs. late iterations for trend detection (improving/degrading)
-- Extracts lessons from memories categorized as "mistake" or "lesson"
-- Stores insights in `memory/pattern-insights.json` with confidence scores
+# start TUI (defaults to packages/lobster working dir)
+bun dev
 
-### 6. Cost & Token Tracking
-Tracks every API call:
-- `tool.execute.after` hook captures output token estimates
-- Per-model pricing (Claude Sonnet 4.5: $3/$15, Opus 4.6: $15/$75 per M tokens)
-- `cost_summary` shows per-model breakdown
-- `cost_budget` sets budget limit + alert threshold (default 80%)
-- Budget warning injected into system prompt when threshold reached
+# run against this repo root
+bun dev .
 
-### 7. Team Coordination
-Multi-agent task decomposition:
-- `team_coordinate` decomposes tasks into subtasks with priorities and dependencies
-- Auto-assigns agents based on keyword matching (implementation -> coder, tests -> tester, etc.)
-- DFS cycle detection on dependency graph
-- File conflict detection across subtasks
-- Subtask states: assigned -> in_progress -> completed (or blocked/failed)
-- Team plugin injects active session progress into system prompt
+# headless API server (default 4096)
+bun dev serve
+bun dev serve --port 8080
 
-### 8. Implementation Planning
-Structured plans with analysis:
-- File analysis: line count, function count, complexity classification
-- Category ordering: types -> config -> implementation -> tests
-- Import-based dependency graph with high fan-in detection
-- Risk assessment: high-complexity files, missing tests, high fan-in files
-- Progress tracking via `plan_status`
+# typecheck all workspace packages
+bun typecheck
 
-### 9. Smart Context Manager (MCP)
-MCP server for intelligent file discovery:
-- `index_project` -- build TF-IDF index of all project files
-- `find_relevant` -- rank files by relevance to natural language query
-- `estimate_tokens` -- estimate context window usage for files
+# tests (run from package, root test is intentionally blocked)
+cd packages/lobster && bun test
+cd packages/lobster && bun test <path-to-test-file>
 
-## Agent Roster
+# build binaries
+bun run --cwd packages/lobster build --single
+bun run --cwd packages/lobster build
 
-| Agent | Role | Access | Model |
-|-------|------|--------|-------|
-| **coder** | Implementation -- writes features, fixes bugs, addresses feedback | Full read/write | Claude Sonnet 4.5 |
-| **reviewer** | Quality gate -- correctness, security, edge cases, performance | Read-only | Claude Sonnet 4.5 |
-| **tester** | Validation -- writes and runs tests, reports coverage gaps | Full read/write | Claude Sonnet 4.5 |
-| **architect** | Design -- structure, scalability, separation of concerns | Read-only | Claude Sonnet 4.5 |
-| **team-lead** | Coordination -- task decomposition, agent assignment, dependency management | Full read/write | Claude Sonnet 4.5 |
-| **docs** | Documentation -- generates and maintains project docs | Full read/write | Claude Sonnet 4.5 |
-| **triage** | Issue triage -- categorizes and prioritizes issues | Read-only | Claude Sonnet 4.5 |
+# regenerate SDK after server/OpenAPI changes
+./script/generate.ts
+```
 
-## Multiple Interfaces
+Notes:
+- `bun test` at repo root intentionally fails (`"do not run tests from root"`).
+- `lobster --help` and `bun dev --help` expose the same command surface during dev.
 
-| Interface | Command | Use Case |
-|-----------|---------|----------|
-| **TUI** | `lobster` | Interactive development with dashboards (`/review`, `/findings`, `/health`, `/patterns`) |
-| **CLI** | `lobster run "message"` | Quick tasks and scripting |
-| **API** | `lobster serve` | Programmatic access (REST on port 4096) |
+## Extension System (`.lobster/`)
 
-## Multi-Provider LLM Support
+LOBSTER loads project-local extensions at runtime.
 
-Works with: Anthropic (Claude), OpenAI (GPT), Google (Gemini), AWS Bedrock, Azure OpenAI, Groq, Mistral, Cohere, Cerebras, DeepInfra, Perplexity, Together AI, xAI, OpenRouter, and more via AI SDK.
+- Plugins: `.lobster/plugins/*.ts`
+- Custom tools: `.lobster/tool/*.ts` (plus optional `.txt` descriptions)
+- Custom agents: `.lobster/agent/*.md`
+- Skills: `.lobster/skill/*/SKILL.md`
+- Custom commands: `.lobster/command/*.md`
+- Runtime state: `.lobster/memory/*.json`
 
-## Plugin System
+Current project config is in `.lobster/lobster.jsonc`.
 
-| Type | Location | Purpose |
-|------|----------|---------|
-| Plugins | `.lobster/plugins/*.ts` | Lifecycle hooks (system prompt injection, tool tracking) |
-| Tools | `.lobster/tool/*.ts` + `*.txt` | New capabilities (`.ts` = logic, `.txt` = AI description) |
-| Agents | `.lobster/agent/*.md` | Specialized agents with system prompts and access rules |
-| Skills | `.lobster/skill/*/SKILL.md` | Slash command prompt templates |
-| Commands | `.lobster/command/*.md` | Markdown-based command extensions |
+### Tool Authoring Rules
 
-Ships with: 5 plugins, 18 tools, 7 agents, 7 skills.
+- Custom tool loader scans every `*.ts` file in `{tool,tools}` directories.
+- It imports each module and treats each export as a tool definition.
+- Do not place generic helper modules in `.lobster/tool` unless they are structured to avoid export collisions.
+- Tool IDs come from filename/export and are sanitized to `[a-zA-Z0-9_-]`.
 
-## Style Guide
+### Command Authoring Rules
 
-- Default branch is `dev`
-- Use Bun APIs when possible
-- Prefer `const`, early returns, no destructuring
-- Avoid `try/catch`, `any` type, `else` blocks
-- Single word variable names where possible
-- Test actual implementations, avoid mocks
+- Command files are markdown with frontmatter in `.lobster/command/`.
+- Command name comes from relative file path, not frontmatter.
+- Schema fields are in `Config.Command` (`template`, optional `description`, `agent`, `model`, `subtask`).
+- Restart/reload TUI if new commands do not appear immediately.
+
+### Skill Loading Rules
+
+Skills are discovered from:
+- project `.lobster/skill/`
+- user folders (for example `~/.claude/skills`, `~/.agents/skills`)
+- configured paths/URLs in config
+
+Duplicate skill names can shadow earlier ones.
+
+## Command Surfaces (Do Not Confuse)
+
+- CLI commands: yargs commands in `packages/lobster/src/index.ts`
+- Slash commands in TUI prompt/palette: UI layer + command catalog
+- Custom markdown commands are shared by CLI (`--command`) and TUI (`/name`)
+- Some slash actions are TUI-only convenience actions and are not 1:1 CLI commands
+
+## Coding Conventions
+
+- Default branch: `dev`
+- Prefer Bun-native APIs (`Bun.file`, `Bun.$`) when appropriate
+- Prefer `const`, immutable flow, early returns
+- Avoid `else` where guard clauses are clearer
+- Prefer precise types; avoid `any`
+- Prefer `.catch(...)` where it keeps control flow simple
+- Avoid unnecessary destructuring
+- Use concise variable names when still clear
+- Match existing patterns in touched files before introducing new abstractions
+
+## Testing and Verification Expectations
+
+- Place/adjust tests under `packages/lobster/test/<domain>/`
+- Prefer real implementation tests over heavy mocking
+- For behavior changes in tools/session/runtime, run targeted tests first, then broader suite
+- If API routes or schemas change, regenerate SDK (`./script/generate.ts`) and verify generated outputs
+
+## PR Expectations (from CONTRIBUTING)
+
+- Link an issue (`Fixes #...` or `Closes #...`)
+- Keep PRs focused and small
+- Include verification steps/results in PR description
+- Include screenshots/videos for UI changes
+- Use conventional commit style in PR titles (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`)
+
+## High-Signal Gotchas
+
+- `bun dev` runs in `packages/lobster` by default; use `bun dev .` for repo-root context.
+- Debugging TUI/server may require `bun dev spawn` or explicit `--inspect` workflows (see `CONTRIBUTING.md`).
+- Config precedence is non-trivial; check `packages/lobster/src/config/config.ts` before assuming defaults.
+- Tool and command names are filename/path-driven in several loaders; renames can change behavior silently.
+
+## Recommended Workflow for Agents
+
+1. Read this file, then inspect touched domain files in `packages/lobster/src`.
+2. Confirm command/tool/agent extension points before implementing.
+3. Make smallest coherent change.
+4. Run targeted verification.
+5. Summarize behavior change + verification evidence with file references.

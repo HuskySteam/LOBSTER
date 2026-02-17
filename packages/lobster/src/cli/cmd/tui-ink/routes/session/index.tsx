@@ -20,6 +20,8 @@ export function Session(props: { sessionID: string }) {
   const { stdout } = useStdout()
   const keybind = useKeybind()
   const [showSidebar, setShowSidebar] = useState(false)
+  const [showThinking, setShowThinking] = useState(true)
+  const [showTimestamps, setShowTimestamps] = useState(false)
   const session = useAppStore((s) =>
     s.session.find((ses) => ses.id === props.sessionID),
   )
@@ -89,6 +91,8 @@ export function Session(props: { sessionID: string }) {
               message={msg}
               parts={parts[msg.id] ?? []}
               isLast={i === messages.length - 1}
+              showThinking={showThinking}
+              showTimestamps={showTimestamps}
             />
           ))}
         </Box>
@@ -112,7 +116,14 @@ export function Session(props: { sessionID: string }) {
             <CostTracker sessionID={props.sessionID} />
             <Text color={theme.textMuted}>Ctrl+T sidebar</Text>
           </Box>
-          <Prompt sessionID={props.sessionID} onSubmit={handleSubmit} />
+          <Prompt
+            sessionID={props.sessionID}
+            onSubmit={handleSubmit}
+            showThinking={showThinking}
+            showTimestamps={showTimestamps}
+            onToggleThinking={() => setShowThinking((prev) => !prev)}
+            onToggleTimestamps={() => setShowTimestamps((prev) => !prev)}
+          />
         </Box>
       </Box>
 

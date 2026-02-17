@@ -2,17 +2,23 @@
 import { Box, Text, useInput } from "ink"
 import TextInput from "ink-text-input"
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react"
+import path from "path"
 import { useTheme } from "../../theme"
 import { useAppStore } from "../../store"
 import { useSDK } from "../../context/sdk"
 import { useArgs } from "../../context/args"
 import { useExit } from "../../context/exit"
+import { useRoute } from "../../context/route"
 import { useLocal } from "../../context/local"
+import { useLobster } from "../../context/lobster"
 import { useKeybind } from "../../context/keybind"
 import { useDialog } from "../../ui/dialog"
+import { useToast } from "../../ui/toast"
+import { DialogHelp } from "../../ui/dialog-help"
 import { DialogModel } from "../dialog-model"
 import { DialogAgent } from "../dialog-agent"
 import { DialogSessionList } from "../dialog-session-list"
+import { DialogSessionRename } from "../dialog-session-rename"
 import { DialogCommand } from "../dialog-command"
 import { DialogProvider } from "../dialog-provider"
 import { DialogKeybinds } from "../dialog-keybinds"
@@ -20,28 +26,73 @@ import { DialogStatus } from "../dialog-status"
 import { DialogThemeList } from "../dialog-theme-list"
 import { DialogMcp } from "../dialog-mcp"
 import { DialogPlugin } from "../dialog-plugin"
+import { DialogReviewDashboard } from "../dialog-review-dashboard"
+import { DialogReviewResults } from "../dialog-review-results"
+import { DialogHealth } from "../dialog-health"
+import { DialogPatterns } from "../dialog-patterns"
 import { Spinner } from "../spinner"
 import { Autocomplete, type AutocompleteOption } from "./autocomplete"
+import { BUILT_IN_COMMANDS, parseSlashCommand, resolveBuiltInCommand } from "./command-registry"
+import { Clipboard } from "@tui/util/clipboard"
+import { formatTranscript } from "@tui/util/transcript"
+import { Identifier } from "@/id/id"
+import type { AssistantMessage, Part, UserMessage } from "@lobster-ai/sdk/v2"
 
 interface PromptProps {
   sessionID?: string
   onSubmit: (input: string, options: { agent: string; model: { providerID: string; modelID: string } }) => void
+  showThinking?: boolean
+  showTimestamps?: boolean
+  onToggleThinking?: () => void
+  onToggleTimestamps?: () => void
+}
+
+const HEALTH_ANALYSIS_PROMPT = `Analyze this project's quality and call the project_quality tool with your assessment.
+
+Instructions:
+1. Use glob to map the directory tree (top-level files and key directories)
+2. Read key files: package.json, tsconfig.json, README.md, any CI config (.github/workflows/*, .gitlab-ci.yml), and sample test files
+3. Score these 5 categories from 0-100:
+   - code_structure: Code organization, patterns, architecture, modularity
+   - testing: Test coverage indicators, test quality, testing practices
+   - documentation: README quality, inline docs, API documentation
+   - dependencies: Dependency health, outdated packages, lock file presence
+   - security: Security practices, no hardcoded secrets, input validation patterns
+4. Call the project_quality tool with your structured results
+
+Calibration guide:
+- 40-59%: Needs significant improvement
+- 60-79%: Well-maintained, typical good project
+- 80-89%: Excellent, above average
+- 90%+: Exceptional, only for truly outstanding projects
+
+Be honest and specific in findings and suggestions.`
+
+function pluginName(spec: string): string {
+  if (!spec) return spec
+  const normalized = spec.replace(/\\/g, "/").replace(/\.git$/, "")
+  const parts = normalized.split("/")
+  const last = parts[parts.length - 1] ?? spec
+  const at = last.indexOf("@")
+  return at > 0 ? last.slice(0, at) : last
 }
 
 export function Prompt(props: PromptProps) {
   const { theme } = useTheme()
   const exit = useExit()
+  const route = useRoute()
   const { sync } = useSDK()
   const args = useArgs()
   const local = useLocal()
+  const lobster = useLobster()
   const dialog = useDialog()
   const keybind = useKeybind()
+  const toast = useToast()
 
   const [input, setInput] = useState(args.prompt ?? "")
   const [interruptCount, setInterruptCount] = useState(0)
   const isDialogOpen = dialog.content !== null
 
-  // Autocomplete state
   const [acMode, setAcMode] = useState<false | "/" | "@">(false)
   const [acIndex, setAcIndex] = useState(0)
   const [acTriggerPos, setAcTriggerPos] = useState(0)
@@ -52,19 +103,28 @@ export function Prompt(props: PromptProps) {
   )
   const commands = useAppStore((s) => s.command)
   const agents = useAppStore((s) => s.agent)
+  const allParts = useAppStore((s) => s.part)
+  const sessions = useAppStore((s) => s.session)
+  const projectDir = useAppStore((s) => s.path.directory)
+  const config = useAppStore((s) => s.config)
+  const sessionMessages = useAppStore((s) =>
+    props.sessionID ? s.message[props.sessionID] ?? [] : [],
+  )
+  const sessionInfo = useMemo(
+    () => sessions.find((x) => x.id === props.sessionID),
+    [sessions, props.sessionID],
+  )
 
   const isBusy = sessionStatus?.type === "busy"
   const currentAgent = local.agent.current()
   const currentModel = local.model.current()
   const modelParsed = local.model.parsed()
 
-  // Suppress global keybindings while autocomplete is open
   useEffect(() => {
     keybind.setDialogOpen(!!acMode || isDialogOpen)
     return () => keybind.setDialogOpen(false)
-  }, [!!acMode, isDialogOpen])
+  }, [acMode, isDialogOpen, keybind])
 
-  // Reset selection on mode change
   const prevModeRef = useRef<false | "/" | "@">(false)
   useEffect(() => {
     if (prevModeRef.current !== acMode) {
@@ -73,7 +133,6 @@ export function Prompt(props: PromptProps) {
     }
   }, [acMode])
 
-  // Debounced file search for "@" mode
   const fileSearchTimer = useRef<ReturnType<typeof setTimeout>>()
   const searchFiles = useCallback(
     (query: string) => {
@@ -92,28 +151,436 @@ export function Prompt(props: PromptProps) {
     [sync],
   )
 
-  // Command options for "/" mode
-  const commandOptions = useMemo<AutocompleteOption[]>(() => {
-    const builtIn: AutocompleteOption[] = [
-      { label: "/connect", value: "__connect", description: "Connect a provider" },
-      { label: "/model", value: "__model", description: "Switch model" },
-      { label: "/agent", value: "__agent", description: "Switch agent" },
-      { label: "/sessions", value: "__sessions", description: "Browse sessions" },
-      { label: "/status", value: "__status", description: "System status" },
-      { label: "/keybinds", value: "__keybinds", description: "Keyboard shortcuts" },
-      { label: "/plugins", value: "__plugins", description: "Manage plugins" },
-      { label: "/mcp", value: "__mcp", description: "MCP servers" },
-      { label: "/theme", value: "__theme", description: "Switch theme" },
-    ]
-    const sdkCmds = commands.map((c) => ({
-      label: "/" + c.name,
-      value: c.name,
-      description: c.description ?? "",
-    }))
-    return [...builtIn, ...sdkCmds]
-  }, [commands])
+  const clearInput = useCallback(() => {
+    setInput("")
+    setAcMode(false)
+    setFileResults([])
+  }, [])
 
-  // Agent + file options for "@" mode
+  const createTranscript = useCallback((): string | null => {
+    if (!sessionInfo) return null
+
+    const messages = sessionMessages
+      .filter((msg): msg is UserMessage | AssistantMessage => msg.role === "user" || msg.role === "assistant")
+      .map((msg) => {
+        const parts = allParts[msg.id] ?? []
+        return { info: msg, parts: parts as Part[] }
+      })
+
+    return formatTranscript(
+      {
+        id: sessionInfo.id,
+        title: sessionInfo.title || "Untitled Session",
+        time: sessionInfo.time,
+      },
+      messages,
+      {
+        thinking: props.showThinking ?? true,
+        toolDetails: true,
+        assistantMetadata: true,
+      },
+    )
+  }, [sessionInfo, sessionMessages, allParts, props.showThinking])
+
+  const openCommandDialog = useCallback(
+    (name: string) => {
+      switch (name) {
+        case "connect":
+          dialog.replace(<DialogProvider />)
+          break
+        case "model":
+          dialog.replace(<DialogModel />)
+          break
+        case "agent":
+          dialog.replace(<DialogAgent />)
+          break
+        case "sessions":
+          dialog.replace(<DialogSessionList />)
+          break
+        case "status":
+          dialog.replace(<DialogStatus />)
+          break
+        case "keybinds":
+          dialog.replace(<DialogKeybinds />)
+          break
+        case "help":
+          dialog.replace(<DialogHelp />)
+          break
+        case "plugin":
+          dialog.replace(<DialogPlugin />)
+          break
+        case "mcp":
+          dialog.replace(<DialogMcp />)
+          break
+        case "theme":
+          dialog.replace(<DialogThemeList />)
+          break
+        case "review":
+          dialog.replace(<DialogReviewDashboard />)
+          break
+        case "findings":
+          dialog.replace(<DialogReviewResults />)
+          break
+        case "health":
+          dialog.replace(<DialogHealth />)
+          break
+        case "patterns":
+          dialog.replace(<DialogPatterns />)
+          break
+      }
+    },
+    [dialog],
+  )
+
+  const runPluginCommand = useCallback(
+    async (args: string) => {
+      const text = args.trim()
+      if (!text) {
+        dialog.replace(<DialogPlugin />)
+        return
+      }
+
+      const [rawSub, ...rest] = text.split(/\s+/)
+      const sub = (rawSub ?? "").toLowerCase()
+      const value = rest.join(" ").trim()
+      const list = ((config as { plugin?: string[] }).plugin ?? []).slice()
+
+      if (sub === "list") {
+        if (list.length === 0) {
+          toast.show({ message: "No plugins installed", variant: "info" })
+          return
+        }
+        toast.show({
+          message: `Installed (${list.length}): ${list.map((x) => pluginName(x)).join(", ")}`,
+          variant: "info",
+          duration: 5000,
+        })
+        return
+      }
+
+      if (sub === "install") {
+        if (!value) {
+          toast.show({ message: "Usage: /plugin install <spec>", variant: "warning" })
+          return
+        }
+        if (list.includes(value)) {
+          toast.show({ message: `Plugin already installed: ${value}`, variant: "warning" })
+          return
+        }
+        await sync.client.global.config.update({ config: { plugin: [...list, value] } })
+        await sync.client.instance.dispose()
+        await sync.bootstrap()
+        toast.show({ message: `Plugin installed: ${pluginName(value)}`, variant: "success" })
+        return
+      }
+
+      if (sub === "remove") {
+        if (!value) {
+          toast.show({ message: "Usage: /plugin remove <name>", variant: "warning" })
+          return
+        }
+
+        const index = list.findIndex((item) => {
+          const name = pluginName(item)
+          return item === value || name.toLowerCase() === value.toLowerCase()
+        })
+        if (index < 0) {
+          toast.show({ message: `Plugin not found: ${value}`, variant: "warning" })
+          return
+        }
+        const removed = list[index]
+        const next = [...list.slice(0, index), ...list.slice(index + 1)]
+        await sync.client.global.config.update({ config: { plugin: next } })
+        await sync.client.instance.dispose()
+        await sync.bootstrap()
+        toast.show({ message: `Plugin removed: ${pluginName(removed ?? value)}`, variant: "success" })
+        return
+      }
+
+      dialog.replace(<DialogPlugin />)
+    },
+    [config, dialog, sync, toast],
+  )
+
+  const runBuiltInCommand = useCallback(
+    async (name: string, args: string) => {
+      const command = resolveBuiltInCommand(name)
+      if (!command) return false
+
+      if (command.sessionOnly && !props.sessionID) {
+        toast.show({ message: `/${command.name} is only available in a session`, variant: "warning" })
+        return true
+      }
+
+      try {
+        switch (command.name) {
+          case "connect":
+          case "model":
+          case "agent":
+          case "sessions":
+          case "status":
+          case "keybinds":
+          case "help":
+          case "mcp":
+          case "theme":
+          case "review":
+          case "findings":
+          case "health":
+          case "patterns":
+            openCommandDialog(command.name)
+            break
+
+          case "plugin":
+            await runPluginCommand(args)
+            break
+
+          case "new":
+            route.navigate({ type: "home" })
+            break
+
+          case "rename":
+            if (props.sessionID) {
+              dialog.replace(<DialogSessionRename sessionID={props.sessionID} />)
+            }
+            break
+
+          case "share": {
+            if (!props.sessionID) break
+            const result = await sync.client.session.share({ sessionID: props.sessionID })
+            const url = result.data?.share?.url
+            if (!url) {
+              toast.show({ message: "Failed to share session", variant: "error" })
+              break
+            }
+            await Clipboard.copy(url).catch(() => {})
+            toast.show({ message: "Share URL copied to clipboard", variant: "success" })
+            break
+          }
+
+          case "unshare":
+            if (!props.sessionID) break
+            await sync.client.session.unshare({ sessionID: props.sessionID })
+            toast.show({ message: "Session unshared", variant: "success" })
+            break
+
+          case "compact":
+            if (!props.sessionID) break
+            if (!currentModel) {
+              toast.show({ message: "Connect a provider to summarize this session", variant: "warning" })
+              break
+            }
+            await sync.client.session.summarize({
+              sessionID: props.sessionID,
+              providerID: currentModel.providerID,
+              modelID: currentModel.modelID,
+            })
+            toast.show({ message: "Session compaction started", variant: "info" })
+            break
+
+          case "undo": {
+            if (!props.sessionID) break
+            if (sessionStatus?.type !== "idle") {
+              await sync.client.session.abort({ sessionID: props.sessionID }).catch(() => {})
+            }
+            const revertID = sessionInfo?.revert?.messageID
+            const target = [...sessionMessages].reverse().find(
+              (msg) => msg.role === "user" && (!revertID || msg.id < revertID),
+            )
+            if (!target) {
+              toast.show({ message: "No user message to undo", variant: "warning" })
+              break
+            }
+            await sync.client.session.revert({ sessionID: props.sessionID, messageID: target.id })
+            toast.show({ message: "Reverted to previous user message", variant: "success" })
+            break
+          }
+
+          case "redo": {
+            if (!props.sessionID) break
+            const revertID = sessionInfo?.revert?.messageID
+            if (!revertID) {
+              toast.show({ message: "Nothing to redo", variant: "warning" })
+              break
+            }
+            const next = sessionMessages.find((msg) => msg.role === "user" && msg.id > revertID)
+            if (next) {
+              await sync.client.session.revert({ sessionID: props.sessionID, messageID: next.id })
+            } else {
+              await sync.client.session.unrevert({ sessionID: props.sessionID })
+            }
+            toast.show({ message: "Redo applied", variant: "success" })
+            break
+          }
+
+          case "copy": {
+            const transcript = createTranscript()
+            if (!transcript) {
+              toast.show({ message: "No active session to copy", variant: "warning" })
+              break
+            }
+            await Clipboard.copy(transcript).catch(() => {})
+            toast.show({ message: "Session transcript copied", variant: "success" })
+            break
+          }
+
+          case "export": {
+            const transcript = createTranscript()
+            if (!transcript || !sessionInfo) {
+              toast.show({ message: "No active session to export", variant: "warning" })
+              break
+            }
+            const safeTitle = (sessionInfo.title || `session-${sessionInfo.id}`)
+              .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+              .replace(/\s+/g, "-")
+              .replace(/-+/g, "-")
+              .replace(/^-|-$/g, "")
+              .slice(0, 80) || sessionInfo.id
+            const targetArg = args.trim()
+            const filename = targetArg || `${safeTitle}.md`
+            const targetPath = path.isAbsolute(filename)
+              ? filename
+              : path.join(projectDir || process.cwd(), filename)
+            await Bun.write(targetPath, transcript)
+            toast.show({ message: `Transcript exported: ${targetPath}`, variant: "success", duration: 5000 })
+            break
+          }
+
+          case "thinking":
+            props.onToggleThinking?.()
+            if (props.onToggleThinking) {
+              toast.show({
+                message: props.showThinking ? "Thinking hidden" : "Thinking visible",
+                variant: "info",
+              })
+            }
+            break
+
+          case "timestamps":
+            props.onToggleTimestamps?.()
+            if (props.onToggleTimestamps) {
+              toast.show({
+                message: props.showTimestamps ? "Timestamps hidden" : "Timestamps visible",
+                variant: "info",
+              })
+            }
+            break
+
+          case "timeline":
+            toast.show({
+              message: "Timeline picker is not yet available in Ink. Use /fork [message-id] as a workaround.",
+              variant: "warning",
+              duration: 4500,
+            })
+            break
+
+          case "fork": {
+            if (!props.sessionID) break
+            const inputMessageID = args.trim()
+            const fallbackMessageID = [...sessionMessages].reverse().find((x) => x.role === "user")?.id
+            const messageID = inputMessageID || fallbackMessageID
+            const result = await sync.client.session.fork({
+              sessionID: props.sessionID,
+              ...(messageID ? { messageID } : {}),
+            })
+            const next = result.data?.id
+            if (!next) {
+              toast.show({ message: "Failed to fork session", variant: "error" })
+              break
+            }
+            route.navigate({ type: "session", sessionID: next })
+            toast.show({ message: "Forked into new session", variant: "success" })
+            break
+          }
+
+          case "exit":
+            exit()
+            break
+        }
+
+        if (command.name === "health") {
+          const quality = lobster.projectQuality
+          if (quality && Date.now() - quality.analyzed_at < 24 * 60 * 60 * 1000) return true
+          if (lobster.analysisRunning) return true
+          if (!currentModel || !currentAgent) {
+            toast.show({ message: "Connect a provider to run health analysis", variant: "warning" })
+            return true
+          }
+
+          let sessionID = props.sessionID
+          if (!sessionID) {
+            const created = await sync.client.session.create({})
+            sessionID = created.data?.id
+            if (!sessionID) {
+              toast.show({ message: "Failed to create session for analysis", variant: "error" })
+              return true
+            }
+            route.navigate({ type: "session", sessionID })
+          }
+
+          lobster.setAnalysisRunning(true)
+          sync.client.session.prompt({
+            sessionID,
+            messageID: Identifier.ascending("message"),
+            agent: currentAgent.name,
+            model: currentModel,
+            parts: [{ id: Identifier.ascending("part"), type: "text", text: HEALTH_ANALYSIS_PROMPT }],
+          }).catch(() => {
+            toast.show({ message: "Failed to start health analysis", variant: "error" })
+          }).finally(() => {
+            lobster.setAnalysisRunning(false)
+          })
+        }
+
+        return true
+      } catch (error) {
+        toast.error(error)
+        return true
+      }
+    },
+    [
+      props.sessionID,
+      props.onToggleThinking,
+      props.onToggleTimestamps,
+      props.showThinking,
+      props.showTimestamps,
+      toast,
+      openCommandDialog,
+      runPluginCommand,
+      route,
+      dialog,
+      currentModel,
+      currentAgent,
+      sync,
+      sessionStatus?.type,
+      sessionInfo,
+      sessionMessages,
+      createTranscript,
+      projectDir,
+      exit,
+      lobster,
+    ],
+  )
+
+  const commandOptions = useMemo<AutocompleteOption[]>(() => {
+    const builtIn = BUILT_IN_COMMANDS
+      .filter((x) => !x.sessionOnly || !!props.sessionID)
+      .map((x) => ({
+        label: `/${x.name}`,
+        value: `builtin:${x.name}`,
+        description: x.aliases && x.aliases.length > 0
+          ? `${x.description} (${x.aliases.join(", ")})`
+          : x.description,
+      }))
+    const sdkCmds = commands
+      .filter((x) => !resolveBuiltInCommand(x.name))
+      .map((x) => ({
+        label: `/${x.name}`,
+        value: `sdk:${x.name}`,
+        description: x.description ?? "",
+      }))
+    return [...builtIn, ...sdkCmds]
+  }, [commands, props.sessionID])
+
   const mentionOptions = useMemo<AutocompleteOption[]>(() => {
     const agentOpts: AutocompleteOption[] = agents
       .filter((a) => !a.hidden && a.mode !== "subagent")
@@ -130,7 +597,6 @@ export function Prompt(props: PromptProps) {
     return [...agentOpts, ...fileOpts]
   }, [agents, fileResults])
 
-  // Filtered options based on current filter text
   const filteredOptions = useMemo(() => {
     if (!acMode) return []
     const source = acMode === "/" ? commandOptions : mentionOptions
@@ -144,44 +610,33 @@ export function Prompt(props: PromptProps) {
     )
   }, [acMode, input, acTriggerPos, commandOptions, mentionOptions])
 
-  // Clamp selected index when options change
   useEffect(() => {
     if (acIndex >= filteredOptions.length && filteredOptions.length > 0) {
       setAcIndex(filteredOptions.length - 1)
     }
-  }, [filteredOptions.length])
+  }, [filteredOptions.length, acIndex])
 
-  // Trigger "@" file search
   useEffect(() => {
     if (acMode === "@") {
       const filterText = input.slice(acTriggerPos + 1)
       searchFiles(filterText)
     }
-  }, [acMode, input, acTriggerPos])
+  }, [acMode, input, acTriggerPos, searchFiles])
 
-  // Handle selecting an autocomplete option
   const selectOption = useCallback(
     (option: AutocompleteOption) => {
       if (acMode === "/") {
-        const builtInActions: Record<string, () => void> = {
-          __connect: () => dialog.replace(<DialogProvider />),
-          __model: () => dialog.replace(<DialogModel />),
-          __agent: () => dialog.replace(<DialogAgent />),
-          __sessions: () => dialog.replace(<DialogSessionList />),
-          __status: () => dialog.replace(<DialogStatus />),
-          __keybinds: () => dialog.replace(<DialogKeybinds />),
-          __plugins: () => dialog.replace(<DialogPlugin />),
-          __mcp: () => dialog.replace(<DialogMcp />),
-          __theme: () => dialog.replace(<DialogThemeList />),
+        if (option.value.startsWith("builtin:")) {
+          const name = option.value.slice("builtin:".length)
+          clearInput()
+          void runBuiltInCommand(name, "")
+          return
         }
-        const action = builtInActions[option.value]
-        if (action) {
-          setInput("")
+        if (option.value.startsWith("sdk:")) {
+          const name = option.value.slice("sdk:".length)
+          setInput("/" + name + " ")
           setAcMode(false)
-          action()
-        } else {
-          setInput("/" + option.value + " ")
-          setAcMode(false)
+          return
         }
       } else if (acMode === "@") {
         const before = input.slice(0, acTriggerPos)
@@ -194,21 +649,18 @@ export function Prompt(props: PromptProps) {
         setAcMode(false)
       }
     },
-    [acMode, acTriggerPos, input, dialog],
+    [acMode, acTriggerPos, input, clearInput, runBuiltInCommand],
   )
 
-  // Detect triggers on input change
   const handleInputChange = useCallback((value: string) => {
     setInput(value)
 
-    // "/" trigger: starts with "/" and no spaces yet
     if (value.startsWith("/") && !value.includes(" ")) {
       setAcMode("/")
       setAcTriggerPos(0)
       return
     }
 
-    // "@" trigger: find last "@" preceded by whitespace or at start, no space after
     const lastAt = value.lastIndexOf("@")
     if (lastAt >= 0) {
       const charBefore = lastAt === 0 ? undefined : value[lastAt - 1]
@@ -220,13 +672,11 @@ export function Prompt(props: PromptProps) {
       }
     }
 
-    // No trigger
     setAcMode(false)
   }, [])
 
   const handleSubmit = useCallback(
     (value: string) => {
-      // Autocomplete selection on Enter
       if (acMode && filteredOptions.length > 0) {
         const selected = filteredOptions[acIndex]
         if (selected) selectOption(selected)
@@ -235,6 +685,22 @@ export function Prompt(props: PromptProps) {
 
       const text = value.trim()
       if (!text) return
+
+      if (text === "exit" || text === "quit" || text === ":q") {
+        exit()
+        return
+      }
+
+      const slash = parseSlashCommand(text)
+      if (slash) {
+        const command = resolveBuiltInCommand(slash.name)
+        if (command) {
+          clearInput()
+          void runBuiltInCommand(command.name, slash.args)
+          return
+        }
+      }
+
       if (isBusy) return
       if (!currentAgent || !currentModel) return
 
@@ -242,13 +708,36 @@ export function Prompt(props: PromptProps) {
         agent: currentAgent.name,
         model: currentModel,
       })
-      setInput("")
+      clearInput()
     },
-    [acMode, acIndex, filteredOptions, selectOption, isBusy, currentAgent, currentModel, props.onSubmit],
+    [
+      acMode,
+      filteredOptions,
+      acIndex,
+      selectOption,
+      isBusy,
+      currentAgent,
+      currentModel,
+      props,
+      exit,
+      clearInput,
+      runBuiltInCommand,
+    ],
+  )
+
+  const handlePaletteCommand = useCallback(
+    (command: string) => {
+      if (resolveBuiltInCommand(command)) {
+        void runBuiltInCommand(command, "")
+        return
+      }
+      setInput(`/${command} `)
+      setAcMode(false)
+    },
+    [runBuiltInCommand],
   )
 
   useInput((ch, key) => {
-    // Autocomplete navigation when visible
     if (acMode && filteredOptions.length > 0) {
       if (key.upArrow) {
         setAcIndex((prev) => (prev <= 0 ? filteredOptions.length - 1 : prev - 1))
@@ -269,7 +758,6 @@ export function Prompt(props: PromptProps) {
       }
     }
 
-    // Ctrl+C: interrupt or exit
     if (key.ctrl && ch === "c") {
       if (isBusy && props.sessionID) {
         setInterruptCount((c) => c + 1)
@@ -285,64 +773,54 @@ export function Prompt(props: PromptProps) {
       return
     }
 
-    // When a dialog is open, suppress all hotkeys except Ctrl+C above
     if (isDialogOpen) return
 
-    // Tab: cycle agent (only when autocomplete not active)
     if (key.tab && !acMode) {
       local.agent.move(1)
       return
     }
 
-    // Ctrl+M: open model picker
     if (key.ctrl && ch === "m") {
       dialog.replace(<DialogModel />)
       return
     }
 
-    // Ctrl+A: open agent picker
     if (key.ctrl && ch === "a") {
       dialog.replace(<DialogAgent />)
       return
     }
 
-    // Ctrl+S: open session list
     if (key.ctrl && ch === "s") {
       dialog.replace(<DialogSessionList />)
       return
     }
 
-    // Ctrl+P: command palette
     if (key.ctrl && ch === "p") {
-      dialog.replace(<DialogCommand />)
+      dialog.replace(<DialogCommand onTrigger={handlePaletteCommand} />)
       return
     }
 
-    // Ctrl+O: connect provider
     if (key.ctrl && ch === "o") {
       dialog.replace(<DialogProvider />)
       return
     }
 
-    // Ctrl+/: keybinds reference
     if (ch === "\x1F") {
       dialog.replace(<DialogKeybinds />)
       return
     }
   })
 
-  // Auto-submit piped prompt on mount
   const autoSubmitted = useRef(false)
   useEffect(() => {
     if (!autoSubmitted.current && args.prompt && currentModel && currentAgent) {
       autoSubmitted.current = true
       handleSubmit(args.prompt)
     }
-  }, [args.prompt, currentModel, currentAgent])
+  }, [args.prompt, currentModel, currentAgent, handleSubmit])
 
   return (
     <Box flexDirection="column">
-      {/* Status line */}
       <Box paddingLeft={2} gap={1}>
         <Text color={theme.secondary} bold>{currentAgent?.name ?? "build"}</Text>
         <Text color={theme.textMuted}>|</Text>
@@ -356,12 +834,10 @@ export function Prompt(props: PromptProps) {
         )}
       </Box>
 
-      {/* Autocomplete dropdown */}
       {acMode && filteredOptions.length > 0 && !isBusy && (
         <Autocomplete options={filteredOptions} selected={acIndex} />
       )}
 
-      {/* Input line */}
       <Box paddingLeft={1}>
         <Text color={theme.accent}>{"> "}</Text>
         {isBusy ? (
@@ -379,7 +855,6 @@ export function Prompt(props: PromptProps) {
         )}
       </Box>
 
-      {/* Hint line */}
       {!isBusy && !acMode && (
         <Box paddingLeft={2} gap={2}>
           <Text color={theme.textMuted} dimColor>tab agent</Text>
@@ -391,7 +866,7 @@ export function Prompt(props: PromptProps) {
       )}
       {!isBusy && acMode && (
         <Box paddingLeft={2} gap={2}>
-          <Text color={theme.textMuted} dimColor>{"↑↓ navigate"}</Text>
+          <Text color={theme.textMuted} dimColor>up/down navigate</Text>
           <Text color={theme.textMuted} dimColor>enter/tab select</Text>
           <Text color={theme.textMuted} dimColor>esc dismiss</Text>
         </Box>

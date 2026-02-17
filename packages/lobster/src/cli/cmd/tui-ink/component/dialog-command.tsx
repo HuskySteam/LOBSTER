@@ -1,20 +1,10 @@
 /** @jsxImportSource react */
 import React, { useMemo } from "react"
 import { useAppStore } from "../store"
+import { useRoute } from "../context/route"
 import { useDialog } from "../ui/dialog"
 import { DialogSelect, type DialogSelectOption } from "../ui/dialog-select"
-
-const BUILT_IN: DialogSelectOption<string>[] = [
-  { title: "/connect", value: "connect", description: "Connect a provider", category: "Suggested" },
-  { title: "/model", value: "model", description: "Switch model", category: "Suggested" },
-  { title: "/agent", value: "agent", description: "Switch agent", category: "Suggested" },
-  { title: "/sessions", value: "sessions", description: "Browse sessions", category: "Navigation" },
-  { title: "/status", value: "status", description: "System status", category: "Navigation" },
-  { title: "/keybinds", value: "keybinds", description: "Keyboard shortcuts", category: "Navigation" },
-  { title: "/plugins", value: "plugins", description: "Manage plugins", category: "System" },
-  { title: "/mcp", value: "mcp", description: "MCP servers", category: "System" },
-  { title: "/theme", value: "theme", description: "Switch theme", category: "System" },
-]
+import { BUILT_IN_COMMANDS } from "./prompt/command-registry"
 
 interface DialogCommandProps {
   onTrigger?: (command: string) => void
@@ -22,17 +12,31 @@ interface DialogCommandProps {
 
 export function DialogCommand(props: DialogCommandProps) {
   const dialog = useDialog()
+  const route = useRoute()
   const commands = useAppStore((s) => s.command)
 
   const options = useMemo<DialogSelectOption<string>[]>(() => {
-    const sdkCommands = commands.map((c) => ({
-      title: `/${c.name}`,
-      value: c.name,
-      description: c.description,
-      category: "Commands",
-    }))
-    return [...BUILT_IN, ...sdkCommands]
-  }, [commands])
+    const inSession = route.data.type === "session"
+    const builtIn = BUILT_IN_COMMANDS
+      .filter((x) => !x.sessionOnly || inSession)
+      .map((x) => ({
+        title: `/${x.name}`,
+        value: x.name,
+        description: x.description,
+        category: x.category,
+      }))
+
+    const sdkCommands = commands
+      .filter((x) => !BUILT_IN_COMMANDS.some((cmd) => cmd.name === x.name))
+      .map((x) => ({
+        title: `/${x.name}`,
+        value: x.name,
+        description: x.description,
+        category: "Commands",
+      }))
+
+    return [...builtIn, ...sdkCommands]
+  }, [commands, route.data.type])
 
   return (
     <DialogSelect

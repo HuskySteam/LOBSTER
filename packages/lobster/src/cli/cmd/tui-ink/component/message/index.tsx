@@ -25,15 +25,23 @@ import {
 // ─── Message Row ──────────────────────────────────────────
 
 export function MessageRow(props: {
-  message: { id: string; role: string; agent?: string }
+  message: { id: string; role: string; agent?: string; time?: { created?: number } }
   parts: Array<{ id: string; type: string; [key: string]: any }>
   isLast: boolean
+  showThinking?: boolean
+  showTimestamps?: boolean
 }) {
   const { theme } = useTheme()
   const { message, parts } = props
 
   if (message.role === "user") {
-    return <UserMessage parts={parts} theme={theme} />
+    return (
+      <UserMessage
+        parts={parts}
+        theme={theme}
+        timestamp={props.showTimestamps ? message.time?.created : undefined}
+      />
+    )
   }
 
   if (message.role === "assistant") {
@@ -43,6 +51,8 @@ export function MessageRow(props: {
         parts={parts}
         theme={theme}
         isLast={props.isLast}
+        showThinking={props.showThinking ?? true}
+        timestamp={props.showTimestamps ? message.time?.created : undefined}
       />
     )
   }
@@ -55,15 +65,25 @@ export function MessageRow(props: {
 function UserMessage(props: {
   parts: Array<Record<string, any>>
   theme: ThemeColors
+  timestamp?: number
 }) {
   const textParts = props.parts.filter((p) => p.type === "text" && !p.synthetic)
   const text = textParts.map((p) => p.text ?? "").join("").trim()
   if (!text) return null
 
   return (
-    <Box marginBottom={1}>
-      <Text color={props.theme.accent} bold>{"> "}</Text>
-      <Text color={props.theme.text}>{text}</Text>
+    <Box marginBottom={1} flexDirection="column">
+      {props.timestamp && (
+        <Box paddingLeft={2}>
+          <Text color={props.theme.textMuted} dimColor>
+            {new Date(props.timestamp).toLocaleTimeString()}
+          </Text>
+        </Box>
+      )}
+      <Box>
+        <Text color={props.theme.accent} bold>{"> "}</Text>
+        <Text color={props.theme.text}>{text}</Text>
+      </Box>
     </Box>
   )
 }
@@ -75,8 +95,10 @@ function AssistantMessage(props: {
   parts: Array<Record<string, any>>
   theme: ThemeColors
   isLast: boolean
+  showThinking: boolean
+  timestamp?: number
 }) {
-  const { message, parts, theme } = props
+  const { message, parts, theme, showThinking } = props
 
   // Check if still streaming (has running/pending tool or is last message with no completed marker)
   const isStreaming = props.isLast && parts.some(
@@ -85,11 +107,18 @@ function AssistantMessage(props: {
 
   return (
     <Box flexDirection="column" marginBottom={1}>
+      {props.timestamp && (
+        <Box paddingLeft={2}>
+          <Text color={theme.textMuted} dimColor>
+            {new Date(props.timestamp).toLocaleTimeString()}
+          </Text>
+        </Box>
+      )}
       {message.agent && (
         <AgentBadge name={message.agent} variant="dot" color={theme.secondary} />
       )}
       {parts.map((part) => (
-        <PartView key={part.id} part={part} theme={theme} />
+        <PartView key={part.id} part={part} theme={theme} showThinking={showThinking} />
       ))}
       {isStreaming && parts.every((p) => p.type !== "tool" || p.state?.status !== "running") && (
         <Box paddingLeft={2}>
@@ -102,7 +131,7 @@ function AssistantMessage(props: {
 
 // ─── Part Dispatcher ──────────────────────────────────────
 
-function PartView(props: { part: Record<string, any>; theme: ThemeColors }) {
+function PartView(props: { part: Record<string, any>; theme: ThemeColors; showThinking: boolean }) {
   const { part, theme } = props
 
   if (part.type === "text") {
@@ -110,6 +139,7 @@ function PartView(props: { part: Record<string, any>; theme: ThemeColors }) {
   }
 
   if (part.type === "reasoning") {
+    if (!props.showThinking) return null
     // Show reasoning/thinking blocks dimmed
     const text = (part.text ?? "").trim()
     if (!text) return null
