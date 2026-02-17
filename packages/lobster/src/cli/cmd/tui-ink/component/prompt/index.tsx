@@ -38,6 +38,8 @@ import { formatTranscript } from "@tui/util/transcript"
 import { Identifier } from "@/id/id"
 import type { AssistantMessage, Part, UserMessage } from "@lobster-ai/sdk/v2"
 
+const EMPTY_MSGS: never[] = []
+
 interface PromptProps {
   sessionID?: string
   onSubmit: (input: string, options: { agent: string; model: { providerID: string; modelID: string } }) => void
@@ -108,7 +110,7 @@ export function Prompt(props: PromptProps) {
   const projectDir = useAppStore((s) => s.path.directory)
   const config = useAppStore((s) => s.config)
   const sessionMessages = useAppStore((s) =>
-    props.sessionID ? s.message[props.sessionID] ?? [] : [],
+    props.sessionID ? s.message[props.sessionID] ?? EMPTY_MSGS : EMPTY_MSGS,
   )
   const sessionInfo = useMemo(
     () => sessions.find((x) => x.id === props.sessionID),
