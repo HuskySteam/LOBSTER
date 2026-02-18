@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import { Box, Text } from "ink"
+import { Box, Text, useStdout } from "ink"
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from "react"
 import { useTheme } from "../theme"
 import { useKeybind } from "../context/keybind"
@@ -26,7 +26,9 @@ export function DialogProvider(props: { children: ReactNode }) {
 
   return (
     <DialogContext.Provider value={{ content, replace, clear }}>
-      {props.children}
+      <Box flexDirection="column" display={content ? "none" : "flex"}>
+        {props.children}
+      </Box>
       {content && <DialogOverlay onClose={clear}>{content}</DialogOverlay>}
     </DialogContext.Provider>
   )
@@ -34,6 +36,8 @@ export function DialogProvider(props: { children: ReactNode }) {
 
 function DialogOverlay(props: { children: ReactNode; onClose: () => void }) {
   const { theme } = useTheme()
+  const { stdout } = useStdout()
+  const maxHeight = Math.max((stdout?.rows ?? 24) - 4, 6)
 
   return (
     <Box
@@ -42,6 +46,8 @@ function DialogOverlay(props: { children: ReactNode; onClose: () => void }) {
       borderColor={theme.border}
       paddingLeft={1}
       paddingRight={1}
+      height={maxHeight}
+      overflow="hidden"
     >
       {props.children}
     </Box>

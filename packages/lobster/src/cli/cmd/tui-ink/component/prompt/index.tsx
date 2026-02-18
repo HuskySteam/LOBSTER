@@ -671,9 +671,10 @@ export function Prompt(props: PromptProps) {
   )
 
   const handleInputChange = useCallback((value: string) => {
-    setInput(value)
+    const clean = value.replace(/[\x00-\x1f]/g, "")
+    setInput(clean)
 
-    if (value.startsWith("/") && !value.includes(" ")) {
+    if (clean.startsWith("/") && !clean.includes(" ")) {
       setAcMode("/")
       setAcTriggerPos(0)
       setAcIndex(0)
@@ -681,10 +682,10 @@ export function Prompt(props: PromptProps) {
       return
     }
 
-    const lastAt = value.lastIndexOf("@")
+    const lastAt = clean.lastIndexOf("@")
     if (lastAt >= 0) {
-      const charBefore = lastAt === 0 ? undefined : value[lastAt - 1]
-      const textAfter = value.slice(lastAt + 1)
+      const charBefore = lastAt === 0 ? undefined : clean[lastAt - 1]
+      const textAfter = clean.slice(lastAt + 1)
       if ((charBefore === undefined || /\s/.test(charBefore)) && !textAfter.includes(" ")) {
         setAcMode("@")
         setAcTriggerPos(lastAt)
@@ -761,6 +762,23 @@ export function Prompt(props: PromptProps) {
   )
 
   useInput((ch, key) => {
+    if (key.ctrl && ch === "c") {
+      if (isBusy && props.sessionID) {
+        setInterruptCount((c) => c + 1)
+        sync.client.session.abort({ sessionID: props.sessionID }).catch(() => {})
+        return
+      }
+      if (interruptCount > 0) {
+        exit()
+        return
+      }
+      setInterruptCount(1)
+      setTimeout(() => setInterruptCount(0), 2000)
+      return
+    }
+
+    if (isDialogOpen) return
+
     if (acMode && filteredOptions.length > 0) {
       if (key.upArrow) {
         setAcIndex((prev) => {
@@ -786,23 +804,6 @@ export function Prompt(props: PromptProps) {
         return
       }
     }
-
-    if (key.ctrl && ch === "c") {
-      if (isBusy && props.sessionID) {
-        setInterruptCount((c) => c + 1)
-        sync.client.session.abort({ sessionID: props.sessionID }).catch(() => {})
-        return
-      }
-      if (interruptCount > 0) {
-        exit()
-        return
-      }
-      setInterruptCount(1)
-      setTimeout(() => setInterruptCount(0), 2000)
-      return
-    }
-
-    if (isDialogOpen) return
 
     if (key.tab && !acMode) {
       local.agent.move(1)

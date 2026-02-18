@@ -43,6 +43,7 @@ export function Home() {
   )
 
   useInput((_ch, key) => {
+    if (dialog.content !== null) return
     if (!hasProvider && key.return) {
       dialog.replace(<DialogProviderSetup />)
     }
