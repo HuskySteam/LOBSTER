@@ -89,9 +89,11 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
       return
     }
     if (key.upArrow) {
+      if (flat.length === 0) return
       setSelected((s) => (s - 1 + flat.length) % flat.length)
     }
     if (key.downArrow) {
+      if (flat.length === 0) return
       setSelected((s) => (s + 1) % flat.length)
     }
     if (key.return) {

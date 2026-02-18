@@ -1,13 +1,15 @@
 /** @jsxImportSource react */
 import { Box, Text, useInput } from "ink"
-import React, { useState, useCallback } from "react"
+import React, { useState, useCallback, useEffect } from "react"
 import { useTheme } from "../../theme"
 import { useSDK } from "../../context/sdk"
+import { useKeybind } from "../../context/keybind"
 import type { QuestionRequest } from "@lobster-ai/sdk/v2"
 
 export function QuestionPrompt(props: { request: QuestionRequest }) {
   const { sync } = useSDK()
   const { theme } = useTheme()
+  const { setBlocker } = useKeybind()
   const [tabIndex, setTabIndex] = useState(0)
   const [selected, setSelected] = useState(0)
   const [answers, setAnswers] = useState<string[][]>([])
@@ -17,6 +19,14 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
   const question = questions[tabIndex]
   const options = question?.options ?? []
   const isMulti = question?.multiple === true
+
+  // Register blocker so global keybinds (Esc, Ctrl+C) don't fire
+  // Use request ID to avoid collisions when multiple question prompts are mounted
+  const blockerID = `question-${props.request.id}`
+  useEffect(() => {
+    setBlocker(blockerID, true)
+    return () => setBlocker(blockerID, false)
+  }, [setBlocker, blockerID])
 
   const reject = useCallback(() => {
     sync.client.question.reject({ requestID: props.request.id })
@@ -74,9 +84,11 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
     }
 
     if (key.upArrow || ch === "k") {
+      if (options.length === 0) return
       setSelected((s) => (s - 1 + options.length) % options.length)
     }
     if (key.downArrow || ch === "j") {
+      if (options.length === 0) return
       setSelected((s) => (s + 1) % options.length)
     }
     if (key.return) {

@@ -13,7 +13,7 @@ export function DialogModel() {
   const current = local.model.current()
 
   const options = useMemo(() => {
-    return providers
+    return [...providers]
       .sort((a, b) => a.name.localeCompare(b.name))
       .flatMap((provider) =>
         Object.entries(provider.models)

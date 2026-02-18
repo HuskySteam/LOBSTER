@@ -1,8 +1,10 @@
 /** @jsxImportSource react */
 import { Box, Text, useInput } from "ink"
-import React, { useState, useCallback } from "react"
+import React, { useState, useCallback, useMemo, useEffect } from "react"
 import { useTheme } from "../../theme"
 import { useSDK } from "../../context/sdk"
+import { useKeybind } from "../../context/keybind"
+import { useAppStore } from "../../store"
 import type { PermissionRequest } from "@lobster-ai/sdk/v2"
 import path from "path"
 
@@ -46,16 +48,31 @@ function describePermission(request: PermissionRequest, input: Record<string, an
 export function PermissionPrompt(props: { request: PermissionRequest }) {
   const { sync } = useSDK()
   const { theme } = useTheme()
+  const { setBlocker } = useKeybind()
   const [selected, setSelected] = useState(0)
   const options = ["Allow once", "Allow always", "Reject"] as const
+  const allParts = useAppStore((s) => s.part)
+
+  // Register blocker so global keybinds (Esc, Ctrl+C) don't fire
+  // Use request ID to avoid collisions when multiple permission prompts are mounted
+  const blockerID = `permission-${props.request.id}`
+  useEffect(() => {
+    setBlocker(blockerID, true)
+    return () => setBlocker(blockerID, false)
+  }, [setBlocker, blockerID])
 
   // Resolve tool input from parts
-  const input = (() => {
+  const input = useMemo(() => {
     const tool = props.request.tool
     if (!tool) return {}
-    const parts = (sync as any).client ? [] : [] // Parts come from store
+    const parts = allParts[tool.messageID] ?? []
+    for (const part of parts) {
+      if (part.type === "tool" && part.callID === tool.callID && part.state.status !== "pending") {
+        return part.state.input ?? {}
+      }
+    }
     return {}
-  })()
+  }, [props.request.tool, allParts])
 
   const description = describePermission(props.request, input)
 

@@ -2,8 +2,6 @@
 import React, { createContext, useContext, useCallback, useMemo, useRef, type ReactNode } from "react"
 import { useInput, useApp } from "ink"
 import { useRoute } from "./route"
-import { useSDK } from "./sdk"
-import { useAppStore } from "../store"
 
 export interface KeybindAction {
   key: string
@@ -27,7 +25,6 @@ const KeybindContext = createContext<KeybindContextValue | undefined>(undefined)
 export function KeybindProvider(props: { children: ReactNode }) {
   const { exit } = useApp()
   const route = useRoute()
-  const { sync } = useSDK()
   const blockersRef = useRef<Map<string, true>>(new Map())
   const bindingsRef = useRef<Map<string, KeybindAction>>(new Map())
 
@@ -50,16 +47,12 @@ export function KeybindProvider(props: { children: ReactNode }) {
 
   // Global keyboard handler
   useInput((ch, key) => {
-    // Always handle Ctrl+C for exit
+    // Ctrl+C handling: on session routes, defer entirely to the prompt's
+    // double-press handler (abort when busy, press-twice-to-exit when idle).
+    // On non-session routes, exit immediately unless a dialog blocker is active.
     if (key.ctrl && ch === "c") {
-      // If in a session that's running, abort first
-      if (route.data.type === "session") {
-        const sessionStatus = useAppStore.getState().session_status[route.data.sessionID]
-        if (sessionStatus?.type === "busy" || sessionStatus?.type === "retry") {
-          sync.client.session.abort({ sessionID: route.data.sessionID }).catch(() => {})
-          return
-        }
-      }
+      if (route.data.type === "session") return
+      if (blockersRef.current.size > 0) return
       exit()
       return
     }
