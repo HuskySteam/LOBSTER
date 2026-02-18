@@ -26,7 +26,7 @@ export function DialogProvider(props: { children: ReactNode }) {
 
   return (
     <DialogContext.Provider value={{ content, replace, clear }}>
-      <Box flexDirection="column" display={content ? "none" : "flex"}>
+      <Box flexDirection="column" height={content ? 0 : undefined} overflow="hidden">
         {props.children}
       </Box>
       {content && <DialogOverlay onClose={clear}>{content}</DialogOverlay>}

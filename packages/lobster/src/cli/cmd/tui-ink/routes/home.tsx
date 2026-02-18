@@ -50,7 +50,7 @@ export function Home() {
   })
 
   return (
-    <Box flexDirection="column" padding={1}>
+    <Box flexDirection="column" padding={1} height="100%">
       <Logo />
 
       {hasProvider ? (

@@ -97,7 +97,7 @@ function App() {
   }
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" height="100%">
       {route.data.type === "home" && <Home />}
       {route.data.type === "session" && <Session sessionID={route.data.sessionID} />}
     </Box>

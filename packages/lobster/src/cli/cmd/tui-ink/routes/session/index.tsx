@@ -14,6 +14,10 @@ import { PermissionPrompt } from "./permission"
 import { QuestionPrompt } from "./question"
 import { Identifier } from "@/id/id"
 
+const EMPTY_MESSAGES: never[] = []
+const EMPTY_PERMISSIONS: never[] = []
+const EMPTY_QUESTIONS: never[] = []
+
 /** Count rendered terminal rows for a string, accounting for soft-wrap at cols. */
 function wrappedLineCount(text: string, cols: number): number {
   const hardLines = text.split("\n")
@@ -114,10 +118,10 @@ export function Session(props: { sessionID: string }) {
   const session = useAppStore((s) =>
     s.session.find((ses) => ses.id === props.sessionID),
   )
-  const messages = useAppStore((s) => s.message[props.sessionID] ?? [])
+  const messages = useAppStore((s) => s.message[props.sessionID] ?? EMPTY_MESSAGES)
   const parts = useAppStore((s) => s.part)
-  const permissions = useAppStore((s) => s.permission[props.sessionID] ?? [])
-  const questions = useAppStore((s) => s.question[props.sessionID] ?? [])
+  const permissions = useAppStore((s) => s.permission[props.sessionID] ?? EMPTY_PERMISSIONS)
+  const questions = useAppStore((s) => s.question[props.sessionID] ?? EMPTY_QUESTIONS)
 
   // Scroll viewport — estimate rendered lines per message to avoid clipping
   const termHeight = stdout?.rows ?? 24
@@ -192,8 +196,9 @@ export function Session(props: { sessionID: string }) {
       totalLines += est
       offset--
     }
-    setScrollOffset(Math.max(0, offset))
-  }, [messages.length, autoScroll, availableRows, estimateLines, messages])
+    const nextOffset = Math.max(0, offset)
+    setScrollOffset((prev) => (prev === nextOffset ? prev : nextOffset))
+  }, [autoScroll, messages, availableRows, estimateLines])
 
   // Register sidebar toggle keybinding
   useEffect(() => {

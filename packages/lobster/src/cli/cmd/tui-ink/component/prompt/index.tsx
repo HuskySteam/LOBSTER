@@ -42,7 +42,10 @@ const EMPTY_MSGS: never[] = []
 
 interface PromptProps {
   sessionID?: string
-  onSubmit: (input: string, options: { agent: string; model: { providerID: string; modelID: string } }) => void
+  onSubmit: (
+    input: string,
+    options: { agent: string; model: { providerID: string; modelID: string } },
+  ) => void
   showThinking?: boolean
   showTimestamps?: boolean
   onToggleThinking?: () => void
@@ -180,6 +183,23 @@ export function Prompt(props: PromptProps) {
     if (fileSearchTimer.current) clearTimeout(fileSearchTimer.current)
     setFileResults((prev) => (prev.length > 0 ? [] : prev))
   }, [])
+
+  const hotkeyInputSnapshot = useRef<string | null>(null)
+  const openHotkeyDialog = useCallback(
+    (content: React.ReactNode) => {
+      hotkeyInputSnapshot.current = input
+      dialog.replace(content)
+    },
+    [dialog, input],
+  )
+
+  useEffect(() => {
+    if (!isDialogOpen) return
+    if (hotkeyInputSnapshot.current === null) return
+    const snapshot = hotkeyInputSnapshot.current
+    hotkeyInputSnapshot.current = null
+    setInput(snapshot)
+  }, [isDialogOpen])
 
   const createTranscript = useCallback((): string | null => {
     if (!sessionInfo) return null
@@ -582,6 +602,7 @@ export function Prompt(props: PromptProps) {
       projectDir,
       exit,
       lobster,
+      local,
     ],
   )
 
@@ -811,32 +832,32 @@ export function Prompt(props: PromptProps) {
     }
 
     if (key.ctrl && ch === "m") {
-      dialog.replace(<DialogModel />)
+      openHotkeyDialog(<DialogModel />)
       return
     }
 
     if (key.ctrl && ch === "a") {
-      dialog.replace(<DialogAgent />)
+      openHotkeyDialog(<DialogAgent />)
       return
     }
 
     if (key.ctrl && ch === "s") {
-      dialog.replace(<DialogSessionList />)
+      openHotkeyDialog(<DialogSessionList />)
       return
     }
 
     if (key.ctrl && ch === "p") {
-      dialog.replace(<DialogCommand onTrigger={handlePaletteCommand} />)
+      openHotkeyDialog(<DialogCommand onTrigger={handlePaletteCommand} />)
       return
     }
 
     if (key.ctrl && ch === "o") {
-      dialog.replace(<DialogProvider />)
+      openHotkeyDialog(<DialogProvider />)
       return
     }
 
     if (ch === "\x1F") {
-      dialog.replace(<DialogKeybinds />)
+      openHotkeyDialog(<DialogKeybinds />)
       return
     }
   })
