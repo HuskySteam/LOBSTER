@@ -6,10 +6,13 @@ import { useAppStore } from "../store"
 import { Spinner } from "./spinner"
 import path from "path"
 
+const EMPTY_MESSAGES: never[] = []
+const EMPTY_PARTS: never[] = []
+
 export function ActivityBar(props: { sessionID: string }) {
   const { theme } = useTheme()
   const sessionStatus = useAppStore((s) => s.session_status[props.sessionID])
-  const messages = useAppStore((s) => s.message[props.sessionID] ?? [])
+  const messages = useAppStore((s) => s.message[props.sessionID] ?? EMPTY_MESSAGES)
   const parts = useAppStore((s) => s.part)
 
   const isBusy = sessionStatus?.type === "busy"
@@ -22,7 +25,7 @@ export function ActivityBar(props: { sessionID: string }) {
     )
     if (!pendingMessage) return { text: "Thinking...", count: "" }
 
-    const msgParts = parts[pendingMessage.id] ?? []
+    const msgParts = parts[pendingMessage.id] ?? EMPTY_PARTS
     const toolParts = msgParts.filter((p) => p.type === "tool")
     if (toolParts.length === 0) return { text: "Thinking...", count: "" }
 

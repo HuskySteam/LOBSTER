@@ -39,7 +39,7 @@ bun run --cwd packages/lobster build
 
 ## Monorepo Structure
 
-Bun workspace with Turborepo orchestration. Package manager: `bun@1.3.5`.
+Bun workspace with Turborepo orchestration. Package manager: `bun@1.3.9`.
 
 | Package | npm name | Purpose |
 |---------|----------|---------|

@@ -5,9 +5,11 @@ import { useTheme } from "../theme"
 import { useAppStore } from "../store"
 import { SessionCost } from "@/session/cost"
 
+const EMPTY_MESSAGES: never[] = []
+
 export function CostTracker(props: { sessionID: string }) {
   const { theme } = useTheme()
-  const messages = useAppStore((s) => s.message[props.sessionID] ?? [])
+  const messages = useAppStore((s) => s.message[props.sessionID] ?? EMPTY_MESSAGES)
   const providers = useAppStore((s) => s.provider)
 
   const totalCost = useMemo(() => {

@@ -5,6 +5,11 @@ import { useTheme } from "../../theme"
 import { useAppStore } from "../../store"
 import { useLocal } from "../../context/local"
 
+const EMPTY_TODO: never[] = []
+const EMPTY_DIFF: never[] = []
+const EMPTY_MESSAGES: never[] = []
+const EMPTY_PARTS: never[] = []
+
 function Divider() {
   const { theme } = useTheme()
   return <Text color={theme.textMuted}>{"─".repeat(34)}</Text>
@@ -16,9 +21,9 @@ export function Sidebar(props: { sessionID: string }) {
   const agents = useAppStore((s) => s.agent.filter((x) => !x.hidden))
   const mcp = useAppStore((s) => s.mcp)
   const lsp = useAppStore((s) => s.lsp)
-  const todo = useAppStore((s) => s.todo[props.sessionID] ?? [])
-  const diff = useAppStore((s) => s.session_diff[props.sessionID] ?? [])
-  const messages = useAppStore((s) => s.message[props.sessionID] ?? [])
+  const todo = useAppStore((s) => s.todo[props.sessionID] ?? EMPTY_TODO)
+  const diff = useAppStore((s) => s.session_diff[props.sessionID] ?? EMPTY_DIFF)
+  const messages = useAppStore((s) => s.message[props.sessionID] ?? EMPTY_MESSAGES)
   const parts = useAppStore((s) => s.part)
   const teams = useAppStore((s) => s.teams)
   const vcs = useAppStore((s) => s.vcs)
@@ -28,7 +33,7 @@ export function Sidebar(props: { sessionID: string }) {
   const tokenInfo = useMemo(() => {
     let total = 0
     for (const msg of messages) {
-      const msgParts = parts[msg.id] ?? []
+      const msgParts = parts[msg.id] ?? EMPTY_PARTS
       for (const part of msgParts) {
         if (part.type === "text") {
           total += Math.ceil(((part as any).text?.length ?? 0) / 4)

@@ -8,9 +8,11 @@ interface TeamTasksProps {
   teamName: string
 }
 
+const EMPTY_TASKS: TeamTaskSummary[] = []
+
 export function TeamTasks(props: TeamTasksProps) {
   const { theme } = useTheme()
-  const tasks = useAppStore((s) => s.team_tasks[props.teamName] ?? []) as TeamTaskSummary[]
+  const tasks = useAppStore((s) => s.team_tasks[props.teamName] ?? EMPTY_TASKS) as TeamTaskSummary[]
 
   if (tasks.length === 0) return null
 

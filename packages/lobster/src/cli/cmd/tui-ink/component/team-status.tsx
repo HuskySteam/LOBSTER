@@ -8,10 +8,12 @@ interface TeamStatusProps {
   teamName: string
 }
 
+const EMPTY_TASKS: TeamTaskSummary[] = []
+
 export function TeamStatus(props: TeamStatusProps) {
   const { theme } = useTheme()
   const team = useAppStore((s) => s.teams[props.teamName]) as TeamInfo | undefined
-  const tasks = useAppStore((s) => s.team_tasks[props.teamName] ?? []) as TeamTaskSummary[]
+  const tasks = useAppStore((s) => s.team_tasks[props.teamName] ?? EMPTY_TASKS) as TeamTaskSummary[]
 
   const summary = useMemo(() => {
     const total = tasks.length

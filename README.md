@@ -111,7 +111,7 @@ That's it. You're in the TUI. Start talking.
 
 ```bash
 git clone https://github.com/HuskySteam/LOBSTER.git && cd lobster
-bun install    # requires Bun >= 1.3.5
+bun install    # requires Bun >= 1.3.9
 bun dev
 ```
 
