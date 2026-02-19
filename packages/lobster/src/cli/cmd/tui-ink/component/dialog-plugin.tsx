@@ -6,6 +6,7 @@ import { useTheme } from "../theme"
 import { useAppStore } from "../store"
 import { useSDK } from "../context/sdk"
 import { useDialog } from "../ui/dialog"
+import { useHotkeyInputGuard } from "../ui/hotkey-input-guard"
 import { Spinner } from "./spinner"
 
 type Tab = "installed" | "add"
@@ -14,18 +15,28 @@ export function DialogPlugin() {
   const { theme } = useTheme()
   const { sync } = useSDK()
   const dialog = useDialog()
+  const { markHotkeyConsumed, wrapOnChange } = useHotkeyInputGuard()
   const config = useAppStore((s) => s.config)
 
   const [tab, setTab] = useState<Tab>("installed")
   const [addInput, setAddInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState(0)
+  const guardedAddInputChange = useMemo(
+    () => wrapOnChange(setAddInput),
+    [wrapOnChange],
+  )
 
   const plugins = useMemo<string[]>(() => (config as any)?.plugin ?? [], [config])
 
   useInput((ch, key) => {
-    if (key.escape) { dialog.clear(); return }
+    if (key.escape) {
+      markHotkeyConsumed()
+      dialog.clear()
+      return
+    }
     if (key.tab) {
+      markHotkeyConsumed()
       setTab((t) => (t === "installed" ? "add" : "installed"))
       setSelected(0)
       return
@@ -34,6 +45,7 @@ export function DialogPlugin() {
       if (key.upArrow) setSelected((s) => Math.max(0, s - 1))
       if (key.downArrow) setSelected((s) => Math.min(plugins.length - 1, s + 1))
       if (ch === "x" || key.delete || key.backspace) {
+        markHotkeyConsumed()
         removePlugin(selected)
       }
     }
@@ -127,7 +139,7 @@ export function DialogPlugin() {
             <Text color={theme.textMuted}>{"> "}</Text>
             <TextInput
               value={addInput}
-              onChange={setAddInput}
+              onChange={guardedAddInputChange}
               onSubmit={addPlugin}
               placeholder="e.g. feature-dev or file://.lobster/plugins/my-plugin.ts"
               focus={tab === "add"}

@@ -1,7 +1,8 @@
 /** @jsxImportSource react */
-import { Box, Text } from "ink"
+import { Box, Text, useStdout } from "ink"
 import React, { useMemo } from "react"
 import { useTheme } from "../../theme"
+import { computeAutocompleteLayout, truncateWithEllipsis } from "./autocomplete-layout"
 
 export interface AutocompleteOption {
   label: string
@@ -17,6 +18,13 @@ interface AutocompleteProps {
 
 export function Autocomplete({ options, selected, maxVisible = 8 }: AutocompleteProps) {
   const { theme } = useTheme()
+  const { stdout } = useStdout()
+  const popupWidth = useMemo(
+    () => Math.max(30, Math.min(120, (stdout?.columns ?? 80) - 4)),
+    [stdout?.columns],
+  )
+  const contentWidth = useMemo(() => Math.max(20, popupWidth - 4), [popupWidth])
+  const layout = useMemo(() => computeAutocompleteLayout(contentWidth), [contentWidth])
 
   const { visible, offset } = useMemo(() => {
     if (options.length <= maxVisible) return { visible: options, offset: 0 }
@@ -40,6 +48,8 @@ export function Autocomplete({ options, selected, maxVisible = 8 }: Autocomplete
       borderColor={theme.border}
       paddingLeft={1}
       paddingRight={1}
+      width={popupWidth}
+      overflow="hidden"
     >
       {offset > 0 && (
         <Text color={theme.textMuted} dimColor>
@@ -49,14 +59,19 @@ export function Autocomplete({ options, selected, maxVisible = 8 }: Autocomplete
       {visible.map((opt) => {
         const idx = globalIdx++
         const isSelected = idx === selected
+        const marker = isSelected ? "> " : "  "
+        const label = truncateWithEllipsis(opt.label, layout.labelWidth).padEnd(layout.labelWidth, " ")
+        const description = truncateWithEllipsis(opt.description ?? "", layout.descriptionWidth)
         return (
-          <Box key={opt.value + idx} gap={1}>
+          <Box key={opt.value + idx} flexDirection="row" overflow="hidden">
             <Text color={isSelected ? theme.secondary : theme.text} bold={isSelected}>
-              {isSelected ? "▸" : " "} {opt.label}
+              {marker}
+              {label}
             </Text>
-            {opt.description && (
+            {layout.showDescription && opt.description && (
               <Text color={isSelected ? theme.secondary : theme.textMuted} dimColor={!isSelected}>
-                {opt.description}
+                {" "}
+                {description}
               </Text>
             )}
           </Box>

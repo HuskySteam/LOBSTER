@@ -1,9 +1,10 @@
 /** @jsxImportSource react */
 import { Box, Text, useInput } from "ink"
 import TextInput from "ink-text-input"
-import React, { useState, type ReactNode } from "react"
+import React, { useMemo, useState, type ReactNode } from "react"
 import { useTheme } from "../theme"
 import { useDialog } from "./dialog"
+import { useHotkeyInputGuard } from "./hotkey-input-guard"
 
 interface DialogPromptProps {
   title: string
@@ -16,10 +17,17 @@ interface DialogPromptProps {
 export function DialogPrompt(props: DialogPromptProps) {
   const { theme } = useTheme()
   const dialog = useDialog()
+  const { markHotkeyConsumed, wrapOnChange } = useHotkeyInputGuard()
   const [value, setValue] = useState(props.value ?? "")
+  const guardedValueChange = useMemo(
+    () => wrapOnChange(setValue),
+    [wrapOnChange],
+  )
 
   useInput((_ch, key) => {
-    if (key.escape) dialog.clear()
+    if (!key.escape) return
+    markHotkeyConsumed()
+    dialog.clear()
   })
 
   return (
@@ -37,7 +45,7 @@ export function DialogPrompt(props: DialogPromptProps) {
         <Text color={theme.textMuted}>{"> "}</Text>
         <TextInput
           value={value}
-          onChange={setValue}
+          onChange={guardedValueChange}
           onSubmit={(v) => props.onConfirm(v)}
           placeholder={props.placeholder ?? ""}
         />

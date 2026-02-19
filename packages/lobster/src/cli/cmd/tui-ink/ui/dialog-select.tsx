@@ -6,6 +6,7 @@ import { Keybind } from "@/util/keybind"
 import { useTheme } from "../theme"
 import { useDialog } from "./dialog"
 import { matchDialogSelectKeybind } from "./dialog-select-keybind"
+import { useHotkeyInputGuard } from "./hotkey-input-guard"
 
 export interface DialogSelectOption<T = any> {
   title: string
@@ -37,6 +38,7 @@ export interface DialogSelectProps<T> {
 export function DialogSelect<T>(props: DialogSelectProps<T>) {
   const { theme } = useTheme()
   const dialog = useDialog()
+  const { markHotkeyConsumed, wrapOnChange } = useHotkeyInputGuard()
   const [selected, setSelected] = useState(0)
   const [filter, setFilter] = useState("")
 
@@ -98,6 +100,10 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     },
     [props.onFilter],
   )
+  const guardedFilterChange = useMemo(
+    () => wrapOnChange(handleFilter),
+    [handleFilter, wrapOnChange],
+  )
 
   useEffect(() => {
     props.onMove?.(flat[selected])
@@ -136,6 +142,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
       if (!matchDialogSelectKeybind(item.keybind, ch, key)) continue
       const opt = flat[selected]
       if (!opt) return
+      markHotkeyConsumed()
       item.onTrigger(opt)
       return
     }
@@ -167,7 +174,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
         <Text color={theme.textMuted}>{"> "}</Text>
         <TextInput
           value={filter}
-          onChange={handleFilter}
+          onChange={guardedFilterChange}
           placeholder={props.placeholder ?? "Search..."}
         />
       </Box>

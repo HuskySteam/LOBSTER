@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useCallback, useMemo, useRef, type ReactNode } from "react"
 import { useInput, useApp } from "ink"
 import { useRoute } from "./route"
+import { markGlobalHotkeyConsumed } from "../ui/hotkey-input-guard"
 
 export interface KeybindAction {
   key: string
@@ -53,6 +54,7 @@ export function KeybindProvider(props: { children: ReactNode }) {
     if (key.ctrl && ch === "c") {
       if (route.data.type === "session") return
       if (blockersRef.current.size > 0) return
+      markGlobalHotkeyConsumed()
       exit()
       return
     }
@@ -62,6 +64,7 @@ export function KeybindProvider(props: { children: ReactNode }) {
 
     // Escape: go back to home from session
     if (key.escape && route.data.type === "session") {
+      markGlobalHotkeyConsumed()
       route.navigate({ type: "home" })
       return
     }
@@ -74,6 +77,7 @@ export function KeybindProvider(props: { children: ReactNode }) {
         (binding.meta ?? false) === (key.meta ?? false)
 
       if (match) {
+        markGlobalHotkeyConsumed()
         binding.action()
         return
       }

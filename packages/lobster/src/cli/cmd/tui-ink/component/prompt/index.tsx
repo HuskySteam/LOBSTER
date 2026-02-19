@@ -14,6 +14,7 @@ import { useLobster } from "../../context/lobster"
 import { useKeybind } from "../../context/keybind"
 import { useDialog } from "../../ui/dialog"
 import { useToast } from "../../ui/toast"
+import { useHotkeyInputGuard } from "../../ui/hotkey-input-guard"
 import { DialogHelp } from "../../ui/dialog-help"
 import { DialogModel } from "../dialog-model"
 import { DialogAgent } from "../dialog-agent"
@@ -93,6 +94,7 @@ export function Prompt(props: PromptProps) {
   const dialog = useDialog()
   const { setBlocker } = useKeybind()
   const toast = useToast()
+  const { markHotkeyConsumed, wrapOnChange, captureSnapshot, restoreSnapshot } = useHotkeyInputGuard()
 
   const [input, setInput] = useState(args.prompt ?? "")
   const [interruptCount, setInterruptCount] = useState(0)
@@ -184,22 +186,19 @@ export function Prompt(props: PromptProps) {
     setFileResults((prev) => (prev.length > 0 ? [] : prev))
   }, [])
 
-  const hotkeyInputSnapshot = useRef<string | null>(null)
   const openHotkeyDialog = useCallback(
     (content: React.ReactNode) => {
-      hotkeyInputSnapshot.current = input
+      captureSnapshot(input)
+      markHotkeyConsumed()
       dialog.replace(content)
     },
-    [dialog, input],
+    [captureSnapshot, dialog, input, markHotkeyConsumed],
   )
 
   useEffect(() => {
     if (!isDialogOpen) return
-    if (hotkeyInputSnapshot.current === null) return
-    const snapshot = hotkeyInputSnapshot.current
-    hotkeyInputSnapshot.current = null
-    setInput(snapshot)
-  }, [isDialogOpen])
+    restoreSnapshot(() => input, setInput)
+  }, [input, isDialogOpen, restoreSnapshot])
 
   const createTranscript = useCallback((): string | null => {
     if (!sessionInfo) return null
@@ -719,6 +718,10 @@ export function Prompt(props: PromptProps) {
     setAcMode(false)
     searchFiles("")
   }, [searchFiles])
+  const guardedInputChange = useMemo(
+    () => wrapOnChange(handleInputChange),
+    [handleInputChange, wrapOnChange],
+  )
 
   const handleSubmit = useCallback(
     (value: string) => {
@@ -784,6 +787,7 @@ export function Prompt(props: PromptProps) {
 
   useInput((ch, key) => {
     if (key.ctrl && ch === "c") {
+      markHotkeyConsumed()
       if (isBusy && props.sessionID) {
         setInterruptCount((c) => c + 1)
         sync.client.session.abort({ sessionID: props.sessionID }).catch(() => {})
@@ -802,6 +806,7 @@ export function Prompt(props: PromptProps) {
 
     if (acMode && filteredOptions.length > 0) {
       if (key.upArrow) {
+        markHotkeyConsumed()
         setAcIndex((prev) => {
           const next = prev <= 0 ? filteredOptions.length - 1 : prev - 1
           return next
@@ -809,6 +814,7 @@ export function Prompt(props: PromptProps) {
         return
       }
       if (key.downArrow) {
+        markHotkeyConsumed()
         setAcIndex((prev) => {
           const next = prev >= filteredOptions.length - 1 ? 0 : prev + 1
           return next
@@ -816,17 +822,20 @@ export function Prompt(props: PromptProps) {
         return
       }
       if (key.tab) {
+        markHotkeyConsumed()
         const selected = filteredOptions[safeAcIndex]
         if (selected) selectOption(selected)
         return
       }
       if (key.escape) {
+        markHotkeyConsumed()
         setAcMode(false)
         return
       }
     }
 
     if (key.tab && !acMode) {
+      markHotkeyConsumed()
       local.agent.move(1)
       return
     }
@@ -898,7 +907,7 @@ export function Prompt(props: PromptProps) {
         ) : (
           <TextInput
             value={input}
-            onChange={handleInputChange}
+            onChange={guardedInputChange}
             onSubmit={handleSubmit}
             placeholder="Type a message... (/ commands, @ mentions)"
             focus={!isDialogOpen}
