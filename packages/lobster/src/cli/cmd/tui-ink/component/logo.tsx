@@ -5,6 +5,15 @@ import { useTheme } from "../theme"
 import { logo, decoChars } from "@/cli/logo"
 
 const DECO_SET = new Set(decoChars)
+const MASCOT_COLOR = "#ff5a1f"
+const MASCOT = [
+  "    █      █",
+  "     █    █",
+  "  ████████████",
+  "  ██  ████  ██",
+  "  ████████████",
+  " ██  ██  ██  ██",
+]
 
 function tintHex(base: string, overlay: string, alpha: number): string {
   const parseHex = (hex: string) => ({
@@ -79,6 +88,13 @@ export function Logo() {
 
   return (
     <Box flexDirection="column">
+      <Box flexDirection="column" marginBottom={1}>
+        {MASCOT.map((line, index) => (
+          <Text key={`mascot-${index}`} color={MASCOT_COLOR} bold>
+            {line}
+          </Text>
+        ))}
+      </Box>
       {logo.map((line, i) => renderLine(line, i))}
     </Box>
   )
