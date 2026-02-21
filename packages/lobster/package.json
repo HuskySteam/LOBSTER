@@ -8,6 +8,10 @@
   "scripts": {
     "typecheck": "tsgo --noEmit",
     "test": "bun test",
+    "test:e2e:tui-ink": "bun run ./test/e2e/tui-ink/runner.ts --mode=all",
+    "test:e2e:tui-ink:critical": "bun run ./test/e2e/tui-ink/runner.ts --mode=critical",
+    "test:e2e:tui-ink:responsive": "bun run ./test/e2e/tui-ink/runner.ts --mode=responsive",
+    "test:e2e:tui-ink:update-snapshots": "bun run ./test/e2e/tui-ink/runner.ts --mode=all --update-snapshots",
     "build": "bun run script/build.ts",
     "dev": "bun run --conditions=browser ./src/index.ts",
     "clean": "rm -rf node_modules dist"

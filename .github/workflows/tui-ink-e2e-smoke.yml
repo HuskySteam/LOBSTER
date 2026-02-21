@@ -1,0 +1,39 @@
+name: tui-ink-e2e-smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "packages/lobster/src/cli/cmd/tui-ink/**"
+      - "packages/lobster/test/e2e/tui-ink/**"
+      - "packages/lobster/package.json"
+      - ".github/workflows/tui-ink-e2e-smoke.yml"
+
+jobs:
+  smoke:
+    name: tui-ink-e2e-smoke
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Install tmux
+        run: sudo apt-get update && sudo apt-get install -y tmux
+
+      - name: Run critical smoke scenario
+        run: |
+          bun run --cwd packages/lobster test:e2e:tui-ink:critical --scenario=home-idle-critical --update-snapshots
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tui-ink-e2e-artifacts
+          path: packages/lobster/test/e2e/tui-ink/artifacts

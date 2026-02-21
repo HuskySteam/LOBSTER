@@ -1,0 +1,38 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  System Status                                                                        esc close  │
+│                                                                                                  │
+│    None connected                                                                                │
+│                                                                                                  │
+│                                                                                                  │
+│  MCP Servers (1)                                                                                 │
+│   ✖  lobster-context                                                                             │
+│                                                                                                  │
+│  LSP (0)                                                                                         │
+│                                                                                                  │
+│  Formatters (24)                                                                                 │
+│   ● biome                                                                                        │
+│   ● clang-format                                                                                 │
+│   ● dart                                                                                         │
+│   ● gleam                                                                                        │
+│   ● gofmt                                                                                        │
+│   ● htmlbeautifier                                                                               │
+│   ● ktlint                                                                                       │
+│   ● latexindent                                                                                  │
+│   ● mix                                                                                          │
+│   ● nixfmt                                                                                       │
+│   ● ocamlformat                                                                                  │
+│   ● ormolu                                                                                       │
+│   ● oxfmt                                                                                        │
+│   ● pint                                                                                         │
+│   ● prettier                                                                                     │
+│   ● rubocop                                                                                      │
+│   ● ruff                                                                                         │
+│   ● rustfmt                                                                                      │
+│   ● shfmt                                                                                        │
+│   ● standardrb                                                                                   │
+│   ● terraform                                                                                    │
+│   ● uv                                                                                           │
+│   ● zig                                                                                          │
+│                                                                                                  │
+│  esc close                                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

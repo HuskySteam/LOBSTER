@@ -140,9 +140,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     for (const item of activeKeybinds) {
       if (!item.keybind) continue
       if (!matchDialogSelectKeybind(item.keybind, ch, key)) continue
+      markHotkeyConsumed()
       const opt = flat[selected]
       if (!opt) return
-      markHotkeyConsumed()
       item.onTrigger(opt)
       return
     }

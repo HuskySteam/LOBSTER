@@ -3,6 +3,7 @@ import React, { createContext, useContext, useCallback, useMemo, useRef, type Re
 import { useInput, useApp } from "ink"
 import { useRoute } from "./route"
 import { markGlobalHotkeyConsumed } from "../ui/hotkey-input-guard"
+import { isCtrlCharacterForLetter, isCtrlShortcut } from "../ui/hotkey"
 
 export interface KeybindAction {
   key: string
@@ -51,7 +52,7 @@ export function KeybindProvider(props: { children: ReactNode }) {
     // Ctrl+C handling: on session routes, defer entirely to the prompt's
     // double-press handler (abort when busy, press-twice-to-exit when idle).
     // On non-session routes, exit immediately unless a dialog blocker is active.
-    if (key.ctrl && ch === "c") {
+    if (isCtrlShortcut(ch, key, "c")) {
       if (route.data.type === "session") return
       if (blockersRef.current.size > 0) return
       markGlobalHotkeyConsumed()
@@ -71,9 +72,25 @@ export function KeybindProvider(props: { children: ReactNode }) {
 
     // Check registered bindings
     for (const binding of bindingsRef.current.values()) {
+      const runtimeKey = key as typeof key & { name?: string; sequence?: string }
+      const normalizedBindingKey = typeof binding.key === "string" ? binding.key.toLowerCase() : binding.key
+
+      const ctrlViaName =
+        (binding.ctrl ?? false) &&
+        (key.ctrl ?? false) &&
+        typeof normalizedBindingKey === "string" &&
+        runtimeKey.name?.toLowerCase() === normalizedBindingKey
+
+      const ctrlViaControlChar =
+        (binding.ctrl ?? false) &&
+        typeof binding.key === "string" &&
+        (isCtrlCharacterForLetter(ch, binding.key) || isCtrlCharacterForLetter(runtimeKey.sequence, binding.key))
+
+      const ctrlPressed = (key.ctrl ?? false) || ctrlViaControlChar
+
       const match =
-        (binding.key === ch || binding.key === key.upArrow?.toString()) &&
-        (binding.ctrl ?? false) === (key.ctrl ?? false) &&
+        (binding.key === ch || binding.key === key.upArrow?.toString() || ctrlViaName || ctrlViaControlChar) &&
+        (binding.ctrl ?? false) === ctrlPressed &&
         (binding.meta ?? false) === (key.meta ?? false)
 
       if (match) {

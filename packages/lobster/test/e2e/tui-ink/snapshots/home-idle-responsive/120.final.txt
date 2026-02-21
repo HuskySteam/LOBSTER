@@ -1,0 +1,23 @@
+LOBSTER Code
+
+ ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │                                                                                                                    │
+ │ Welcome back root!                           │  Tips for getting started                                           │
+ │                                              │  Connect a provider first, then ask Lobster to create your first    │
+ │     █      █                                 │  app.                                                               │
+ │      █    █                                  │  Try /model, /agent, and /sessions to navigate faster.              │
+ │   ████████████                               │                                                                     │
+ │   ██  ████  ██                               │  ────────────────────────────────────────────                       │
+ │ ██ ██████████ ██                             │                                                                     │
+ │      ██  ██                                  │  Recent activity                                                    │
+ │                                              │  No recent activity                                                 │
+ │                                              │                                                                     │
+ │ No providers connected                       │                                                                     │
+ │ Press Enter or Ctrl+O to connect a           │                                                                     │
+ │ provider.                                    │                                                                     │
+ │                                                                                                                    │
+ ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+   build | No model (No provider)
+  > Type a message... (/ commands, @ mentions)
+   tab agent  ^M model  ^S sessions  ^P commands  ^O connect

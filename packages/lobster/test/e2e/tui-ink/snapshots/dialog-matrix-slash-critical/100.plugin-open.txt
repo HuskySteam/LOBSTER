@@ -1,0 +1,38 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  Plugins                                                                              esc close  │
+│                                                                                                  │
+│  Installed (7)  Add  tab switch                                                                  │
+│                                                                                                  │
+│  > [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-auto-context.ts                      │
+│    [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-cost-tracker.ts                      │
+│    [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-insights.ts                          │
+│    [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-memory.ts                            │
+│    [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-orchestrator.ts                      │
+│    [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-sentiment.ts                         │
+│    [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-team.ts                              │
+│                                                                                                  │
+│  ↑↓ navigate  x remove                                                                           │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

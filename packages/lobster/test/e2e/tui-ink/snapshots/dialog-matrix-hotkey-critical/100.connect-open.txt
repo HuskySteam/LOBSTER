@@ -1,0 +1,38 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  Connect a provider                                                                   esc close  │
+│                                                                                                  │
+│  > Search providers...                                                                           │
+│                                                                                                  │
+│    Anthropic (Claude Max or API key)                                                             │
+│    GitHub Copilot                                                                                │
+│    OpenAI (ChatGPT Plus/Pro or API key)                                                          │
+│    Google                                                                                        │
+│    OpenRouter                                                                                    │
+│    evroc                                                                                         │
+│    Privatemode AI                                                                                │
+│    StepFun                                                                                       │
+│    Moonshot AI (China)                                                                           │
+│    Firmware                                                                                      │
+│    Nova                                                                                          │
+│    LucidQuery AI                                                                                 │
+│    Moonshot AI                                                                                   │
+│    302.AI                                                                                        │
+│    QiHang                                                                                        │
+│    ... 81 more below                                                                             │
+│                                                                                                  │
+│  up/down navigate  enter select  esc close                                                       │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

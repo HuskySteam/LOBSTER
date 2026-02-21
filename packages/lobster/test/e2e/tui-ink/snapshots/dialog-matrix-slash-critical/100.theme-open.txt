@@ -1,0 +1,38 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  Theme                                                                                esc close  │
+│                                                                                                  │
+│  > Search themes...                                                                              │
+│                                                                                                  │
+│    ... 7 more above                                                                              │
+│    cursor                                                                                        │
+│    dracula                                                                                       │
+│    everforest                                                                                    │
+│    flexoki                                                                                       │
+│    github                                                                                        │
+│    gruvbox                                                                                       │
+│    kanagawa                                                                                      │
+│  * lobster (current)                                                                             │
+│    lucent-orng                                                                                   │
+│    material                                                                                      │
+│    matrix                                                                                        │
+│    mercury                                                                                       │
+│    monokai                                                                                       │
+│    mytheme                                                                                       │
+│    nightowl                                                                                      │
+│    ... 13 more below                                                                             │
+│                                                                                                  │
+│  up/down navigate  enter select  esc close                                                       │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

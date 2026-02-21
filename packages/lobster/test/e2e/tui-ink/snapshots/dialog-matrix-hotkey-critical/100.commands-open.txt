@@ -1,0 +1,38 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  Commands                                                                             esc close  │
+│                                                                                                  │
+│  > Search commands...                                                                            │
+│                                                                                                  │
+│    /connect Connect a provider                                                                   │
+│    /model Switch model                                                                           │
+│    /agent Switch agent                                                                           │
+│    /mcp MCP servers                                                                              │
+│    /theme Switch theme                                                                           │
+│    /status System status                                                                         │
+│    /keybinds Keyboard shortcuts                                                                  │
+│    /help Help                                                                                    │
+│    /plugin Plugin manager                                                                        │
+│    /exit Exit the app                                                                            │
+│    /sessions Browse sessions                                                                     │
+│    /new Start a new session                                                                      │
+│    /review Review loop dashboard                                                                 │
+│    /findings Review findings                                                                     │
+│    /health Project health dashboard                                                              │
+│    ... 16 more below                                                                             │
+│                                                                                                  │
+│  up/down navigate  enter select  esc close                                                       │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

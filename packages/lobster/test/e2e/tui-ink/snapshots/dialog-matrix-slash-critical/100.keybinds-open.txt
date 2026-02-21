@@ -1,0 +1,38 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  Keyboard Shortcuts                                                                   esc close  │
+│                                                                                                  │
+│  Session                                                                                         │
+│   Browse sessions                                                                        Ctrl+S  │
+│   Interrupt agent                                                                        Ctrl+C  │
+│   Exit                                                                              Ctrl+C (×2)  │
+│                                                                                                  │
+│  Agent & Model                                                                                   │
+│   Cycle agent                                                                               Tab  │
+│   Pick agent                                                                             Ctrl+A  │
+│   Pick model                                                                             Ctrl+M  │
+│                                                                                                  │
+│  Navigation                                                                                      │
+│   Command palette                                                                        Ctrl+P  │
+│   Connect provider                                                                       Ctrl+O  │
+│   Toggle sidebar                                                                         Ctrl+T  │
+│                                                                                                  │
+│  System                                                                                          │
+│   Keyboard shortcuts                                                                     Ctrl+/  │
+│                                                                                                  │
+│  enter/esc close                                                                                 │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

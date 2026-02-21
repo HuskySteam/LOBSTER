@@ -15,6 +15,7 @@ import { useKeybind } from "../../context/keybind"
 import { useDialog } from "../../ui/dialog"
 import { useToast } from "../../ui/toast"
 import { useHotkeyInputGuard } from "../../ui/hotkey-input-guard"
+import { isCtrlShortcut } from "../../ui/hotkey"
 import { DialogHelp } from "../../ui/dialog-help"
 import { DialogModel } from "../dialog-model"
 import { DialogAgent } from "../dialog-agent"
@@ -725,12 +726,6 @@ export function Prompt(props: PromptProps) {
 
   const handleSubmit = useCallback(
     (value: string) => {
-      if (acMode && filteredOptions.length > 0) {
-        const selected = filteredOptions[safeAcIndex]
-        if (selected) selectOption(selected)
-        return
-      }
-
       const text = value.trim()
       if (!text) return
 
@@ -747,6 +742,12 @@ export function Prompt(props: PromptProps) {
           void runBuiltInCommand(command.name, slash.args)
           return
         }
+      }
+
+      if (acMode && filteredOptions.length > 0) {
+        const selected = filteredOptions[safeAcIndex]
+        if (selected) selectOption(selected)
+        return
       }
 
       if (isBusy) return
@@ -786,7 +787,7 @@ export function Prompt(props: PromptProps) {
   )
 
   useInput((ch, key) => {
-    if (key.ctrl && ch === "c") {
+    if (isCtrlShortcut(ch, key, "c")) {
       markHotkeyConsumed()
       if (isBusy && props.sessionID) {
         setInterruptCount((c) => c + 1)
@@ -840,27 +841,27 @@ export function Prompt(props: PromptProps) {
       return
     }
 
-    if (key.ctrl && ch === "m") {
+    if (isCtrlShortcut(ch, key, "m", { allowControlChar: false })) {
       openHotkeyDialog(<DialogModel />)
       return
     }
 
-    if (key.ctrl && ch === "a") {
+    if (isCtrlShortcut(ch, key, "a")) {
       openHotkeyDialog(<DialogAgent />)
       return
     }
 
-    if (key.ctrl && ch === "s") {
+    if (isCtrlShortcut(ch, key, "s")) {
       openHotkeyDialog(<DialogSessionList />)
       return
     }
 
-    if (key.ctrl && ch === "p") {
+    if (isCtrlShortcut(ch, key, "p")) {
       openHotkeyDialog(<DialogCommand onTrigger={handlePaletteCommand} />)
       return
     }
 
-    if (key.ctrl && ch === "o") {
+    if (isCtrlShortcut(ch, key, "o")) {
       openHotkeyDialog(<DialogProvider />)
       return
     }

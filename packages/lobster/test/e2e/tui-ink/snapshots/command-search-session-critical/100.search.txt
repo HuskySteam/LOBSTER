@@ -1,0 +1,38 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│  Commands                                                                             esc close  │
+│                                                                                                  │
+│  > session                                                                                       │
+│                                                                                                  │
+│    /sessions Browse sessions                                                                     │
+│    /new Start a new session                                                                      │
+│    /continue resume previous session context                                                     │
+│   /learn Extract non-obvious learnings from session to AGENTS.md files to build codebase         │
+│         understanding                                                                            │
+│   /team Use this when you need to coordinate multiple agents working on a complex task in        │
+│        parallel, or check team session status                                                    │
+│                                                                                                  │
+│  up/down navigate  enter select  esc close                                                       │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
