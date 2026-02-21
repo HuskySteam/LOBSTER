@@ -79,19 +79,20 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
   useEffect(() => {
     if (flat.length === 0) {
-      setSelected(0)
+      setSelected((prev) => (prev === 0 ? prev : 0))
       return
     }
 
-    let next = selected
-    if (props.current !== undefined) {
-      const idx = flat.findIndex((x) => JSON.stringify(x.value) === JSON.stringify(props.current))
-      if (idx >= 0) next = idx
-    }
-
-    if (next >= flat.length) next = flat.length - 1
-    setSelected((prev) => (prev === next ? prev : next))
-  }, [flat, props.current, selected])
+    setSelected((prev) => {
+      let next = prev
+      if (props.current !== undefined) {
+        const idx = flat.findIndex((x) => JSON.stringify(x.value) === JSON.stringify(props.current))
+        if (idx >= 0) next = idx
+      }
+      if (next >= flat.length) next = flat.length - 1
+      return prev === next ? prev : next
+    })
+  }, [flat, props.current])
 
   const handleFilter = useCallback(
     (value: string) => {
@@ -106,8 +107,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   )
 
   useEffect(() => {
-    props.onMove?.(flat[selected])
-  }, [selected])
+    const next = selected >= 0 && selected < flat.length ? flat[selected] : undefined
+    props.onMove?.(next)
+  }, [selected, flat, props.onMove])
 
   useInput((ch, key) => {
     if (key.escape) {

@@ -13,7 +13,6 @@ jobs:
   smoke:
     name: tui-ink-e2e-smoke
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         shell: bash

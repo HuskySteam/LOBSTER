@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import { createContext, useContext, useState, useMemo, type ReactNode } from "react"
+import { createContext, useContext, useState, useMemo, useEffect, type ReactNode } from "react"
 import path from "path"
 import { Global } from "@/global"
 import { Filesystem } from "@/util/filesystem"
@@ -227,11 +227,21 @@ export function ThemeProvider(props: {
   const [active, setActive] = useState(props.configTheme ?? "lobster")
 
   // Load custom themes on mount
-  useState(() => {
+  useEffect(() => {
+    let cancelled = false
     getCustomThemes()
-      .then((custom) => setThemes((prev) => ({ ...prev, ...custom })))
-      .catch(() => setActive("lobster"))
-  })
+      .then((custom) => {
+        if (cancelled) return
+        setThemes((prev) => ({ ...prev, ...custom }))
+      })
+      .catch(() => {
+        if (cancelled) return
+        setActive("lobster")
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const resolved = useMemo(
     () => resolveTheme(themes[active] ?? themes.lobster, mode),
