@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react"
 
 let globalBlockedUntil = 0
+let globalSnapshot: string | null = null
 
 export function markGlobalHotkeyConsumed(windowMs = 32, now = Date.now()) {
   globalBlockedUntil = Math.max(globalBlockedUntil, now + windowMs)
@@ -12,6 +13,7 @@ export function shouldIgnoreGlobalInput(now = Date.now()) {
 
 export function resetGlobalHotkeyGuard() {
   globalBlockedUntil = 0
+  globalSnapshot = null
 }
 
 export interface HotkeyInputGuard {
@@ -37,12 +39,14 @@ export function createHotkeyInputGuard(windowMs = 32): HotkeyInputGuard {
 
   function captureSnapshot(value: string) {
     snapshot = value
+    globalSnapshot = value
   }
 
   function restoreSnapshot(getValue: () => string, setValue: (value: string) => void) {
-    if (snapshot === null) return
-    const next = snapshot
+    const next = snapshot ?? globalSnapshot
+    if (next === null) return
     snapshot = null
+    globalSnapshot = null
     if (getValue() === next) return
     setValue(next)
   }

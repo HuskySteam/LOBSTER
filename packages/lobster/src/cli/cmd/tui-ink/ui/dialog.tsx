@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import { Box, Text, useStdout } from "ink"
+import { Box, useStdout } from "ink"
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from "react"
 import { useTheme } from "../theme"
 import { useKeybind } from "../context/keybind"
@@ -26,12 +26,7 @@ export function DialogProvider(props: { children: ReactNode }) {
 
   return (
     <DialogContext.Provider value={{ content, replace, clear }}>
-      <Box
-        flexDirection="column"
-        display={content ? "none" : "flex"}
-      >
-        {props.children}
-      </Box>
+      {content ? null : <Box flexDirection="column">{props.children}</Box>}
       {content && <DialogOverlay onClose={clear}>{content}</DialogOverlay>}
     </DialogContext.Provider>
   )
