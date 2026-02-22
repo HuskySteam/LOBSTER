@@ -107,7 +107,7 @@ const SLASH_DIALOG_MATRIX: DialogMatrixEntry[] = [
   {
     command: "plugin",
     openExpectation: {
-      required: ["Plugins", "Installed", "tab switch", "esc close"],
+      required: ["Plugins", "Installed", "Marketplace", "tab switch", "esc close"],
     },
   },
   {

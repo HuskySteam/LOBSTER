@@ -32,6 +32,14 @@ import { DialogReviewDashboard } from "../dialog-review-dashboard"
 import { DialogReviewResults } from "../dialog-review-results"
 import { DialogHealth } from "../dialog-health"
 import { DialogPatterns } from "../dialog-patterns"
+import {
+  clearPluginMarketplaceCache,
+  findMarketplaceMatchesByName,
+  isValidMarketplaceSource,
+  loadPluginMarketplace,
+  normalizeMarketplaceSource,
+  pluginSpecName,
+} from "../plugin-marketplace"
 import { Spinner } from "../spinner"
 import { Autocomplete, type AutocompleteOption } from "./autocomplete"
 import { BUILT_IN_COMMANDS, parseSlashCommand, resolveBuiltInCommand } from "./command-registry"
@@ -75,15 +83,6 @@ Calibration guide:
 
 Be honest and specific in findings and suggestions.`
 
-function pluginName(spec: string): string {
-  if (!spec) return spec
-  const normalized = spec.replace(/\\/g, "/").replace(/\.git$/, "")
-  const parts = normalized.split("/")
-  const last = parts[parts.length - 1] ?? spec
-  const at = last.indexOf("@")
-  return at > 0 ? last.slice(0, at) : last
-}
-
 export function Prompt(props: PromptProps) {
   const { theme } = useTheme()
   const exit = useExit()
@@ -114,7 +113,6 @@ export function Prompt(props: PromptProps) {
   const allParts = useAppStore((s) => s.part)
   const sessions = useAppStore((s) => s.session)
   const projectDir = useAppStore((s) => s.path.directory)
-  const config = useAppStore((s) => s.config)
   const sessionMessages = useAppStore((s) =>
     props.sessionID ? s.message[props.sessionID] ?? EMPTY_MSGS : EMPTY_MSGS,
   )
@@ -287,15 +285,79 @@ export function Prompt(props: PromptProps) {
       const [rawSub, ...rest] = text.split(/\s+/)
       const sub = (rawSub ?? "").toLowerCase()
       const value = rest.join(" ").trim()
-      const list = ((config as { plugin?: string[] }).plugin ?? []).slice()
+
+      if (sub === "marketplace") {
+        const action = (rest[0] ?? "").toLowerCase()
+        const sourceInput = rest.slice(1).join(" ")
+        const source = normalizeMarketplaceSource(sourceInput)
+
+        if (!action) {
+          dialog.replace(<DialogPlugin initialTab="marketplace" />)
+          return
+        }
+
+        if (action === "add") {
+          if (!source) {
+            toast.show({ message: "Usage: /plugin marketplace add <owner/repo>", variant: "warning" })
+            return
+          }
+          if (!isValidMarketplaceSource(source)) {
+            toast.show({ message: "Invalid source format. Use owner/repo.", variant: "error" })
+            return
+          }
+          const configResult = await sync.client.global.config.get()
+          const current = Array.from(
+            new Set((configResult.data?.plugin_marketplaces ?? []).map(normalizeMarketplaceSource).filter(Boolean)),
+          )
+          if (current.includes(source)) {
+            toast.show({ message: `Marketplace already added: ${source}`, variant: "warning" })
+            return
+          }
+          await sync.client.global.config.update({ config: { plugin_marketplaces: [...current, source] } })
+          clearPluginMarketplaceCache()
+          toast.show({ message: `Marketplace added: ${source}`, variant: "success" })
+          return
+        }
+
+        if (action === "remove") {
+          if (!source) {
+            toast.show({ message: "Usage: /plugin marketplace remove <owner/repo>", variant: "warning" })
+            return
+          }
+          const configResult = await sync.client.global.config.get()
+          const current = Array.from(
+            new Set((configResult.data?.plugin_marketplaces ?? []).map(normalizeMarketplaceSource).filter(Boolean)),
+          )
+          const next = current.filter((item) => item !== source)
+          if (next.length === current.length) {
+            toast.show({ message: `Marketplace not found: ${source}`, variant: "warning" })
+            return
+          }
+          await sync.client.global.config.update({ config: { plugin_marketplaces: next } })
+          clearPluginMarketplaceCache()
+          toast.show({ message: `Marketplace removed: ${source}`, variant: "success" })
+          return
+        }
+
+        if (action === "refresh") {
+          clearPluginMarketplaceCache()
+          toast.show({ message: "Marketplace cache cleared. Will refresh on next open.", variant: "info" })
+          return
+        }
+
+        toast.show({ message: "Usage: /plugin marketplace [add|remove|refresh]", variant: "warning" })
+        return
+      }
 
       if (sub === "list") {
+        const configResult = await sync.client.global.config.get()
+        const list = configResult.data?.plugin ?? []
         if (list.length === 0) {
           toast.show({ message: "No plugins installed", variant: "info" })
           return
         }
         toast.show({
-          message: `Installed (${list.length}): ${list.map((x) => pluginName(x)).join(", ")}`,
+          message: `Installed (${list.length}): ${list.map((x) => pluginSpecName(x)).join(", ")}`,
           variant: "info",
           duration: 5000,
         })
@@ -304,17 +366,45 @@ export function Prompt(props: PromptProps) {
 
       if (sub === "install") {
         if (!value) {
-          toast.show({ message: "Usage: /plugin install <spec>", variant: "warning" })
+          toast.show({ message: "Usage: /plugin install <name|spec>", variant: "warning" })
           return
         }
-        if (list.includes(value)) {
+
+        const configResult = await sync.client.global.config.get()
+        const currentPlugins = configResult.data?.plugin ?? []
+        if (currentPlugins.includes(value)) {
           toast.show({ message: `Plugin already installed: ${value}`, variant: "warning" })
           return
         }
-        await sync.client.global.config.update({ config: { plugin: [...list, value] } })
+
+        const sources = configResult.data?.plugin_marketplaces ?? []
+        const marketplace = await loadPluginMarketplace(sources)
+        const matches = findMarketplaceMatchesByName(marketplace.plugins, value)
+        if (matches.length > 1) {
+          const candidates = matches.slice(0, 4).map((item) => `- [${item.source}] ${item.spec}`).join("\n")
+          const more = matches.length > 4 ? `\n...and ${matches.length - 4} more` : ""
+          toast.show({
+            message:
+              `Multiple marketplace plugins named "${value}" found:\n` +
+              `${candidates}${more}\n` +
+              "Install by explicit spec: /plugin install <spec>",
+            variant: "warning",
+            duration: 8000,
+          })
+          return
+        }
+
+        const matched = matches[0]
+        const target = matched?.spec ?? value
+        if (currentPlugins.includes(target)) {
+          toast.show({ message: `Plugin already installed: ${pluginSpecName(target)}`, variant: "warning" })
+          return
+        }
+
+        await sync.client.global.config.update({ config: { plugin: [...currentPlugins, target] } })
         await sync.client.instance.dispose()
         await sync.bootstrap()
-        toast.show({ message: `Plugin installed: ${pluginName(value)}`, variant: "success" })
+        toast.show({ message: `Plugin installed: ${matched?.name ?? pluginSpecName(target)}`, variant: "success" })
         return
       }
 
@@ -324,26 +414,28 @@ export function Prompt(props: PromptProps) {
           return
         }
 
-        const index = list.findIndex((item) => {
-          const name = pluginName(item)
+        const configResult = await sync.client.global.config.get()
+        const current = configResult.data?.plugin ?? []
+        const index = current.findIndex((item) => {
+          const name = pluginSpecName(item)
           return item === value || name.toLowerCase() === value.toLowerCase()
         })
         if (index < 0) {
           toast.show({ message: `Plugin not found: ${value}`, variant: "warning" })
           return
         }
-        const removed = list[index]
-        const next = [...list.slice(0, index), ...list.slice(index + 1)]
+        const removed = current[index]
+        const next = [...current.slice(0, index), ...current.slice(index + 1)]
         await sync.client.global.config.update({ config: { plugin: next } })
         await sync.client.instance.dispose()
         await sync.bootstrap()
-        toast.show({ message: `Plugin removed: ${pluginName(removed ?? value)}`, variant: "success" })
+        toast.show({ message: `Plugin removed: ${pluginSpecName(removed ?? value)}`, variant: "success" })
         return
       }
 
       dialog.replace(<DialogPlugin />)
     },
-    [config, dialog, sync, toast],
+    [dialog, sync, toast],
   )
 
   const runBuiltInCommand = useCallback(

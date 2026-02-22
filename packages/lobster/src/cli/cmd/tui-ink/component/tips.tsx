@@ -18,7 +18,7 @@ const TIPS = [
   "Use {/thinking} and {/timestamps} to control message visibility",
   "Use {/review}, {/findings}, {/health}, and {/patterns} for Lobster dashboards",
   "Use {/help} for quick shortcuts and guidance",
-  "Manage plugins with {/plugin}, {/plugin list}, {/plugin install <spec>}, and {/plugin remove <name>}",
+  "Manage plugins with {/plugin}, {/plugin marketplace}, {/plugin install <name|spec>}, and {/plugin remove <name>}",
   "Add custom tools in {.lobster/tool/}",
   "Create custom agents in {.lobster/agent/}",
   "Skills in {.lobster/skill/} add slash command workflows",
