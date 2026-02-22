@@ -1,6 +1,6 @@
 /** @jsxImportSource react */
 import { Box, Text, useStdout } from "ink"
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTheme } from "../../theme"
 import { useAppStore } from "../../store"
 import { useSDK } from "../../context/sdk"
@@ -15,6 +15,8 @@ import { QuestionPrompt } from "./question"
 import { Identifier } from "@/id/id"
 
 const EMPTY_MESSAGES: never[] = []
+const EMPTY_SESSION_PARTS: Record<string, never[]> = {}
+const EMPTY_PARTS: never[] = []
 const EMPTY_PERMISSIONS: never[] = []
 const EMPTY_QUESTIONS: never[] = []
 
@@ -119,9 +121,15 @@ export function Session(props: { sessionID: string }) {
     s.session.find((ses) => ses.id === props.sessionID),
   )
   const messages = useAppStore((s) => s.message[props.sessionID] ?? EMPTY_MESSAGES)
-  const parts = useAppStore((s) => s.part)
+  const sessionParts = useAppStore((s) => s.session_part[props.sessionID] ?? EMPTY_SESSION_PARTS)
   const permissions = useAppStore((s) => s.permission[props.sessionID] ?? EMPTY_PERMISSIONS)
   const questions = useAppStore((s) => s.question[props.sessionID] ?? EMPTY_QUESTIONS)
+  const lineEstimateCache = useRef(
+    new Map<
+      string,
+      { partsRef: readonly unknown[]; width: number; role: string; lines: number }
+    >(),
+  )
 
   // Scroll viewport — estimate rendered lines per message to avoid clipping
   const termHeight = stdout?.rows ?? 24
@@ -132,7 +140,13 @@ export function Session(props: { sessionID: string }) {
 
   const estimateLines = useCallback(
     (msg: { id: string; role: string }) => {
-      const msgParts = parts[msg.id] ?? []
+      const msgParts = sessionParts[msg.id] ?? EMPTY_PARTS
+      const cached = lineEstimateCache.current.get(msg.id)
+      if (cached && cached.partsRef === msgParts && cached.width === contentWidth && cached.role === msg.role) {
+        return cached.lines
+      }
+
+      let nextLines = 1
       if (msg.role === "user") {
         // UserMessage: "> " prefix + joined text parts + marginBottom(1)
         const text = msgParts
@@ -140,9 +154,24 @@ export function Session(props: { sessionID: string }) {
           .map((p: any) => p.text ?? "")
           .join("")
           .trim()
-        if (!text) return 1 // empty user message renders null, just marginBottom
+        if (!text) {
+          lineEstimateCache.current.set(msg.id, {
+            partsRef: msgParts,
+            width: contentWidth,
+            role: msg.role,
+            lines: 1,
+          })
+          return 1
+        }
         // "> " takes 2 chars, leaving contentWidth - 2 for text
-        return wrappedLineCount(text, Math.max(contentWidth - 2, 10)) + 1
+        nextLines = wrappedLineCount(text, Math.max(contentWidth - 2, 10)) + 1
+        lineEstimateCache.current.set(msg.id, {
+          partsRef: msgParts,
+          width: contentWidth,
+          role: msg.role,
+          lines: nextLines,
+        })
+        return nextLines
       }
       // Assistant: agent badge(1) + parts + marginBottom
       let lines = 1
@@ -156,10 +185,24 @@ export function Session(props: { sessionID: string }) {
           lines += 1
         }
       }
-      return Math.max(lines, 2)
+      nextLines = Math.max(lines, 2)
+      lineEstimateCache.current.set(msg.id, {
+        partsRef: msgParts,
+        width: contentWidth,
+        role: msg.role,
+        lines: nextLines,
+      })
+      return nextLines
     },
-    [parts, contentWidth],
+    [sessionParts, contentWidth],
   )
+
+  useEffect(() => {
+    const activeIDs = new Set(messages.map((x) => x.id))
+    for (const key of lineEstimateCache.current.keys()) {
+      if (!activeIDs.has(key)) lineEstimateCache.current.delete(key)
+    }
+  }, [messages])
 
   // Compute visible window based on estimated line heights
   const { visibleMessages, hasAbove, hasBelow, aboveCount, belowCount } = useMemo(() => {
@@ -294,7 +337,7 @@ export function Session(props: { sessionID: string }) {
             <MessageRow
               key={msg.id}
               message={msg}
-              parts={parts[msg.id] ?? []}
+              parts={sessionParts[msg.id] ?? []}
               isLast={msg.id === messages[messages.length - 1]?.id}
               showThinking={showThinking}
               showTimestamps={showTimestamps}

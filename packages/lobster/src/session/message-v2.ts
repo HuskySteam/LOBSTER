@@ -13,6 +13,45 @@ import { type SystemError } from "bun"
 import type { Provider } from "@/provider/provider"
 
 export namespace MessageV2 {
+  const messageIDIndex = new Map<string, string[]>()
+
+  function insertSortedUnique(values: string[], value: string) {
+    let low = 0
+    let high = values.length
+    while (low < high) {
+      const mid = (low + high) >>> 1
+      if (values[mid] < value) low = mid + 1
+      else high = mid
+    }
+    if (values[low] !== value) values.splice(low, 0, value)
+  }
+
+  async function getMessageIDs(sessionID: string): Promise<string[]> {
+    const cached = messageIDIndex.get(sessionID)
+    if (cached) return cached
+    const keys = await Storage.list(["message", sessionID])
+    const ids = keys.map((key) => key[2]).sort()
+    messageIDIndex.set(sessionID, ids)
+    return ids
+  }
+
+  export function rememberMessageID(sessionID: string, messageID: string) {
+    const cached = messageIDIndex.get(sessionID)
+    if (!cached) return
+    insertSortedUnique(cached, messageID)
+  }
+
+  export function forgetMessageID(sessionID: string, messageID: string) {
+    const cached = messageIDIndex.get(sessionID)
+    if (!cached) return
+    const index = cached.indexOf(messageID)
+    if (index >= 0) cached.splice(index, 1)
+  }
+
+  export function clearMessageIDIndex(sessionID: string) {
+    messageIDIndex.delete(sessionID)
+  }
+
   export const OutputLengthError = NamedError.create("MessageOutputLengthError", z.object({}))
   export const AbortedError = NamedError.create("MessageAbortedError", z.object({ message: z.string() }))
   export const AuthError = NamedError.create(
@@ -664,15 +703,19 @@ export namespace MessageV2 {
     )
   }
 
-  // NOTE: This loads the full message ID list into memory. For very large sessions,
-  // consider using filterCompacted or Session.messages with a limit to avoid excessive memory usage.
   export const stream = fn(Identifier.schema("session"), async function* (sessionID) {
-    const list = await Array.fromAsync(await Storage.list(["message", sessionID]))
-    for (let i = list.length - 1; i >= 0; i--) {
-      yield await get({
+    const ids = [...(await getMessageIDs(sessionID))]
+    for (let i = ids.length - 1; i >= 0; i--) {
+      const messageID = ids[i]
+      const msg = await get({
         sessionID,
-        messageID: list[i][2],
-      })
+        messageID,
+      }).catch(() => undefined)
+      if (!msg) {
+        forgetMessageID(sessionID, messageID)
+        continue
+      }
+      yield msg
     }
   })
 

@@ -86,6 +86,67 @@ export namespace SessionProcessor {
     const reasoningHashes = new Set<number>()
     let reversalCount = 0
     let lastScannedPosition = 0
+    const recentPartIDs: string[] = []
+    const recentPartState = new Map<
+      string,
+      {
+        type: MessageV2.Part["type"]
+        tool?: string
+        status?: "pending" | "running" | "completed" | "error"
+        inputHash?: number
+      }
+    >()
+
+    function trackRecentPart(part: MessageV2.Part) {
+      if (!recentPartState.has(part.id)) {
+        recentPartIDs.push(part.id)
+        if (recentPartIDs.length > DOOM_LOOP_THRESHOLD) {
+          const evicted = recentPartIDs.shift()
+          if (evicted) recentPartState.delete(evicted)
+        }
+      }
+      if (part.type === "tool") {
+        recentPartState.set(part.id, {
+          type: part.type,
+          tool: part.tool,
+          status: part.state.status,
+          inputHash: djb2Hash(JSON.stringify(part.state.input)),
+        })
+        return
+      }
+      recentPartState.set(part.id, {
+        type: part.type,
+      })
+    }
+
+    async function hydrateRecentPartWindow() {
+      recentPartIDs.length = 0
+      recentPartState.clear()
+      const parts = await MessageV2.parts(input.assistantMessage.id).catch(() => [])
+      for (const part of parts.slice(-DOOM_LOOP_THRESHOLD)) {
+        trackRecentPart(part)
+      }
+    }
+
+    async function updatePartTracked(update: Parameters<typeof Session.updatePart>[0]) {
+      const part = await Session.updatePart(update as any)
+      trackRecentPart(part as MessageV2.Part)
+      return part
+    }
+
+    function isRecentToolDoomLoop(toolName: string, inputValue: Record<string, any>) {
+      if (recentPartIDs.length !== DOOM_LOOP_THRESHOLD) return false
+      const inputHash = djb2Hash(JSON.stringify(inputValue))
+      return recentPartIDs.every((id) => {
+        const part = recentPartState.get(id)
+        return (
+          part?.type === "tool" &&
+          part.tool === toolName &&
+          part.status !== "pending" &&
+          part.inputHash === inputHash
+        )
+      })
+    }
 
     const result = {
       get message() {
@@ -97,6 +158,7 @@ export namespace SessionProcessor {
       async process(streamInput: LLM.StreamInput) {
         log.info("process")
         needsCompaction = false
+        await hydrateRecentPartWindow()
         const shouldBreak = (await Config.get()).experimental?.continue_loop_on_deny !== true
         const MAX_ITERATIONS = 1000
         let iteration = 0
@@ -139,7 +201,7 @@ export namespace SessionProcessor {
                     const part = reasoningMap[value.id]
                     part.text += value.text
                     if (value.providerMetadata) part.metadata = value.providerMetadata
-                    if (part.text) await Session.updatePart({ part, delta: value.text })
+                    if (part.text) await updatePartTracked({ part, delta: value.text })
 
                     // Anti-Loop Intelligence: detect circular reasoning (incremental scan)
                     if (!circularityDetected && part.text.length > 100) {
@@ -169,13 +231,13 @@ export namespace SessionProcessor {
                       end: Date.now(),
                     }
                     if (value.providerMetadata) part.metadata = value.providerMetadata
-                    await Session.updatePart(part)
+                    await updatePartTracked(part)
                     delete reasoningMap[value.id]
                   }
                   break
 
                 case "tool-input-start":
-                  const part = await Session.updatePart({
+                  const part = await updatePartTracked({
                     id: toolcalls[value.id]?.id ?? Identifier.ascending("part"),
                     messageID: input.assistantMessage.id,
                     sessionID: input.assistantMessage.sessionID,
@@ -203,7 +265,7 @@ export namespace SessionProcessor {
                     if (WRITE_CAPABLE_TOOLS.has(value.toolName)) {
                       hasWriteTools = true
                     }
-                    const part = await Session.updatePart({
+                    const part = await updatePartTracked({
                       ...match,
                       tool: value.toolName,
                       state: {
@@ -217,20 +279,7 @@ export namespace SessionProcessor {
                     })
                     toolcalls[value.toolCallId] = part as MessageV2.ToolPart
 
-                    const parts = await MessageV2.parts(input.assistantMessage.id)
-                    const lastThree = parts.slice(-DOOM_LOOP_THRESHOLD)
-                    const currentInputHash = djb2Hash(JSON.stringify(value.input))
-
-                    if (
-                      lastThree.length === DOOM_LOOP_THRESHOLD &&
-                      lastThree.every(
-                        (p) =>
-                          p.type === "tool" &&
-                          p.tool === value.toolName &&
-                          p.state.status !== "pending" &&
-                          djb2Hash(JSON.stringify(p.state.input)) === currentInputHash,
-                      )
-                    ) {
+                    if (isRecentToolDoomLoop(value.toolName, value.input)) {
                       const agent = await Agent.get(input.assistantMessage.agent)
                       await PermissionNext.ask({
                         permission: "doom_loop",
@@ -250,7 +299,7 @@ export namespace SessionProcessor {
                 case "tool-result": {
                   const match = toolcalls[value.toolCallId]
                   if (match && match.state.status === "running") {
-                    await Session.updatePart({
+                    await updatePartTracked({
                       ...match,
                       state: {
                         status: "completed",
@@ -274,7 +323,7 @@ export namespace SessionProcessor {
                 case "tool-error": {
                   const match = toolcalls[value.toolCallId]
                   if (match && match.state.status === "running") {
-                    await Session.updatePart({
+                    await updatePartTracked({
                       ...match,
                       state: {
                         status: "error",
@@ -314,7 +363,7 @@ export namespace SessionProcessor {
                 case "start-step":
                   hasWriteTools = false
                   snapshot = await Snapshot.track()
-                  await Session.updatePart({
+                  await updatePartTracked({
                     id: Identifier.ascending("part"),
                     messageID: input.assistantMessage.id,
                     sessionID: input.sessionID,
@@ -340,7 +389,7 @@ export namespace SessionProcessor {
                     },
                     reasoning: (input.assistantMessage.tokens.reasoning ?? 0) + (usage.tokens.reasoning ?? 0),
                   }
-                  await Session.updatePart({
+                  await updatePartTracked({
                     id: Identifier.ascending("part"),
                     reason: value.finishReason,
                     snapshot: hasWriteTools ? await Snapshot.track() : snapshot,
@@ -354,7 +403,7 @@ export namespace SessionProcessor {
                   if (snapshot && hasWriteTools) {
                     const patch = await Snapshot.patch(snapshot)
                     if (patch.files.length) {
-                      await Session.updatePart({
+                      await updatePartTracked({
                         id: Identifier.ascending("part"),
                         messageID: input.assistantMessage.id,
                         sessionID: input.sessionID,
@@ -393,7 +442,7 @@ export namespace SessionProcessor {
                     currentText.text += value.text
                     if (value.providerMetadata) currentText.metadata = value.providerMetadata
                     if (currentText.text)
-                      await Session.updatePart({
+                      await updatePartTracked({
                         part: currentText,
                         delta: value.text,
                       })
@@ -418,7 +467,7 @@ export namespace SessionProcessor {
                       end: Date.now(),
                     }
                     if (value.providerMetadata) currentText.metadata = value.providerMetadata
-                    await Session.updatePart(currentText)
+                    await updatePartTracked(currentText)
                   }
                   currentText = undefined
                   break
@@ -455,7 +504,7 @@ export namespace SessionProcessor {
               // Mark stale running tools as error before retrying
               for (const [id, tc] of Object.entries(toolcalls)) {
                 if (tc.state.status !== "completed" && tc.state.status !== "error") {
-                  await Session.updatePart({
+                  await updatePartTracked({
                     ...tc,
                     state: {
                       ...tc.state,
@@ -494,7 +543,7 @@ export namespace SessionProcessor {
           if (snapshot) {
             const patch = await Snapshot.patch(snapshot)
             if (patch.files.length) {
-              await Session.updatePart({
+              await updatePartTracked({
                 id: Identifier.ascending("part"),
                 messageID: input.assistantMessage.id,
                 sessionID: input.sessionID,
@@ -508,7 +557,7 @@ export namespace SessionProcessor {
           const p = await MessageV2.parts(input.assistantMessage.id)
           for (const part of p) {
             if (part.type === "tool" && part.state.status !== "completed" && part.state.status !== "error") {
-              await Session.updatePart({
+              await updatePartTracked({
                 ...part,
                 state: {
                   ...part.state,
@@ -546,3 +595,4 @@ export namespace SessionProcessor {
     return result
   }
 }
+

@@ -976,18 +976,22 @@ export namespace Provider {
 
         // Strip openai itemId metadata following what codex does
         if (model.api.npm === "@ai-sdk/openai" && opts.body && opts.method === "POST") {
-          const bodyStr = opts.body as string
-          if (bodyStr.includes('"input"')) {
+          const bodyStr = typeof opts.body === "string" ? opts.body : undefined
+          if (bodyStr && bodyStr.includes('"input"') && bodyStr.includes('"id"')) {
             const body = JSON.parse(bodyStr)
             const isAzure = model.providerID.includes("azure")
             const keepIds = isAzure && body.store === true
             if (!keepIds && Array.isArray(body.input)) {
+              let stripped = false
               for (const item of body.input) {
                 if ("id" in item) {
                   delete item.id
+                  stripped = true
                 }
               }
-              opts.body = JSON.stringify(body)
+              if (stripped) {
+                opts.body = JSON.stringify(body)
+              }
             }
           }
         }

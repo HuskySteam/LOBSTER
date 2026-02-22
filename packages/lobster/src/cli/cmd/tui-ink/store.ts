@@ -54,6 +54,10 @@ export interface AppState {
   todo: Record<string, Todo[]>
   message: Record<string, Message[]>
   part: Record<string, Part[]>
+  message_session: Record<string, string>
+  session_part: Record<string, Record<string, Part[]>>
+  message_text_tokens: Record<string, number>
+  session_text_tokens: Record<string, number>
   lsp: LspStatus[]
   mcp: Record<string, McpStatus>
   mcp_resource: Record<string, McpResource>
@@ -119,6 +123,10 @@ const initialState: AppState = {
   todo: {},
   message: {},
   part: {},
+  message_session: {},
+  session_part: {},
+  message_text_tokens: {},
+  session_text_tokens: {},
   lsp: [],
   mcp: {},
   mcp_resource: {},
@@ -141,6 +149,145 @@ function binarySearch<T>(arr: T[], id: string, getId: (item: T) => string): { fo
     else hi = mid - 1
   }
   return { found: false, index: lo }
+}
+
+const MAX_SESSION_MESSAGES = 100
+
+function hasOwn(obj: Record<string, unknown>, key: string) {
+  return Object.prototype.hasOwnProperty.call(obj, key)
+}
+
+function textTokenEstimate(parts: Part[]): number {
+  let total = 0
+  for (const part of parts) {
+    if (part.type !== "text") continue
+    total += Math.ceil((((part as any).text as string | undefined)?.length ?? 0) / 4)
+  }
+  return total
+}
+
+function upsertSessionMessageBuffer(messages: Message[], msg: Message): {
+  next: Message[]
+  changed: boolean
+  evicted?: Message
+} {
+  if (messages.length === 0) {
+    return { next: [msg], changed: true }
+  }
+
+  const last = messages[messages.length - 1]!
+  if (last.id === msg.id) {
+    if (last === msg) return { next: messages, changed: false }
+    const next = [...messages]
+    next[next.length - 1] = msg
+    return { next, changed: true }
+  }
+
+  if (last.id.localeCompare(msg.id) < 0) {
+    if (messages.length < MAX_SESSION_MESSAGES) {
+      return { next: [...messages, msg], changed: true }
+    }
+    return { next: [...messages.slice(1), msg], changed: true, evicted: messages[0] }
+  }
+
+  const result = binarySearch(messages, msg.id, (m) => m.id)
+  if (result.found) {
+    if (messages[result.index] === msg) return { next: messages, changed: false }
+    const next = [...messages]
+    next[result.index] = msg
+    return { next, changed: true }
+  }
+
+  const next = [...messages]
+  next.splice(result.index, 0, msg)
+  if (next.length > MAX_SESSION_MESSAGES) {
+    return { next: next.slice(1), changed: true, evicted: next[0] }
+  }
+  return { next, changed: true }
+}
+
+function upsertPartBuffer(parts: Part[], part: Part): { next: Part[]; changed: boolean } {
+  if (parts.length === 0) return { next: [part], changed: true }
+
+  const last = parts[parts.length - 1]!
+  if (last.id === part.id) {
+    if (last === part) return { next: parts, changed: false }
+    const next = [...parts]
+    next[next.length - 1] = part
+    return { next, changed: true }
+  }
+
+  if (last.id.localeCompare(part.id) < 0) {
+    return { next: [...parts, part], changed: true }
+  }
+
+  const result = binarySearch(parts, part.id, (p) => p.id)
+  if (result.found) {
+    if (parts[result.index] === part) return { next: parts, changed: false }
+    const next = [...parts]
+    next[result.index] = part
+    return { next, changed: true }
+  }
+
+  const next = [...parts]
+  next.splice(result.index, 0, part)
+  return { next, changed: true }
+}
+
+function updateSessionPartMap(
+  source: Record<string, Record<string, Part[]>>,
+  sessionID: string,
+  messageID: string,
+  parts: Part[] | undefined,
+) {
+  const currentSessionParts = source[sessionID] ?? {}
+  if (parts === undefined) {
+    if (!hasOwn(currentSessionParts as Record<string, unknown>, messageID)) return source
+    const nextSessionParts = { ...currentSessionParts }
+    delete nextSessionParts[messageID]
+    if (Object.keys(nextSessionParts).length === 0) {
+      const next = { ...source }
+      delete next[sessionID]
+      return next
+    }
+    return { ...source, [sessionID]: nextSessionParts }
+  }
+
+  if (currentSessionParts[messageID] === parts) return source
+  return {
+    ...source,
+    [sessionID]: {
+      ...currentSessionParts,
+      [messageID]: parts,
+    },
+  }
+}
+
+function setMessageTokenMap(
+  source: Record<string, number>,
+  messageID: string,
+  tokens: number | undefined,
+): Record<string, number> {
+  if (tokens === undefined) {
+    if (!hasOwn(source as Record<string, unknown>, messageID)) return source
+    const next = { ...source }
+    delete next[messageID]
+    return next
+  }
+  if (source[messageID] === tokens) return source
+  return { ...source, [messageID]: tokens }
+}
+
+function adjustSessionTokenMap(
+  source: Record<string, number>,
+  sessionID: string,
+  delta: number,
+): Record<string, number> {
+  if (delta === 0) return source
+  const current = source[sessionID] ?? 0
+  const next = Math.max(0, current + delta)
+  if (next === current) return source
+  return { ...source, [sessionID]: next }
 }
 
 export const useAppStore = create<AppState & AppActions>()((set) => ({
@@ -180,7 +327,54 @@ export const useAppStore = create<AppState & AppActions>()((set) => ({
       if (!result.found) return state
       const next = [...state.session]
       next.splice(result.index, 1)
-      return { session: next }
+
+      const sessionMessages = state.message[sessionID] ?? []
+
+      let message = state.message
+      if (hasOwn(message as Record<string, unknown>, sessionID)) {
+        message = { ...message }
+        delete message[sessionID]
+      }
+
+      let part = state.part
+      let message_session = state.message_session
+      let message_text_tokens = state.message_text_tokens
+      for (const msg of sessionMessages) {
+        if (hasOwn(part as Record<string, unknown>, msg.id)) {
+          if (part === state.part) part = { ...part }
+          delete part[msg.id]
+        }
+        if (hasOwn(message_session as Record<string, unknown>, msg.id)) {
+          if (message_session === state.message_session) message_session = { ...message_session }
+          delete message_session[msg.id]
+        }
+        if (hasOwn(message_text_tokens as Record<string, unknown>, msg.id)) {
+          if (message_text_tokens === state.message_text_tokens) message_text_tokens = { ...message_text_tokens }
+          delete message_text_tokens[msg.id]
+        }
+      }
+
+      let session_part = state.session_part
+      if (hasOwn(session_part as Record<string, unknown>, sessionID)) {
+        session_part = { ...session_part }
+        delete session_part[sessionID]
+      }
+
+      let session_text_tokens = state.session_text_tokens
+      if (hasOwn(session_text_tokens as Record<string, unknown>, sessionID)) {
+        session_text_tokens = { ...session_text_tokens }
+        delete session_text_tokens[sessionID]
+      }
+
+      return {
+        session: next,
+        ...(message !== state.message ? { message } : {}),
+        ...(part !== state.part ? { part } : {}),
+        ...(message_session !== state.message_session ? { message_session } : {}),
+        ...(message_text_tokens !== state.message_text_tokens ? { message_text_tokens } : {}),
+        ...(session_part !== state.session_part ? { session_part } : {}),
+        ...(session_text_tokens !== state.session_text_tokens ? { session_text_tokens } : {}),
+      }
     }),
 
   setSessionStatus: (sessionID, status) =>
@@ -201,25 +395,78 @@ export const useAppStore = create<AppState & AppActions>()((set) => ({
   upsertMessage: (msg) =>
     set((state) => {
       const sessionMessages = state.message[msg.sessionID] ?? []
-      const result = binarySearch(sessionMessages, msg.id, (m) => m.id)
-      const next = [...sessionMessages]
-      if (result.found) {
-        next[result.index] = msg
-      } else {
-        next.splice(result.index, 0, msg)
+      const buffer = upsertSessionMessageBuffer(sessionMessages, msg)
+
+      let message = state.message
+      if (buffer.changed) {
+        message = { ...message, [msg.sessionID]: buffer.next }
       }
-      // Evict oldest if buffer exceeds 100
-      const evicted = next.length > 100 ? next.slice(1) : next
-      const partUpdate: Record<string, Part[]> = {}
-      if (next.length > 100) {
-        // Remove parts for evicted message
-        const evictedMsg = next[0]
-        Object.assign(partUpdate, state.part)
-        delete partUpdate[evictedMsg.id]
+
+      let message_session = state.message_session
+      if (message_session[msg.id] !== msg.sessionID) {
+        message_session = { ...message_session, [msg.id]: msg.sessionID }
       }
+
+      let part = state.part
+      let session_part = state.session_part
+      let message_text_tokens = state.message_text_tokens
+      let session_text_tokens = state.session_text_tokens
+
+      // Backfill derived state if parts arrive before message mapping.
+      const knownParts = part[msg.id]
+      if (knownParts) {
+        session_part = updateSessionPartMap(session_part, msg.sessionID, msg.id, knownParts)
+        const prevTokens = message_text_tokens[msg.id] ?? 0
+        const nextTokens = textTokenEstimate(knownParts)
+        if (nextTokens !== prevTokens || !hasOwn(message_text_tokens as Record<string, unknown>, msg.id)) {
+          message_text_tokens = setMessageTokenMap(message_text_tokens, msg.id, nextTokens)
+          session_text_tokens = adjustSessionTokenMap(session_text_tokens, msg.sessionID, nextTokens - prevTokens)
+        }
+      }
+
+      if (buffer.evicted) {
+        const evictedID = buffer.evicted.id
+        const evictedSessionID = message_session[evictedID] ?? msg.sessionID
+
+        if (hasOwn(message_session as Record<string, unknown>, evictedID)) {
+          if (message_session === state.message_session) message_session = { ...message_session }
+          delete message_session[evictedID]
+        }
+
+        if (hasOwn(part as Record<string, unknown>, evictedID)) {
+          if (part === state.part) part = { ...part }
+          delete part[evictedID]
+        }
+
+        session_part = updateSessionPartMap(session_part, evictedSessionID, evictedID, undefined)
+
+        const evictedTokens = message_text_tokens[evictedID] ?? 0
+        if (hasOwn(message_text_tokens as Record<string, unknown>, evictedID)) {
+          message_text_tokens = setMessageTokenMap(message_text_tokens, evictedID, undefined)
+        }
+        if (evictedTokens !== 0) {
+          session_text_tokens = adjustSessionTokenMap(session_text_tokens, evictedSessionID, -evictedTokens)
+        }
+      }
+
+      if (
+        message === state.message &&
+        message_session === state.message_session &&
+        part === state.part &&
+        session_part === state.session_part &&
+        message_text_tokens === state.message_text_tokens &&
+        session_text_tokens === state.session_text_tokens
+      ) {
+        return state
+      }
+
       return {
-        message: { ...state.message, [msg.sessionID]: evicted },
-        ...(next.length > 100 ? { part: partUpdate } : {}),
+        ...(message !== state.message ? { message } : {}),
+        ...(message_session !== state.message_session ? { message_session } : {}),
+        ...(part !== state.part ? { part } : {}),
+        ...(session_part !== state.session_part ? { session_part } : {}),
+        ...(message_text_tokens !== state.message_text_tokens ? { message_text_tokens } : {}),
+        ...(session_text_tokens !== state.session_text_tokens ? { session_text_tokens } : {}),
       }
     }),
 
@@ -230,25 +477,123 @@ export const useAppStore = create<AppState & AppActions>()((set) => ({
       if (!result.found) return state
       const next = [...sessionMessages]
       next.splice(result.index, 1)
-      return { message: { ...state.message, [sessionID]: next } }
+
+      let part = state.part
+      if (hasOwn(part as Record<string, unknown>, messageID)) {
+        part = { ...part }
+        delete part[messageID]
+      }
+
+      let message_session = state.message_session
+      if (hasOwn(message_session as Record<string, unknown>, messageID)) {
+        message_session = { ...message_session }
+        delete message_session[messageID]
+      }
+
+      const prevTokens = state.message_text_tokens[messageID] ?? 0
+      const message_text_tokens = setMessageTokenMap(state.message_text_tokens, messageID, undefined)
+      const session_text_tokens = adjustSessionTokenMap(state.session_text_tokens, sessionID, -prevTokens)
+      const session_part = updateSessionPartMap(state.session_part, sessionID, messageID, undefined)
+
+      return {
+        message: { ...state.message, [sessionID]: next },
+        ...(part !== state.part ? { part } : {}),
+        ...(message_session !== state.message_session ? { message_session } : {}),
+        ...(message_text_tokens !== state.message_text_tokens ? { message_text_tokens } : {}),
+        ...(session_text_tokens !== state.session_text_tokens ? { session_text_tokens } : {}),
+        ...(session_part !== state.session_part ? { session_part } : {}),
+      }
     }),
 
   setMessages: (sessionID, messages) =>
-    set((state) => ({
-      message: { ...state.message, [sessionID]: messages },
-    })),
+    set((state) => {
+      const previous = state.message[sessionID] ?? []
+      const nextIDs = new Set(messages.map((x) => x.id))
+
+      let part = state.part
+      let message_session = state.message_session
+      let message_text_tokens = state.message_text_tokens
+
+      for (const msg of previous) {
+        if (nextIDs.has(msg.id)) continue
+        if (hasOwn(part as Record<string, unknown>, msg.id)) {
+          if (part === state.part) part = { ...part }
+          delete part[msg.id]
+        }
+        if (hasOwn(message_session as Record<string, unknown>, msg.id)) {
+          if (message_session === state.message_session) message_session = { ...message_session }
+          delete message_session[msg.id]
+        }
+        if (hasOwn(message_text_tokens as Record<string, unknown>, msg.id)) {
+          if (message_text_tokens === state.message_text_tokens) message_text_tokens = { ...message_text_tokens }
+          delete message_text_tokens[msg.id]
+        }
+      }
+
+      let nextSessionPart: Record<string, Part[]> | undefined
+      let sessionTotal = 0
+      for (const msg of messages) {
+        if (message_session[msg.id] !== sessionID) {
+          if (message_session === state.message_session) message_session = { ...message_session }
+          message_session[msg.id] = sessionID
+        }
+
+        const msgParts = part[msg.id]
+        if (!msgParts) {
+          message_text_tokens = setMessageTokenMap(message_text_tokens, msg.id, undefined)
+          continue
+        }
+
+        if (!nextSessionPart) nextSessionPart = {}
+        nextSessionPart[msg.id] = msgParts
+
+        const tokens = textTokenEstimate(msgParts)
+        sessionTotal += tokens
+        message_text_tokens = setMessageTokenMap(message_text_tokens, msg.id, tokens)
+      }
+
+      const session_part = (() => {
+        if (nextSessionPart) return { ...state.session_part, [sessionID]: nextSessionPart }
+        if (!hasOwn(state.session_part as Record<string, unknown>, sessionID)) return state.session_part
+        const next = { ...state.session_part }
+        delete next[sessionID]
+        return next
+      })()
+
+      const session_text_tokens = { ...state.session_text_tokens, [sessionID]: sessionTotal }
+
+      return {
+        message: { ...state.message, [sessionID]: messages },
+        ...(part !== state.part ? { part } : {}),
+        ...(message_session !== state.message_session ? { message_session } : {}),
+        ...(message_text_tokens !== state.message_text_tokens ? { message_text_tokens } : {}),
+        ...(session_part !== state.session_part ? { session_part } : {}),
+        ...(session_text_tokens !== state.session_text_tokens ? { session_text_tokens } : {}),
+      }
+    }),
 
   upsertPart: (part) =>
     set((state) => {
       const messageParts = state.part[part.messageID] ?? []
-      const result = binarySearch(messageParts, part.id, (p) => p.id)
-      const next = [...messageParts]
-      if (result.found) {
-        next[result.index] = part
-      } else {
-        next.splice(result.index, 0, part)
+      const updated = upsertPartBuffer(messageParts, part)
+      if (!updated.changed) return state
+
+      const partMap = { ...state.part, [part.messageID]: updated.next }
+      const sessionID = state.message_session[part.messageID]
+      if (!sessionID) return { part: partMap }
+
+      const session_part = updateSessionPartMap(state.session_part, sessionID, part.messageID, updated.next)
+      const prevTokens = state.message_text_tokens[part.messageID] ?? 0
+      const nextTokens = textTokenEstimate(updated.next)
+      const message_text_tokens = setMessageTokenMap(state.message_text_tokens, part.messageID, nextTokens)
+      const session_text_tokens = adjustSessionTokenMap(state.session_text_tokens, sessionID, nextTokens - prevTokens)
+
+      return {
+        part: partMap,
+        ...(session_part !== state.session_part ? { session_part } : {}),
+        ...(message_text_tokens !== state.message_text_tokens ? { message_text_tokens } : {}),
+        ...(session_text_tokens !== state.session_text_tokens ? { session_text_tokens } : {}),
       }
-      return { part: { ...state.part, [part.messageID]: next } }
     }),
 
   removePart: (messageID, partID) =>
@@ -258,13 +603,58 @@ export const useAppStore = create<AppState & AppActions>()((set) => ({
       if (!result.found) return state
       const next = [...messageParts]
       next.splice(result.index, 1)
-      return { part: { ...state.part, [messageID]: next } }
+
+      const partMap = { ...state.part }
+      if (next.length === 0) delete partMap[messageID]
+      else partMap[messageID] = next
+
+      const sessionID = state.message_session[messageID]
+      if (!sessionID) return { part: partMap }
+
+      const session_part = updateSessionPartMap(state.session_part, sessionID, messageID, next.length > 0 ? next : undefined)
+      const prevTokens = state.message_text_tokens[messageID] ?? 0
+      const nextTokens = next.length > 0 ? textTokenEstimate(next) : 0
+      const message_text_tokens = setMessageTokenMap(
+        state.message_text_tokens,
+        messageID,
+        next.length > 0 ? nextTokens : undefined,
+      )
+      const session_text_tokens = adjustSessionTokenMap(state.session_text_tokens, sessionID, nextTokens - prevTokens)
+
+      return {
+        part: partMap,
+        ...(session_part !== state.session_part ? { session_part } : {}),
+        ...(message_text_tokens !== state.message_text_tokens ? { message_text_tokens } : {}),
+        ...(session_text_tokens !== state.session_text_tokens ? { session_text_tokens } : {}),
+      }
     }),
 
   setParts: (messageID, parts) =>
-    set((state) => ({
-      part: { ...state.part, [messageID]: parts },
-    })),
+    set((state) => {
+      const partMap = { ...state.part }
+      if (parts.length === 0) delete partMap[messageID]
+      else partMap[messageID] = parts
+
+      const sessionID = state.message_session[messageID]
+      if (!sessionID) return { part: partMap }
+
+      const session_part = updateSessionPartMap(state.session_part, sessionID, messageID, parts.length > 0 ? parts : undefined)
+      const prevTokens = state.message_text_tokens[messageID] ?? 0
+      const nextTokens = parts.length > 0 ? textTokenEstimate(parts) : 0
+      const message_text_tokens = setMessageTokenMap(
+        state.message_text_tokens,
+        messageID,
+        parts.length > 0 ? nextTokens : undefined,
+      )
+      const session_text_tokens = adjustSessionTokenMap(state.session_text_tokens, sessionID, nextTokens - prevTokens)
+
+      return {
+        part: partMap,
+        ...(session_part !== state.session_part ? { session_part } : {}),
+        ...(message_text_tokens !== state.message_text_tokens ? { message_text_tokens } : {}),
+        ...(session_text_tokens !== state.session_text_tokens ? { session_text_tokens } : {}),
+      }
+    }),
 
   addPermission: (request) =>
     set((state) => {

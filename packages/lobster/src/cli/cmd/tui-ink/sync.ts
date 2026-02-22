@@ -45,7 +45,43 @@ export function createSyncManager(input: {
   let eventQueue: Event[] = []
   let flushTimer: Timer | undefined
   let lastFlush = 0
+  let lspRefreshTimer: Timer | undefined
+  let lspRefreshInFlight = false
+  let lspRefreshPending = false
   const fullSyncedSessions = new Set<string>()
+  const LSP_REFRESH_DEBOUNCE_MS = 80
+
+  async function refreshLspStatus() {
+    if (lspRefreshInFlight) return
+    if (!lspRefreshPending) return
+
+    lspRefreshPending = false
+    lspRefreshInFlight = true
+    try {
+      const x = await client.lsp.status()
+      if (x.data) useAppStore.getState().setLsp(x.data)
+    } catch {
+      // best-effort refresh
+    } finally {
+      lspRefreshInFlight = false
+      if (lspRefreshPending && !lspRefreshTimer) {
+        lspRefreshTimer = setTimeout(() => {
+          lspRefreshTimer = undefined
+          void refreshLspStatus()
+        }, LSP_REFRESH_DEBOUNCE_MS)
+      }
+    }
+  }
+
+  function scheduleLspRefresh() {
+    lspRefreshPending = true
+    if (lspRefreshInFlight) return
+    if (lspRefreshTimer) return
+    lspRefreshTimer = setTimeout(() => {
+      lspRefreshTimer = undefined
+      void refreshLspStatus()
+    }, LSP_REFRESH_DEBOUNCE_MS)
+  }
 
   function flush() {
     if (eventQueue.length === 0) return
@@ -130,9 +166,7 @@ export function createSyncManager(input: {
         break
 
       case "lsp.updated":
-        client.lsp.status().then((x) => {
-          if (x.data) useAppStore.getState().setLsp(x.data)
-        }).catch(() => {})
+        scheduleLspRefresh()
         break
 
       case "vcs.branch.updated":
@@ -301,6 +335,7 @@ export function createSyncManager(input: {
   function dispose() {
     abort.abort()
     if (flushTimer) clearTimeout(flushTimer)
+    if (lspRefreshTimer) clearTimeout(lspRefreshTimer)
   }
 
   return {

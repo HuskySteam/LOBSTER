@@ -8,12 +8,13 @@ import path from "path"
 
 const EMPTY_MESSAGES: never[] = []
 const EMPTY_PARTS: never[] = []
+const EMPTY_SESSION_PARTS: Record<string, never[]> = {}
 
 export function ActivityBar(props: { sessionID: string }) {
   const { theme } = useTheme()
   const sessionStatus = useAppStore((s) => s.session_status[props.sessionID])
   const messages = useAppStore((s) => s.message[props.sessionID] ?? EMPTY_MESSAGES)
-  const parts = useAppStore((s) => s.part)
+  const sessionParts = useAppStore((s) => s.session_part[props.sessionID] ?? EMPTY_SESSION_PARTS)
 
   const isBusy = sessionStatus?.type === "busy"
 
@@ -25,7 +26,7 @@ export function ActivityBar(props: { sessionID: string }) {
     )
     if (!pendingMessage) return { text: "Thinking...", count: "" }
 
-    const msgParts = parts[pendingMessage.id] ?? EMPTY_PARTS
+    const msgParts = sessionParts[pendingMessage.id] ?? EMPTY_PARTS
     const toolParts = msgParts.filter((p) => p.type === "tool")
     if (toolParts.length === 0) return { text: "Thinking...", count: "" }
 
@@ -44,7 +45,7 @@ export function ActivityBar(props: { sessionID: string }) {
     const count = total > 1 ? ` ${done}/${total}` : ""
 
     return { text, count }
-  }, [isBusy, messages, parts])
+  }, [isBusy, messages, sessionParts])
 
   if (!isBusy || !activityInfo) return null
 

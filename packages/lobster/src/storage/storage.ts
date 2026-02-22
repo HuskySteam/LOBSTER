@@ -11,6 +11,7 @@ import z from "zod"
 
 export namespace Storage {
   const log = Log.create({ service: "storage" })
+  const listCache = new Map<string, string[][]>()
 
   type Migration = (dir: string) => Promise<void>
 
@@ -166,12 +167,25 @@ export namespace Storage {
     }
   })
 
+  function cacheKey(prefix: string[]) {
+    return prefix.join("\0")
+  }
+
+  function cloneKeys(keys: string[][]): string[][] {
+    return keys.map((key) => [...key])
+  }
+
+  function clearListCache() {
+    listCache.clear()
+  }
+
   export async function remove(key: string[]) {
     validateKey(key)
     const dir = await state().then((x) => x.dir)
     const target = path.join(dir, ...key) + ".json"
     return withErrorHandling(async () => {
       await fs.unlink(target).catch(() => {})
+      clearListCache()
     })
   }
 
@@ -195,6 +209,7 @@ export namespace Storage {
       const content = await Bun.file(target).json()
       fn(content)
       await Bun.write(target, JSON.stringify(content, null, 2))
+      clearListCache()
       return content as T
     })
   }
@@ -206,6 +221,7 @@ export namespace Storage {
     return withErrorHandling(async () => {
       using _ = await Lock.write(target)
       await Bun.write(target, JSON.stringify(content, null, 2))
+      clearListCache()
     })
   }
 
@@ -220,20 +236,26 @@ export namespace Storage {
     })
   }
 
-  const glob = new Bun.Glob("**/*")
+  const listGlob = new Bun.Glob("**/*.json")
   export async function list(prefix: string[]) {
     validateKey(prefix)
+    const key = cacheKey(prefix)
+    const cached = listCache.get(key)
+    if (cached) return cloneKeys(cached)
+
     const dir = await state().then((x) => x.dir)
     try {
       const result = await Array.fromAsync(
-        glob.scan({
+        listGlob.scan({
           cwd: path.join(dir, ...prefix),
           onlyFiles: true,
         }),
-      ).then((results) => results.map((x) => [...prefix, ...x.slice(0, -5).split(path.sep)]))
+      ).then((results) => results.map((item) => [...prefix, ...item.slice(0, -5).split(/[/\\]/)]))
       result.sort()
+      listCache.set(key, cloneKeys(result))
       return result
     } catch {
+      listCache.set(key, [])
       return []
     }
   }

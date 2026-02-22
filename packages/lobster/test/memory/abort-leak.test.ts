@@ -1,7 +1,12 @@
-import { describe, test, expect } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import path from "path"
 import { Instance } from "../../src/project/instance"
-import { WebFetchTool } from "../../src/tool/webfetch"
+
+mock.module("dns/promises", () => ({
+  lookup: async () => [{ address: "93.184.216.34", family: 4 }],
+}))
+
+const { WebFetchTool } = await import("../../src/tool/webfetch")
 
 const projectRoot = path.join(__dirname, "../..")
 
@@ -18,11 +23,34 @@ const ctx = {
 
 const MB = 1024 * 1024
 const ITERATIONS = 50
+const TEST_URL = "https://example.com/fixture"
 
 const getHeapMB = () => {
   Bun.gc(true)
   return process.memoryUsage().heapUsed / MB
 }
+
+let originalFetch: typeof fetch
+
+beforeEach(() => {
+  originalFetch = globalThis.fetch
+  globalThis.fetch = mock(async () => {
+    return new Response("ok", {
+      status: 200,
+      headers: {
+        "content-type": "text/plain",
+      },
+    })
+  }) as unknown as typeof fetch
+})
+
+afterEach(() => {
+  globalThis.fetch = originalFetch
+})
+
+afterAll(() => {
+  mock.restore()
+})
 
 describe("memory: abort controller leak", () => {
   test("webfetch does not leak memory over many invocations", async () => {
@@ -32,14 +60,14 @@ describe("memory: abort controller leak", () => {
         const tool = await WebFetchTool.init()
 
         // Warm up
-        await tool.execute({ url: "https://example.com", format: "text" }, ctx).catch(() => {})
+        await tool.execute({ url: TEST_URL, format: "text" }, ctx).catch(() => {})
 
         Bun.gc(true)
         const baseline = getHeapMB()
 
         // Run many fetches
         for (let i = 0; i < ITERATIONS; i++) {
-          await tool.execute({ url: "https://example.com", format: "text" }, ctx).catch(() => {})
+          await tool.execute({ url: TEST_URL, format: "text" }, ctx).catch(() => {})
         }
 
         Bun.gc(true)

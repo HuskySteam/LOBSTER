@@ -1,0 +1,80 @@
+﻿[
+  {
+    "id": "A8-001",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "high",
+    "path": "packages/lobster/src/benchmark/benchmark.ts",
+    "line": 9,
+    "evidence": "Benchmarks are toy single-file tasks that do not model real production workloads.",
+    "impact": "Benchmark numbers underrepresent real orchestration/editing complexity regressions.",
+    "recommendation": "Add multi-file and tool-chain realistic benchmark scenarios.",
+    "effort": "m",
+    "owner_area": "benchmark"
+  },
+  {
+    "id": "A8-002",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/benchmark/runner.ts",
+    "line": 18,
+    "evidence": "Timer includes setup/teardown and not just agent execution latency.",
+    "impact": "Timing signal is noisy and poor for regression tracking.",
+    "recommendation": "Measure agent fix phase separately from deterministic harness overhead.",
+    "effort": "m",
+    "owner_area": "benchmark"
+  },
+  {
+    "id": "A8-003",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/benchmark/runner.ts",
+    "line": 111,
+    "evidence": "Each challenge runs once without warmup/repeats or variance reporting.",
+    "impact": "Single-run timings fluctuate and hide subtle performance regressions.",
+    "recommendation": "Run multiple iterations with warmup and report mean/stddev.",
+    "effort": "m",
+    "owner_area": "benchmark"
+  },
+  {
+    "id": "A8-004",
+    "category": "quality",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/test/mcp/oauth-browser.test.ts",
+    "line": 136,
+    "evidence": "OAuth tests rely on fixed sleep delays instead of deterministic completion signals.",
+    "impact": "Adds suite latency and introduces flakiness under slower CI conditions.",
+    "recommendation": "Await real callback/event completion and remove arbitrary sleeps.",
+    "effort": "m",
+    "owner_area": "test.mcp"
+  },
+  {
+    "id": "A8-005",
+    "category": "quality",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/test/memory/abort-leak.test.ts",
+    "line": 34,
+    "evidence": "Memory leak test depends on external network calls to example.com.",
+    "impact": "Offline/isolated environments can fail nondeterministically.",
+    "recommendation": "Stub/mocking fetch behavior for deterministic local test execution.",
+    "effort": "m",
+    "owner_area": "test.memory"
+  },
+  {
+    "id": "A8-006",
+    "category": "security",
+    "severity": "high",
+    "confidence": "medium",
+    "path": "packages/lobster/src/benchmark/runner.ts",
+    "line": 44,
+    "evidence": "Benchmark permission allowlist has no regression test coverage.",
+    "impact": "Future drift may silently widen shell permissions.",
+    "recommendation": "Add explicit tests asserting strict benchmark permission matrix.",
+    "effort": "m",
+    "owner_area": "benchmark"
+  }
+]

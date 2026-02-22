@@ -34,10 +34,78 @@ export namespace McpAuth {
   // Credential Manager) could be added as a future improvement for stronger
   // at-rest protection.
   const filepath = path.join(Global.Path.data, "mcp-auth.json")
+  const WRITE_DEBOUNCE_MS = 25
+
+  let cache: Record<string, Entry> | undefined
+  let loading: Promise<Record<string, Entry>> | undefined
+  let writeTimer: ReturnType<typeof setTimeout> | undefined
+  let pendingWrite: Promise<void> | undefined
+  let resolvePendingWrite: (() => void) | undefined
+  let rejectPendingWrite: ((error: unknown) => void) | undefined
+
+  async function loadCache(): Promise<Record<string, Entry>> {
+    if (cache) return cache
+    if (loading) return loading
+
+    const file = Bun.file(filepath)
+    loading = file
+      .json()
+      .catch(() => ({}))
+      .then((data) => {
+        if (data && typeof data === "object" && !Array.isArray(data)) {
+          cache = data as Record<string, Entry>
+          return cache
+        }
+        cache = {}
+        return cache
+      })
+
+    return loading
+  }
+
+  function schedulePersist(): Promise<void> {
+    pendingWrite ??= new Promise<void>((resolve, reject) => {
+      resolvePendingWrite = resolve
+      rejectPendingWrite = reject
+    })
+    if (writeTimer) return pendingWrite
+
+    writeTimer = setTimeout(async () => {
+      const resolve = resolvePendingWrite
+      const reject = rejectPendingWrite
+      writeTimer = undefined
+      pendingWrite = undefined
+      resolvePendingWrite = undefined
+      rejectPendingWrite = undefined
+
+      try {
+        const file = Bun.file(filepath)
+        await Bun.write(file, JSON.stringify(cache ?? {}, null, 2), { mode: 0o600 })
+        resolve?.()
+      } catch (error) {
+        reject?.(error)
+      }
+    }, WRITE_DEBOUNCE_MS)
+
+    return pendingWrite
+  }
+
+  async function mutate(mcpName: string, update: (entry: Entry) => void, serverUrl?: string): Promise<void> {
+    const data = await loadCache()
+    const entry = { ...(data[mcpName] ?? {}) }
+    update(entry)
+    if (serverUrl) {
+      entry.serverUrl = serverUrl
+    }
+    data[mcpName] = entry
+    await schedulePersist()
+  }
 
   export async function get(mcpName: string): Promise<Entry | undefined> {
-    const data = await all()
-    return data[mcpName]
+    const data = await loadCache()
+    const entry = data[mcpName]
+    if (!entry) return undefined
+    return structuredClone(entry)
   }
 
   /**
@@ -58,57 +126,64 @@ export namespace McpAuth {
   }
 
   export async function all(): Promise<Record<string, Entry>> {
-    const file = Bun.file(filepath)
-    return file.json().catch(() => ({}))
+    const data = await loadCache()
+    return structuredClone(data)
   }
 
   export async function set(mcpName: string, entry: Entry, serverUrl?: string): Promise<void> {
-    const file = Bun.file(filepath)
-    const data = await all()
-    // Always update serverUrl if provided
+    const data = await loadCache()
+    const next = { ...entry }
     if (serverUrl) {
-      entry.serverUrl = serverUrl
+      next.serverUrl = serverUrl
     }
-    await Bun.write(file, JSON.stringify({ ...data, [mcpName]: entry }, null, 2), { mode: 0o600 })
+    data[mcpName] = next
+    await schedulePersist()
   }
 
   export async function remove(mcpName: string): Promise<void> {
-    const file = Bun.file(filepath)
-    const data = await all()
+    const data = await loadCache()
     delete data[mcpName]
-    await Bun.write(file, JSON.stringify(data, null, 2), { mode: 0o600 })
+    await schedulePersist()
   }
 
   export async function updateTokens(mcpName: string, tokens: Tokens, serverUrl?: string): Promise<void> {
-    const entry = (await get(mcpName)) ?? {}
-    entry.tokens = tokens
-    await set(mcpName, entry, serverUrl)
+    await mutate(
+      mcpName,
+      (entry) => {
+        entry.tokens = tokens
+      },
+      serverUrl,
+    )
   }
 
   export async function updateClientInfo(mcpName: string, clientInfo: ClientInfo, serverUrl?: string): Promise<void> {
-    const entry = (await get(mcpName)) ?? {}
-    entry.clientInfo = clientInfo
-    await set(mcpName, entry, serverUrl)
+    await mutate(
+      mcpName,
+      (entry) => {
+        entry.clientInfo = clientInfo
+      },
+      serverUrl,
+    )
   }
 
   export async function updateCodeVerifier(mcpName: string, codeVerifier: string): Promise<void> {
-    const entry = (await get(mcpName)) ?? {}
-    entry.codeVerifier = codeVerifier
-    await set(mcpName, entry)
+    await mutate(mcpName, (entry) => {
+      entry.codeVerifier = codeVerifier
+    })
   }
 
   export async function clearCodeVerifier(mcpName: string): Promise<void> {
-    const entry = await get(mcpName)
-    if (entry) {
-      delete entry.codeVerifier
-      await set(mcpName, entry)
-    }
+    const data = await loadCache()
+    const entry = data[mcpName]
+    if (!entry) return
+    delete entry.codeVerifier
+    await schedulePersist()
   }
 
   export async function updateOAuthState(mcpName: string, oauthState: string): Promise<void> {
-    const entry = (await get(mcpName)) ?? {}
-    entry.oauthState = oauthState
-    await set(mcpName, entry)
+    await mutate(mcpName, (entry) => {
+      entry.oauthState = oauthState
+    })
   }
 
   export async function getOAuthState(mcpName: string): Promise<string | undefined> {
@@ -117,11 +192,11 @@ export namespace McpAuth {
   }
 
   export async function clearOAuthState(mcpName: string): Promise<void> {
-    const entry = await get(mcpName)
-    if (entry) {
-      delete entry.oauthState
-      await set(mcpName, entry)
-    }
+    const data = await loadCache()
+    const entry = data[mcpName]
+    if (!entry) return
+    delete entry.oauthState
+    await schedulePersist()
   }
 
   /**

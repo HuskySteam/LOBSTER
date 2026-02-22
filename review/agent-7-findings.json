@@ -1,0 +1,67 @@
+﻿[
+  {
+    "id": "A7-001",
+    "category": "security",
+    "severity": "critical",
+    "confidence": "high",
+    "path": "packages/lobster/src/server/routes/config.ts",
+    "line": 36,
+    "evidence": "Config patch endpoint can alter plugin config that leads to package install/import execution.",
+    "impact": "If unauthenticated route access exists, attacker can trigger arbitrary code execution via malicious plugin entry.",
+    "recommendation": "Require privileged auth for config mutation and gate plugin installs to trusted sources.",
+    "effort": "s",
+    "owner_area": "server"
+  },
+  {
+    "id": "A7-002",
+    "category": "security",
+    "severity": "critical",
+    "confidence": "high",
+    "path": "packages/lobster/src/server/routes/experimental.ts",
+    "line": 90,
+    "evidence": "Worktree create accepts `startCommand` that is executed by shell in worktree startup flow.",
+    "impact": "Untrusted callers can execute arbitrary host commands when endpoint is exposed without strong auth.",
+    "recommendation": "Treat endpoint as privileged and remove/sandbox arbitrary start command execution.",
+    "effort": "m",
+    "owner_area": "worktree"
+  },
+  {
+    "id": "A7-003",
+    "category": "security",
+    "severity": "high",
+    "confidence": "high",
+    "path": "packages/lobster/src/server/routes/mcp.ts",
+    "line": 24,
+    "evidence": "MCP add endpoint accepts arbitrary URL and opens outbound transport connections.",
+    "impact": "Can be abused for SSRF toward internal metadata/private network targets.",
+    "recommendation": "Require privileged auth and validate/allowlist MCP URLs.",
+    "effort": "m",
+    "owner_area": "mcp"
+  },
+  {
+    "id": "A7-004",
+    "category": "security",
+    "severity": "high",
+    "confidence": "medium",
+    "path": "packages/lobster/src/server/routes/experimental.ts",
+    "line": 137,
+    "evidence": "Worktree delete endpoint performs destructive git worktree/branch removal with provided directory.",
+    "impact": "Unauthorized callers can destroy branches/worktrees and lose local work.",
+    "recommendation": "Require privileged auth and explicit destructive-action confirmation controls.",
+    "effort": "m",
+    "owner_area": "worktree"
+  },
+  {
+    "id": "A7-005",
+    "category": "security",
+    "severity": "high",
+    "confidence": "medium",
+    "path": "packages/lobster/src/server/routes/experimental.ts",
+    "line": 163,
+    "evidence": "Worktree reset endpoint runs `git reset --hard` and `git clean -fdx` on requested directory.",
+    "impact": "Unauthorized calls can wipe uncommitted data irreversibly.",
+    "recommendation": "Protect route with privileged auth and add local operator confirmation/safeguards.",
+    "effort": "m",
+    "owner_area": "worktree"
+  }
+]

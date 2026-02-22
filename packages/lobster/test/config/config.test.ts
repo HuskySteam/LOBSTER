@@ -1,5 +1,6 @@
 import { test, expect, describe, mock, afterEach } from "bun:test"
 import { Config } from "../../src/config/config"
+import { ConfigMarkdown } from "../../src/config/markdown"
 import { Instance } from "../../src/project/instance"
 import { Auth } from "../../src/auth"
 import { tmpdir } from "../fixture/fixture"
@@ -556,6 +557,72 @@ Nested command template`,
       })
     },
   })
+})
+
+test("loads command, agent, and mode markdown in parallel per directory", async () => {
+  const originalParse = ConfigMarkdown.parse
+  let activeParses = 0
+  let maxActiveParses = 0
+
+  ConfigMarkdown.parse = mock(async (filePath: string) => {
+    activeParses++
+    maxActiveParses = Math.max(maxActiveParses, activeParses)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    try {
+      return await originalParse(filePath)
+    } finally {
+      activeParses--
+    }
+  })
+
+  try {
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        const opencodeDir = path.join(dir, ".lobster")
+        await fs.mkdir(path.join(opencodeDir, "commands"), { recursive: true })
+        await fs.mkdir(path.join(opencodeDir, "agents"), { recursive: true })
+        await fs.mkdir(path.join(opencodeDir, "modes"), { recursive: true })
+
+        await Bun.write(
+          path.join(opencodeDir, "commands", "parallel.md"),
+          `---
+description: Parallel command
+---
+echo parallel`,
+        )
+
+        await Bun.write(
+          path.join(opencodeDir, "agents", "parallel.md"),
+          `---
+model: test/model
+mode: subagent
+---
+Parallel agent`,
+        )
+
+        await Bun.write(
+          path.join(opencodeDir, "modes", "parallel.md"),
+          `---
+model: test/model
+---
+Parallel mode`,
+        )
+      },
+    })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const config = await Config.get()
+        expect(config.command?.parallel).toBeDefined()
+        expect(config.agent?.parallel).toBeDefined()
+      },
+    })
+
+    expect(maxActiveParses).toBeGreaterThan(1)
+  } finally {
+    ConfigMarkdown.parse = originalParse
+  }
 })
 
 test("updates config and writes to file", async () => {
@@ -1501,6 +1568,70 @@ test("project config overrides remote well-known config", async () => {
         expect(config.mcp?.jira?.enabled).toBe(true)
       },
     })
+  } finally {
+    globalThis.fetch = originalFetch
+    Auth.all = originalAuthAll
+  }
+})
+
+test("fetches well-known configs concurrently", async () => {
+  const originalFetch = globalThis.fetch
+  let activeFetches = 0
+  let maxActiveFetches = 0
+
+  const mockFetch = mock(async (url: string | URL | Request) => {
+    const urlStr = url.toString()
+    if (urlStr.includes(".well-known/lobster")) {
+      activeFetches++
+      maxActiveFetches = Math.max(maxActiveFetches, activeFetches)
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      activeFetches--
+
+      return new Response(
+        JSON.stringify({
+          config: {
+            $schema: "https://opencode.ai/config.json",
+          },
+        }),
+        { status: 200 },
+      )
+    }
+    return originalFetch(url)
+  })
+
+  globalThis.fetch = mockFetch as unknown as typeof fetch
+
+  const originalAuthAll = Auth.all
+  Auth.all = mock(() =>
+    Promise.resolve({
+      "https://one.example.com": {
+        type: "wellknown" as const,
+        key: "TEST_TOKEN_ONE",
+        token: "token-one",
+      },
+      "https://two.example.com": {
+        type: "wellknown" as const,
+        key: "TEST_TOKEN_TWO",
+        token: "token-two",
+      },
+      "https://three.example.com": {
+        type: "wellknown" as const,
+        key: "TEST_TOKEN_THREE",
+        token: "token-three",
+      },
+    }),
+  )
+
+  try {
+    await using tmp = await tmpdir({ git: true })
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await Config.get()
+      },
+    })
+
+    expect(maxActiveFetches).toBeGreaterThan(1)
   } finally {
     globalThis.fetch = originalFetch
     Auth.all = originalAuthAll

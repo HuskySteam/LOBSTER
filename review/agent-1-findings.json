@@ -1,0 +1,93 @@
+﻿[
+  {
+    "id": "A1-001",
+    "category": "performance",
+    "severity": "high",
+    "confidence": "high",
+    "path": "packages/lobster/src/session/processor.ts",
+    "line": 228,
+    "evidence": "Tool-call handling reloads all assistant parts to run doom-loop checks.",
+    "impact": "Adds synchronous storage I/O on every tool invocation in long sessions.",
+    "recommendation": "Track a rolling in-memory window of recent tool parts during streaming.",
+    "effort": "m",
+    "owner_area": "session"
+  },
+  {
+    "id": "A1-002",
+    "category": "performance",
+    "severity": "high",
+    "confidence": "high",
+    "path": "packages/lobster/src/session/message-v2.ts",
+    "line": 670,
+    "evidence": "Message stream path materializes full message-id list before yielding entries.",
+    "impact": "Large sessions pay O(n) memory and startup latency before first result.",
+    "recommendation": "Stream or paginate storage keys instead of buffering all IDs.",
+    "effort": "m",
+    "owner_area": "session"
+  },
+  {
+    "id": "A1-003",
+    "category": "performance",
+    "severity": "high",
+    "confidence": "high",
+    "path": "packages/lobster/src/session/index.ts",
+    "line": 353,
+    "evidence": "Session search scans every session and every part text for each query.",
+    "impact": "Search latency scales poorly with history size and blocks interactive flows.",
+    "recommendation": "Add lightweight indexing and bounded scan windows for search.",
+    "effort": "l",
+    "owner_area": "session"
+  },
+  {
+    "id": "A1-004",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "high",
+    "path": "packages/lobster/src/session/compaction.ts",
+    "line": 59,
+    "evidence": "Compaction re-scans and re-sorts entire session history each run.",
+    "impact": "Token overflow events trigger expensive full-history work repeatedly.",
+    "recommendation": "Maintain incremental candidate metadata for prune decisions.",
+    "effort": "l",
+    "owner_area": "session"
+  },
+  {
+    "id": "A1-005",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "high",
+    "path": "packages/lobster/src/tool/task.ts",
+    "line": 424,
+    "evidence": "Task completion summary re-reads full session messages after execution.",
+    "impact": "Task response latency increases with session length.",
+    "recommendation": "Summarize from recent or already-tracked tool outcomes.",
+    "effort": "m",
+    "owner_area": "tool"
+  },
+  {
+    "id": "A1-006",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "high",
+    "path": "packages/lobster/src/team/manager.ts",
+    "line": 176,
+    "evidence": "Cycle detection repeatedly reads task graph nodes from storage per update.",
+    "impact": "Dependency updates become I/O-bound as team graph grows.",
+    "recommendation": "Cache adjacency data and run cycle checks over in-memory graph state.",
+    "effort": "l",
+    "owner_area": "team"
+  },
+  {
+    "id": "A1-007",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "high",
+    "path": "packages/lobster/src/team/manager.ts",
+    "line": 336,
+    "evidence": "Task listing reads all team task keys and entities on each call.",
+    "impact": "Common task-context calls carry O(n) storage overhead.",
+    "recommendation": "Cache/snapshot sortable task metadata per team.",
+    "effort": "m",
+    "owner_area": "team"
+  }
+]

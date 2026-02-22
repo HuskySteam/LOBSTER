@@ -1,0 +1,80 @@
+﻿[
+  {
+    "id": "A3-001",
+    "category": "performance",
+    "severity": "high",
+    "confidence": "medium",
+    "path": "packages/lobster/src/cli/cmd/tui-ink/routes/session/index.tsx",
+    "line": 120,
+    "evidence": "Session route subscribes to global `part` map, not session-scoped part state.",
+    "impact": "Unrelated part updates invalidate viewport calculations and rerender loops.",
+    "recommendation": "Use session-scoped part selectors and memoized derivations.",
+    "effort": "m",
+    "owner_area": "cli.tui-ink"
+  },
+  {
+    "id": "A3-002",
+    "category": "performance",
+    "severity": "high",
+    "confidence": "medium",
+    "path": "packages/lobster/src/cli/cmd/tui-ink/routes/session/index.tsx",
+    "line": 164,
+    "evidence": "Visible message window recomputes line estimates across large message ranges.",
+    "impact": "High SSE activity triggers expensive repeated virtualization math.",
+    "recommendation": "Cache per-message line heights and update incrementally.",
+    "effort": "m",
+    "owner_area": "cli.tui-ink"
+  },
+  {
+    "id": "A3-003",
+    "category": "performance",
+    "severity": "high",
+    "confidence": "medium",
+    "path": "packages/lobster/src/cli/cmd/tui-ink/routes/session/sidebar.tsx",
+    "line": 27,
+    "evidence": "Sidebar token totals recalc across all messages/parts on global part changes.",
+    "impact": "Adds O(messages x parts) work for frequent tool-part updates.",
+    "recommendation": "Maintain per-session aggregate counters and narrow selectors.",
+    "effort": "m",
+    "owner_area": "cli.tui-ink"
+  },
+  {
+    "id": "A3-004",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/cli/cmd/tui-ink/store.ts",
+    "line": 201,
+    "evidence": "Upsert message path clones and splices arrays per insert.",
+    "impact": "Long sessions accumulate allocation churn and GC pressure.",
+    "recommendation": "Adopt append/truncate buffers and avoid full-collection cloning.",
+    "effort": "l",
+    "owner_area": "cli.tui-ink"
+  },
+  {
+    "id": "A3-005",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/cli/cmd/tui-ink/store.ts",
+    "line": 246,
+    "evidence": "Part updates clone part structures on each streamed update.",
+    "impact": "Streaming tools cause avoidable global store churn and re-renders.",
+    "recommendation": "Partition part state and patch only touched message entries.",
+    "effort": "m",
+    "owner_area": "cli.tui-ink"
+  },
+  {
+    "id": "A3-006",
+    "category": "quality",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/cli/cmd/tui-ink/sync.ts",
+    "line": 132,
+    "evidence": "LSP status refresh fires for each update event without debounce.",
+    "impact": "Burst event streams can saturate fetch/event loop and degrade UX.",
+    "recommendation": "Debounce or coalesce status refresh calls during bursts.",
+    "effort": "s",
+    "owner_area": "cli.tui-ink"
+  }
+]

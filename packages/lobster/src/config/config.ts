@@ -34,6 +34,7 @@ import { iife } from "@/util/iife"
 
 export namespace Config {
   const log = Log.create({ service: "config" })
+  const WELLKNOWN_FETCH_CONCURRENCY = 4
 
   // Managed settings directory for enterprise deployments (highest priority, admin-controlled)
   // These settings override all user and project settings
@@ -65,6 +66,30 @@ export namespace Config {
     return merged
   }
 
+  async function mapWithConcurrency<T, R>(
+    items: T[],
+    concurrency: number,
+    mapper: (item: T, index: number) => Promise<R>,
+  ): Promise<R[]> {
+    if (items.length === 0) return []
+
+    const workerCount = Math.max(1, Math.min(concurrency, items.length))
+    const result = new Array<R>(items.length)
+    let nextIndex = 0
+
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        while (true) {
+          const index = nextIndex++
+          if (index >= items.length) return
+          result[index] = await mapper(items[index]!, index)
+        }
+      }),
+    )
+
+    return result
+  }
+
   export const state = Instance.state(async () => {
     const auth = await Auth.all()
 
@@ -77,8 +102,13 @@ export namespace Config {
     // 6) Inline config (LOBSTER_CONFIG_CONTENT)
     // Managed config directory is enterprise-only and always overrides everything above.
     let result: Info = {}
-    for (const [key, value] of Object.entries(auth)) {
-      if (value.type === "wellknown") {
+    const wellknownEntries = Object.entries(auth).flatMap(([key, value]) =>
+      value.type === "wellknown" ? ([[key, value]] as const) : [],
+    )
+    const wellknownConfigs = await mapWithConcurrency(
+      wellknownEntries,
+      WELLKNOWN_FETCH_CONCURRENCY,
+      async ([key, value]) => {
         process.env[value.key] = value.token
         const remoteUrl = `${key}/.well-known/lobster`
         log.debug("fetching remote config", { url: remoteUrl })
@@ -96,12 +126,12 @@ export namespace Config {
         const remoteConfig = wellknown.config ?? {}
         // Add $schema to prevent load() from trying to write back to a non-existent file
         if (!remoteConfig.$schema) remoteConfig.$schema = "https://opencode.ai/config.json"
-        result = mergeConfigConcatArrays(
-          result,
-          await load(JSON.stringify(remoteConfig), `${key}/.well-known/lobster`),
-        )
         log.debug("loaded remote config from well-known", { url: key })
-      }
+        return load(JSON.stringify(remoteConfig), `${key}/.well-known/lobster`)
+      },
+    )
+    for (const config of wellknownConfigs) {
+      result = mergeConfigConcatArrays(result, config)
     }
 
     // Global user config overrides remote config.
@@ -184,10 +214,17 @@ export namespace Config {
         }),
       )
 
-      result.command = mergeDeep(result.command ?? {}, await loadCommand(dir))
-      result.agent = mergeDeep(result.agent, await loadAgent(dir))
-      result.agent = mergeDeep(result.agent, await loadMode(dir))
-      result.plugin.push(...(await loadPlugin(dir)))
+      const [commands, agents, modes, plugins] = await Promise.all([
+        loadCommand(dir),
+        loadAgent(dir),
+        loadMode(dir),
+        loadPlugin(dir),
+      ])
+
+      result.command = mergeDeep(result.command ?? {}, commands)
+      result.agent = mergeDeep(result.agent, agents)
+      result.agent = mergeDeep(result.agent, modes)
+      result.plugin.push(...plugins)
     }
 
     // Inline config content overrides all non-managed config sources.

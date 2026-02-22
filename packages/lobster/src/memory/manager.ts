@@ -6,6 +6,7 @@ import { ulid } from "ulid"
 
 export namespace MemoryManager {
   const log = Log.create({ service: "memory.manager" })
+  const LIST_READ_CONCURRENCY = 16
   let lastDecayTime = 0
 
   // In-memory cache to avoid repeated storage reads
@@ -51,6 +52,38 @@ export namespace MemoryManager {
     for (const entry of entries) {
       indexEntry(entry)
     }
+  }
+
+  function collectCandidateIDs(words: string[]): Set<string> {
+    const candidateIDs = new Set<string>()
+    for (const word of words) {
+      const ids = _keywordIndex.get(word)
+      if (!ids) continue
+      for (const id of ids) {
+        candidateIDs.add(id)
+      }
+    }
+    return candidateIDs
+  }
+
+  async function readEntries(keys: readonly (readonly string[])[]): Promise<Array<Memory.Entry | undefined>> {
+    if (keys.length === 0) return []
+
+    const results = new Array<Memory.Entry | undefined>(keys.length)
+    const workerCount = Math.min(LIST_READ_CONCURRENCY, keys.length)
+    let nextIndex = 0
+
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        while (true) {
+          const index = nextIndex++
+          if (index >= keys.length) return
+          results[index] = await Storage.read<Memory.Entry>([...keys[index]!]).catch(() => undefined)
+        }
+      }),
+    )
+
+    return results
   }
 
   export async function save(input: {
@@ -133,7 +166,13 @@ export namespace MemoryManager {
   export async function search(query: string, tags?: string[]): Promise<Memory.Entry[]> {
     const all = await listAll()
     const lower = query.toLowerCase()
-    return all.filter((entry) => {
+    const words = extractKeywords(query)
+    const candidateIDs = words.length > 0 ? collectCandidateIDs(words) : new Set<string>()
+    const candidates = candidateIDs.size > 0
+      ? all.filter((entry) => candidateIDs.has(entry.id))
+      : all
+
+    return candidates.filter((entry) => {
       const matchesQuery = entry.content.toLowerCase().includes(lower)
       const matchesTags = !tags?.length || tags.some((t) => entry.tags.includes(t))
       return matchesQuery && matchesTags
@@ -174,13 +213,7 @@ export namespace MemoryManager {
     if (!searchWords.length) return all.slice(0, 5)
 
     // Use keyword index to narrow candidates instead of scanning all entries
-    const candidateIds = new Set<string>()
-    for (const word of searchWords) {
-      const ids = _keywordIndex.get(word)
-      if (ids) {
-        for (const id of ids) candidateIds.add(id)
-      }
-    }
+    const candidateIds = collectCandidateIDs(searchWords)
 
     // If no keyword matches, fall back to full scan (handles substring matches)
     const candidates = candidateIds.size > 0
@@ -212,9 +245,7 @@ export namespace MemoryManager {
   async function listAll(): Promise<Memory.Entry[]> {
     if (_cache) return _cache
     const keys = await Storage.list(["memory"])
-    const results = await Promise.all(
-      keys.map((key) => Storage.read<Memory.Entry>(key).catch(() => undefined)),
-    )
+    const results = await readEntries(keys)
     const entries = results
       .filter((entry): entry is Memory.Entry => entry !== undefined)
       .map((entry) => ({

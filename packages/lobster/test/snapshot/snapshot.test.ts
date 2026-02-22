@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test"
 import { $ } from "bun"
 import path from "path"
+import fs from "fs/promises"
 import { Snapshot } from "../../src/snapshot"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -143,7 +144,13 @@ test("symlink handling", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await $`ln -s ${tmp.path}/a.txt ${tmp.path}/link.txt`.quiet()
+      try {
+        await fs.symlink(path.join(tmp.path, "a.txt"), path.join(tmp.path, "link.txt"), "file")
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code
+        if (code === "EPERM" || code === "EACCES" || code === "ENOTSUP") return
+        throw error
+      }
 
       expect((await Snapshot.patch(before!)).files).toContain(`${tmp.path}${path.sep}link.txt`)
     },
@@ -395,8 +402,15 @@ test("nested symlinks", async () => {
 
       await $`mkdir -p ${tmp.path}/sub/dir`.quiet()
       await Bun.write(path.join(tmp.path, "sub", "dir", "target.txt"), "target content")
-      await $`ln -s ${tmp.path}/sub/dir/target.txt ${tmp.path}/sub/dir/link.txt`.quiet()
-      await $`ln -s ${tmp.path}/sub ${tmp.path}/sub-link`.quiet()
+      try {
+        await fs.symlink(path.join(tmp.path, "sub", "dir", "target.txt"), path.join(tmp.path, "sub", "dir", "link.txt"), "file")
+        const dirType = process.platform === "win32" ? "junction" : "dir"
+        await fs.symlink(path.join(tmp.path, "sub"), path.join(tmp.path, "sub-link"), dirType as "dir" | "junction")
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code
+        if (code === "EPERM" || code === "EACCES" || code === "ENOTSUP") return
+        throw error
+      }
 
       const patch = await Snapshot.patch(before!)
       expect(patch.files).toContain(path.join(tmp.path, "sub", "dir", "link.txt"))
@@ -412,13 +426,15 @@ test("file permissions and ownership changes", async () => {
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
+      if (process.platform === "win32") return
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
       // Change permissions multiple times
-      await $`chmod 600 ${tmp.path}/a.txt`.quiet()
-      await $`chmod 755 ${tmp.path}/a.txt`.quiet()
-      await $`chmod 644 ${tmp.path}/a.txt`.quiet()
+      const target = path.join(tmp.path, "a.txt")
+      await fs.chmod(target, 0o600)
+      await fs.chmod(target, 0o755)
+      await fs.chmod(target, 0o644)
 
       const patch = await Snapshot.patch(before!)
       // Note: git doesn't track permission changes on existing files by default
@@ -437,7 +453,9 @@ test("circular symlinks", async () => {
       expect(before).toBeTruthy()
 
       // Create circular symlink
-      await $`ln -s ${tmp.path}/circular ${tmp.path}/circular`.quiet().nothrow()
+      try {
+        await fs.symlink(path.join(tmp.path, "circular"), path.join(tmp.path, "circular"), "file")
+      } catch {}
 
       const patch = await Snapshot.patch(before!)
       expect(patch.files.length).toBeGreaterThanOrEqual(0) // Should not crash

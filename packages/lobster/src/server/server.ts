@@ -63,6 +63,36 @@ export namespace Server {
     return _sessionToken
   }
 
+  function isPrivilegedRouteWithoutPassword(method: string, reqPath: string) {
+    const normalizedPath = reqPath.length > 1 && reqPath.endsWith("/") ? reqPath.slice(0, -1) : reqPath
+
+    const sessionCommandPath =
+      normalizedPath.startsWith("/session/") &&
+      (normalizedPath.endsWith("/shell") || normalizedPath.endsWith("/command"))
+    if (sessionCommandPath) return true
+    if (normalizedPath.startsWith("/pty")) return true
+
+    const isAuthMutation = normalizedPath.startsWith("/auth/") && (method === "PUT" || method === "DELETE")
+    if (isAuthMutation) return true
+
+    const isConfigMutation = method === "PATCH" && normalizedPath === "/config"
+    if (isConfigMutation) return true
+
+    const isWorktreeCreate = method === "POST" && normalizedPath === "/experimental/worktree"
+    const isWorktreeReset = method === "POST" && normalizedPath === "/experimental/worktree/reset"
+    const isWorktreeRemove = method === "DELETE" && normalizedPath === "/experimental/worktree"
+    if (isWorktreeCreate || isWorktreeReset || isWorktreeRemove) return true
+
+    const isMcpCreate = method === "POST" && normalizedPath === "/mcp"
+    const isMcpMutation = normalizedPath.startsWith("/mcp/") && (method === "POST" || method === "DELETE")
+    if (isMcpCreate || isMcpMutation) return true
+
+    const isInstanceDispose = method === "POST" && normalizedPath === "/instance/dispose"
+    if (isInstanceDispose) return true
+
+    return false
+  }
+
   export function url(): URL {
     return _url ?? new URL("http://localhost:4096")
   }
@@ -96,17 +126,10 @@ export namespace Server {
             const username = Flag.LOBSTER_SERVER_USERNAME ?? "lobster"
             return basicAuth({ username, password })(c, next)
           }
-          // SECURITY: When no explicit password is configured, require session token
-          // for privileged endpoints (shell, PTY, file operations).
-          // Non-privileged endpoints (SSE events, read-only queries) remain open for
-          // seamless TUI in-process connectivity.
-          const privilegedPrefixes = ["/session/", "/pty"]
-          const privilegedSuffixes = ["/shell", "/command"]
-          const reqPath = c.req.path
-          const isPrivileged =
-            privilegedPrefixes.some((p) => reqPath.startsWith(p) && privilegedSuffixes.some((s) => reqPath.endsWith(s))) ||
-            reqPath.startsWith("/pty")
-          if (isPrivileged) {
+
+          // SECURITY: In passwordless mode, require the in-process session token
+          // for high-risk mutating endpoints.
+          if (isPrivilegedRouteWithoutPassword(c.req.method, c.req.path)) {
             const token = c.req.header("x-lobster-token")
             if (token !== _sessionToken) {
               return c.json({ error: "Unauthorized: session token required" }, { status: 401 })

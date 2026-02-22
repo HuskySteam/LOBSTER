@@ -21,12 +21,13 @@ console.log("✅ Opencode server ready")
 
 const MAX_SESSIONS = 1000
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000
+const EVENT_BACKOFF_BASE_MS = 500
+const EVENT_BACKOFF_MAX_MS = 10_000
 
 const sessions = new Map<string, { client: any; server: any; sessionId: string; channel: string; thread: string; lastAccessed: number }>()
 const sessionIdToKey = new Map<string, string>()
 
 function evictStaleSessions() {
-  if (sessions.size <= MAX_SESSIONS) return
   const now = Date.now()
   for (const [key, session] of sessions.entries()) {
     if (now - session.lastAccessed > SESSION_TTL_MS) {
@@ -43,24 +44,51 @@ function evictStaleSessions() {
   }
 }
 
-;(async () => {
-  const events = await opencode.client.event.subscribe()
-  for await (const event of events.stream) {
-    if (event.type === "message.part.updated") {
-      const part = event.properties.part
-      if (part.type === "tool") {
-        const sessionKey = sessionIdToKey.get(part.sessionID)
-        if (sessionKey) {
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+async function subscribeToEventsForever() {
+  let reconnectAttempt = 0
+
+  while (true) {
+    try {
+      const events = await opencode.client.event.subscribe()
+      reconnectAttempt = 0
+
+      for await (const event of events.stream) {
+        try {
+          if (event.type !== "message.part.updated") continue
+          const part = event.properties.part
+          if (part.type !== "tool") continue
+
+          const sessionKey = sessionIdToKey.get(part.sessionID)
+          if (!sessionKey) continue
+
           const session = sessions.get(sessionKey)
-          if (session) {
-            session.lastAccessed = Date.now()
-            handleToolUpdate(part, session.channel, session.thread)
-          }
+          if (!session) continue
+
+          session.lastAccessed = Date.now()
+          await handleToolUpdate(part, session.channel, session.thread)
+        } catch (error) {
+          console.error("âŒ Failed to process stream event:", error)
         }
       }
+
+      console.warn("âš ï¸ Event stream closed, reconnecting...")
+    } catch (error) {
+      console.error("âš ï¸ Event stream failed, reconnecting:", error)
     }
+
+    reconnectAttempt += 1
+    const backoffMs = Math.min(EVENT_BACKOFF_BASE_MS * 2 ** (reconnectAttempt - 1), EVENT_BACKOFF_MAX_MS)
+    await sleep(backoffMs)
   }
-})()
+}
+
+void subscribeToEventsForever()
 
 async function handleToolUpdate(part: ToolPart, channel: string, thread: string) {
   if (part.state.status !== "completed") return
@@ -91,6 +119,8 @@ app.message(async ({ message, say }) => {
   const channel = message.channel
   const thread = (message as any).thread_ts || message.ts
   const sessionKey = `${channel}-${thread}`
+
+  evictStaleSessions()
 
   let session = sessions.get(sessionKey)
   if (session) {

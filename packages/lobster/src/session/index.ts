@@ -29,6 +29,81 @@ export namespace Session {
 
   const parentTitlePrefix = "New session - "
   const childTitlePrefix = "Child session - "
+  type SearchIndexEntry = {
+    partTextByID: Map<string, string>
+    text: string
+    dirty: boolean
+  }
+  const searchIndexBySession = new Map<string, SearchIndexEntry>()
+  const mutationVersionBySession = new Map<string, number>()
+
+  function bumpMutationVersion(sessionID: string) {
+    mutationVersionBySession.set(sessionID, (mutationVersionBySession.get(sessionID) ?? 0) + 1)
+  }
+
+  export function mutationVersion(sessionID: string) {
+    return mutationVersionBySession.get(sessionID) ?? 0
+  }
+
+  function normalizeSearchText(text: string) {
+    return text.toLowerCase()
+  }
+
+  function clearSearchIndex(sessionID: string) {
+    searchIndexBySession.delete(sessionID)
+  }
+
+  function materializeSearchIndex(entry: SearchIndexEntry) {
+    if (!entry.dirty) return entry
+    entry.text = Array.from(entry.partTextByID.values()).join("\n")
+    entry.dirty = false
+    return entry
+  }
+
+  function updateSearchIndexPart(part: MessageV2.Part) {
+    if (part.type !== "text") return
+    const entry = searchIndexBySession.get(part.sessionID)
+    if (!entry) return
+    const normalized = normalizeSearchText(part.text)
+    const previous = entry.partTextByID.get(part.id)
+    entry.partTextByID.set(part.id, normalized)
+    if (previous === undefined) {
+      if (!entry.dirty) {
+        entry.text = entry.text ? `${entry.text}\n${normalized}` : normalized
+      }
+      return
+    }
+    if (previous !== normalized) {
+      entry.dirty = true
+    }
+  }
+
+  function removePartFromSearchIndex(sessionID: string, partID: string) {
+    const entry = searchIndexBySession.get(sessionID)
+    if (!entry) return
+    if (entry.partTextByID.delete(partID)) entry.dirty = true
+  }
+
+  async function ensureSearchIndex(sessionID: string): Promise<SearchIndexEntry> {
+    const cached = searchIndexBySession.get(sessionID)
+    if (cached) return materializeSearchIndex(cached)
+
+    const partTextByID = new Map<string, string>()
+    const msgs = await messages({ sessionID }).catch(() => [])
+    for (const msg of msgs) {
+      for (const part of msg.parts) {
+        if (part.type !== "text") continue
+        partTextByID.set(part.id, normalizeSearchText(part.text))
+      }
+    }
+    const next: SearchIndexEntry = {
+      partTextByID,
+      text: Array.from(partTextByID.values()).join("\n"),
+      dirty: false,
+    }
+    searchIndexBySession.set(sessionID, next)
+    return next
+  }
 
   function createDefaultTitle(isChild = false) {
     return (isChild ? childTitlePrefix : parentTitlePrefix) + new Date().toISOString()
@@ -363,13 +438,8 @@ export namespace Session {
         results.push(session)
         continue
       }
-      const msgs = await messages({ sessionID: session.id }).catch(() => [])
-      const hasMatch = msgs.some((msg) =>
-        msg.parts.some((p) =>
-          p.type === "text" && (p as any).text?.toLowerCase().includes(lower)
-        )
-      )
-      if (hasMatch) results.push(session)
+      const index = await ensureSearchIndex(session.id)
+      if (index.text.includes(lower)) results.push(session)
     }
     return results
   }
@@ -401,6 +471,9 @@ export namespace Session {
         await Storage.remove(msg)
       }
       await Storage.remove(["session", project.id, sessionID])
+      MessageV2.clearMessageIDIndex(sessionID)
+      clearSearchIndex(sessionID)
+      mutationVersionBySession.delete(sessionID)
       AgentState.clear(sessionID)
       Bus.publish(Event.Deleted, {
         info: session,
@@ -412,6 +485,8 @@ export namespace Session {
 
   export const updateMessage = fn(MessageV2.Info, async (msg) => {
     await Storage.write(["message", msg.sessionID, msg.id], msg)
+    MessageV2.rememberMessageID(msg.sessionID, msg.id)
+    bumpMutationVersion(msg.sessionID)
     Bus.publish(MessageV2.Event.Updated, {
       info: msg,
     })
@@ -425,6 +500,9 @@ export namespace Session {
     }),
     async (input) => {
       await Storage.remove(["message", input.sessionID, input.messageID])
+      MessageV2.forgetMessageID(input.sessionID, input.messageID)
+      clearSearchIndex(input.sessionID)
+      bumpMutationVersion(input.sessionID)
       Bus.publish(MessageV2.Event.Removed, {
         sessionID: input.sessionID,
         messageID: input.messageID,
@@ -441,6 +519,8 @@ export namespace Session {
     }),
     async (input) => {
       await Storage.remove(["part", input.messageID, input.partID])
+      removePartFromSearchIndex(input.sessionID, input.partID)
+      bumpMutationVersion(input.sessionID)
       Bus.publish(MessageV2.Event.PartRemoved, {
         sessionID: input.sessionID,
         messageID: input.messageID,
@@ -466,6 +546,10 @@ export namespace Session {
     const part = "delta" in input ? input.part : input
     const delta = "delta" in input ? input.delta : undefined
     await Storage.write(["part", part.messageID, part.id], part)
+    updateSearchIndexPart(part)
+    if (part.type === "tool") {
+      bumpMutationVersion(part.sessionID)
+    }
     Bus.publish(MessageV2.Event.PartUpdated, {
       part,
       delta,

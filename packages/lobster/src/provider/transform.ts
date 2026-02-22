@@ -17,6 +17,8 @@ function mimeToModality(mime: string): Modality | undefined {
 }
 
 export namespace ProviderTransform {
+  const geminiSchemaCache = new WeakMap<object, Map<string, JSONSchema7>>()
+
   // Maps npm package to the key the AI SDK expects for providerOptions
   function sdkKey(npm: string): string | undefined {
     switch (npm) {
@@ -44,45 +46,92 @@ export namespace ProviderTransform {
   function normalizeMessages(
     msgs: ModelMessage[],
     model: Provider.Model,
-    options: Record<string, unknown>,
+    _options: Record<string, unknown>,
   ): ModelMessage[] {
     // Anthropic rejects messages with empty content - filter out empty string messages
     // and remove empty text/reasoning parts from array content
     if (model.api.npm === "@ai-sdk/anthropic") {
-      msgs = msgs
-        .map((msg) => {
-          if (typeof msg.content === "string") {
-            if (msg.content === "") return undefined
-            return msg
+      let nextMsgs: ModelMessage[] | undefined
+      for (let msgIndex = 0; msgIndex < msgs.length; msgIndex++) {
+        const msg = msgs[msgIndex]
+        let nextMsg: ModelMessage | undefined = msg
+        if (typeof msg.content === "string") {
+          if (msg.content === "") {
+            nextMsg = undefined
           }
-          if (!Array.isArray(msg.content)) return msg
-          const filtered = msg.content.filter((part) => {
-            if (part.type === "text" || part.type === "reasoning") {
-              return part.text !== ""
+        } else if (Array.isArray(msg.content)) {
+          let nextContent: any[] | undefined
+          for (let partIndex = 0; partIndex < msg.content.length; partIndex++) {
+            const part = msg.content[partIndex]
+            const isEmptyText = (part.type === "text" || part.type === "reasoning") && part.text === ""
+            if (isEmptyText) {
+              nextContent ??= msg.content.slice(0, partIndex)
+              continue
             }
-            return true
-          })
-          if (filtered.length === 0) return undefined
-          return { ...msg, content: filtered }
-        })
-        .filter((msg): msg is ModelMessage => msg !== undefined && msg.content !== "")
+            if (nextContent) nextContent.push(part)
+          }
+          if (nextContent) {
+            if (nextContent.length === 0) {
+              nextMsg = undefined
+            } else {
+              nextMsg = { ...msg, content: nextContent as any }
+            }
+          }
+        }
+
+        if (!nextMsg) {
+          nextMsgs ??= msgs.slice(0, msgIndex)
+          continue
+        }
+        if (nextMsg !== msg) {
+          nextMsgs ??= msgs.slice(0, msgIndex)
+        }
+        if (nextMsgs) nextMsgs.push(nextMsg)
+      }
+      if (nextMsgs) {
+        msgs = nextMsgs
+      }
     }
 
     if (model.api.npm === "@ai-sdk/anthropic" || model.api.id.includes("claude")) {
-      return msgs.map((msg) => {
+      let nextMsgs: ModelMessage[] | undefined
+      for (let msgIndex = 0; msgIndex < msgs.length; msgIndex++) {
+        const msg = msgs[msgIndex]
+        let nextMsg = msg
         if ((msg.role === "assistant" || msg.role === "tool") && Array.isArray(msg.content)) {
-          msg.content = msg.content.map((part) => {
-            if ((part.type === "tool-call" || part.type === "tool-result") && "toolCallId" in part) {
-              return {
-                ...part,
-                toolCallId: part.toolCallId.replace(/[^a-zA-Z0-9_-]/g, "_"),
+          let nextContent: any[] | undefined
+          for (let partIndex = 0; partIndex < msg.content.length; partIndex++) {
+            const part = msg.content[partIndex]
+            if (
+              (part.type === "tool-call" || part.type === "tool-result") &&
+              "toolCallId" in part &&
+              typeof part.toolCallId === "string"
+            ) {
+              const normalizedId = part.toolCallId.replace(/[^a-zA-Z0-9_-]/g, "_")
+              if (normalizedId !== part.toolCallId) {
+                nextContent ??= msg.content.slice(0, partIndex)
+                nextContent.push({
+                  ...part,
+                  toolCallId: normalizedId,
+                } as any)
+                continue
               }
             }
-            return part
-          })
+            if (nextContent) nextContent.push(part)
+          }
+          if (nextContent) {
+            nextMsg = {
+              ...msg,
+              content: nextContent as any,
+            }
+          }
         }
-        return msg
-      })
+        if (nextMsg !== msg) {
+          nextMsgs ??= msgs.slice(0, msgIndex)
+        }
+        if (nextMsgs) nextMsgs.push(nextMsg)
+      }
+      return nextMsgs ?? msgs
     }
     if (
       model.api.npm === "@ai-sdk/mistral" ||
@@ -91,13 +140,21 @@ export namespace ProviderTransform {
       model.api.id.toLocaleLowerCase().includes("devstral")
     ) {
       const result: ModelMessage[] = []
+      let changed = false
       for (let i = 0; i < msgs.length; i++) {
         const msg = msgs[i]
         const nextMsg = msgs[i + 1]
+        let current = msg
 
         if ((msg.role === "assistant" || msg.role === "tool") && Array.isArray(msg.content)) {
-          msg.content = msg.content.map((part) => {
-            if ((part.type === "tool-call" || part.type === "tool-result") && "toolCallId" in part) {
+          let nextContent: any[] | undefined
+          for (let partIndex = 0; partIndex < msg.content.length; partIndex++) {
+            const part = msg.content[partIndex]
+            if (
+              (part.type === "tool-call" || part.type === "tool-result") &&
+              "toolCallId" in part &&
+              typeof part.toolCallId === "string"
+            ) {
               // Mistral requires alphanumeric tool call IDs with exactly 9 characters
               // Use xxHash32 to avoid collisions from simple truncation
               const hash = Bun.hash.xxHash32(part.toolCallId).toString(36)
@@ -105,17 +162,27 @@ export namespace ProviderTransform {
                 .replace(/[^a-zA-Z0-9]/g, "")
                 .substring(0, 9)
                 .padEnd(9, "0")
-
-              return {
-                ...part,
-                toolCallId: normalizedId,
+              if (normalizedId !== part.toolCallId) {
+                nextContent ??= msg.content.slice(0, partIndex)
+                nextContent.push({
+                  ...part,
+                  toolCallId: normalizedId,
+                } as any)
+                continue
               }
             }
-            return part
-          })
+            if (nextContent) nextContent.push(part)
+          }
+          if (nextContent) {
+            current = {
+              ...msg,
+              content: nextContent as any,
+            }
+            changed = true
+          }
         }
 
-        result.push(msg)
+        result.push(current)
 
         // Fix message sequence: tool messages cannot be followed by user messages
         if (msg.role === "tool" && nextMsg?.role === "user") {
@@ -128,27 +195,36 @@ export namespace ProviderTransform {
               },
             ],
           })
+          changed = true
         }
       }
-      return result
+      return changed ? result : msgs
     }
 
     if (typeof model.capabilities.interleaved === "object" && model.capabilities.interleaved.field) {
       const field = model.capabilities.interleaved.field
       const providerKey = sdkKey(model.api.npm) ?? "openaiCompatible"
-      return msgs.map((msg) => {
+      let nextMsgs: ModelMessage[] | undefined
+      for (let msgIndex = 0; msgIndex < msgs.length; msgIndex++) {
+        const msg = msgs[msgIndex]
+        let nextMsg = msg
         if (msg.role === "assistant" && Array.isArray(msg.content)) {
-          const reasoningParts = msg.content.filter((part: any) => part.type === "reasoning")
-          const reasoningText = reasoningParts.map((part: any) => part.text).join("")
+          let reasoningText = ""
+          let filteredContent: any[] | undefined
+          for (let partIndex = 0; partIndex < msg.content.length; partIndex++) {
+            const part = msg.content[partIndex] as any
+            if (part.type === "reasoning") {
+              filteredContent ??= msg.content.slice(0, partIndex)
+              reasoningText += part.text ?? ""
+              continue
+            }
+            if (filteredContent) filteredContent.push(part)
+          }
 
-          // Filter out reasoning parts from content
-          const filteredContent = msg.content.filter((part: any) => part.type !== "reasoning")
-
-          // Include reasoning_content | reasoning_details directly on the message for all assistant messages
-          if (reasoningText) {
-            return {
+          if (filteredContent && reasoningText) {
+            nextMsg = {
               ...msg,
-              content: filteredContent,
+              content: filteredContent as any,
               providerOptions: {
                 ...msg.providerOptions,
                 [providerKey]: {
@@ -157,16 +233,19 @@ export namespace ProviderTransform {
                 },
               },
             }
-          }
-
-          return {
-            ...msg,
-            content: filteredContent,
+          } else if (filteredContent) {
+            nextMsg = {
+              ...msg,
+              content: filteredContent as any,
+            }
           }
         }
-
-        return msg
-      })
+        if (nextMsg !== msg) {
+          nextMsgs ??= msgs.slice(0, msgIndex)
+        }
+        if (nextMsgs) nextMsgs.push(nextMsg)
+      }
+      return nextMsgs ?? msgs
     }
 
     return msgs
@@ -212,42 +291,96 @@ export namespace ProviderTransform {
     return msgs
   }
 
+  function parseDataUrlImage(image: unknown): { mime?: string; isBase64: boolean; payload: string } | undefined {
+    if (typeof image !== "string") return undefined
+    if (!image.startsWith("data:")) return undefined
+    const commaIndex = image.indexOf(",")
+    if (commaIndex === -1) return undefined
+    const metadata = image.slice("data:".length, commaIndex)
+    const semicolonIndex = metadata.indexOf(";")
+    const mime = semicolonIndex === -1 ? metadata : metadata.slice(0, semicolonIndex)
+    return {
+      mime: mime || undefined,
+      isBase64: metadata.includes(";base64"),
+      payload: image.slice(commaIndex + 1),
+    }
+  }
+
+  function partMime(part: any): string | undefined {
+    if (typeof part.mediaType === "string" && part.mediaType) return part.mediaType
+    const metadata = part.metadata
+    if (metadata && typeof metadata === "object") {
+      if (typeof metadata.mediaType === "string" && metadata.mediaType) return metadata.mediaType
+      if (typeof metadata.mimeType === "string" && metadata.mimeType) return metadata.mimeType
+    }
+    if (part.type === "image") {
+      return parseDataUrlImage(part.image)?.mime
+    }
+    return undefined
+  }
+
   function unsupportedParts(msgs: ModelMessage[], model: Provider.Model): ModelMessage[] {
-    return msgs.map((msg) => {
-      if (msg.role !== "user" || !Array.isArray(msg.content)) return msg
+    let nextMsgs: ModelMessage[] | undefined
+    for (let msgIndex = 0; msgIndex < msgs.length; msgIndex++) {
+      const msg = msgs[msgIndex]
+      if (msg.role !== "user" || !Array.isArray(msg.content)) {
+        if (nextMsgs) nextMsgs.push(msg)
+        continue
+      }
 
-      const filtered = msg.content.map((part) => {
-        if (part.type !== "file" && part.type !== "image") return part
+      let nextContent: typeof msg.content | undefined
+      for (let partIndex = 0; partIndex < msg.content.length; partIndex++) {
+        const part = msg.content[partIndex] as any
+        if (part.type !== "file" && part.type !== "image") {
+          if (nextContent) nextContent.push(part)
+          continue
+        }
 
-        // Check for empty base64 image data
+        // Check for empty base64 image data only when we have a data URL.
         if (part.type === "image") {
-          const imageStr = part.image.toString()
-          if (imageStr.startsWith("data:")) {
-            const match = imageStr.match(/^data:([^;]+);base64,(.*)$/)
-            if (match && (!match[2] || match[2].length === 0)) {
-              return {
-                type: "text" as const,
-                text: "ERROR: Image file is empty or corrupted. Please provide a valid image.",
-              }
-            }
+          const parsed = parseDataUrlImage(part.image)
+          if (parsed?.isBase64 && parsed.payload.length === 0) {
+            nextContent ??= msg.content.slice(0, partIndex)
+            nextContent.push({
+              type: "text" as const,
+              text: "ERROR: Image file is empty or corrupted. Please provide a valid image.",
+            })
+            continue
           }
         }
 
-        const mime = part.type === "image" ? part.image.toString().split(";")[0].replace("data:", "") : part.mediaType
-        const filename = part.type === "file" ? part.filename : undefined
+        const mime = partMime(part)
+        if (!mime) {
+          if (nextContent) nextContent.push(part)
+          continue
+        }
         const modality = mimeToModality(mime)
-        if (!modality) return part
-        if (model.capabilities.input[modality]) return part
+        if (!modality || model.capabilities.input[modality]) {
+          if (nextContent) nextContent.push(part)
+          continue
+        }
 
-        const name = filename ? `"${filename}"` : modality
-        return {
+        nextContent ??= msg.content.slice(0, partIndex)
+        const name = part.type === "file" && part.filename ? `"${part.filename}"` : modality
+        nextContent.push({
           type: "text" as const,
           text: `ERROR: Cannot read ${name} (this model does not support ${modality} input). Inform the user.`,
-        }
-      })
+        })
+      }
 
-      return { ...msg, content: filtered }
-    })
+      if (!nextContent) {
+        if (nextMsgs) nextMsgs.push(msg)
+        continue
+      }
+
+      nextMsgs ??= msgs.slice(0, msgIndex)
+      nextMsgs.push({
+        ...msg,
+        content: nextContent,
+      })
+    }
+
+    return nextMsgs ?? msgs
   }
 
   export function message(msgs: ModelMessage[], model: Provider.Model, options: Record<string, unknown>) {
@@ -276,14 +409,48 @@ export namespace ProviderTransform {
         return result
       }
 
-      msgs = msgs.map((msg) => {
-        if (!Array.isArray(msg.content)) return { ...msg, providerOptions: remap(msg.providerOptions) }
-        return {
-          ...msg,
-          providerOptions: remap(msg.providerOptions),
-          content: msg.content.map((part) => ({ ...part, providerOptions: remap(part.providerOptions) })),
-        } as typeof msg
-      })
+      let nextMsgs: ModelMessage[] | undefined
+      for (let msgIndex = 0; msgIndex < msgs.length; msgIndex++) {
+        const msg = msgs[msgIndex]
+        const remappedMessageOptions = remap(msg.providerOptions)
+        let nextMsg = msg as ModelMessage
+
+        if (Array.isArray(msg.content)) {
+          let nextContent: any[] | undefined
+          for (let partIndex = 0; partIndex < msg.content.length; partIndex++) {
+            const part = msg.content[partIndex] as any
+            const remappedPartOptions = remap(part.providerOptions)
+            if (remappedPartOptions !== part.providerOptions) {
+              nextContent ??= msg.content.slice(0, partIndex)
+              nextContent.push({
+                ...part,
+                providerOptions: remappedPartOptions,
+              })
+              continue
+            }
+            if (nextContent) nextContent.push(part)
+          }
+
+          if (nextContent || remappedMessageOptions !== msg.providerOptions) {
+              nextMsg = {
+                ...msg,
+                providerOptions: remappedMessageOptions,
+                content: (nextContent ?? msg.content) as any,
+              } as typeof msg
+          }
+        } else if (remappedMessageOptions !== msg.providerOptions) {
+          nextMsg = {
+            ...msg,
+            providerOptions: remappedMessageOptions,
+          } as typeof msg
+        }
+
+        if (nextMsg !== msg) {
+          nextMsgs ??= msgs.slice(0, msgIndex)
+        }
+        if (nextMsgs) nextMsgs.push(nextMsg)
+      }
+      if (nextMsgs) msgs = nextMsgs
     }
 
     return msgs
@@ -752,6 +919,13 @@ export namespace ProviderTransform {
 
     // Convert integer enums to string enums for Google/Gemini
     if (model.providerID === "google" || model.api.id.includes("gemini")) {
+      const cacheKey = `${model.providerID}:${model.api.id}`
+      if (schema && typeof schema === "object") {
+        const perModel = geminiSchemaCache.get(schema as object)
+        const cached = perModel?.get(cacheKey)
+        if (cached) return cached
+      }
+
       const sanitizeGemini = (obj: any): any => {
         if (obj === null || typeof obj !== "object") {
           return obj
@@ -805,7 +979,17 @@ export namespace ProviderTransform {
         return result
       }
 
-      schema = sanitizeGemini(schema)
+      const sanitized = sanitizeGemini(schema) as JSONSchema7
+      if (schema && typeof schema === "object") {
+        const key = schema as object
+        const existing = geminiSchemaCache.get(key)
+        if (existing) {
+          existing.set(cacheKey, sanitized)
+        } else {
+          geminiSchemaCache.set(key, new Map([[cacheKey, sanitized]]))
+        }
+      }
+      schema = sanitized
     }
 
     return schema as JSONSchema7

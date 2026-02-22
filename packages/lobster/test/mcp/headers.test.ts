@@ -1,4 +1,4 @@
-import { test, expect, mock, beforeEach } from "bun:test"
+import { afterAll, beforeEach, expect, mock, test } from "bun:test"
 
 // Track what options were passed to each transport constructor
 const transportCalls: Array<{
@@ -40,6 +40,10 @@ mock.module("@modelcontextprotocol/sdk/client/sse.js", () => ({
 
 beforeEach(() => {
   transportCalls.length = 0
+})
+
+afterAll(() => {
+  mock.restore()
 })
 
 // Import MCP after mocking

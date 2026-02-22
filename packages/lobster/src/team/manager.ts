@@ -4,12 +4,12 @@ import { Team } from "./team"
 import { TeamTask } from "./task"
 import { TeamMessage } from "./message"
 import { Log } from "../util/log"
-import { ulid } from "ulid"
 
 export namespace TeamManager {
   const log = Log.create({ service: "team.manager" })
 
   const NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/
+  const taskGraphCache = new Map<string, Map<string, TeamTask.Info>>()
 
   function validateName(name: string, label: string) {
     if (!NAME_PATTERN.test(name))
@@ -18,12 +18,47 @@ export namespace TeamManager {
       )
   }
 
+  function cloneTask(task: TeamTask.Info): TeamTask.Info {
+    return structuredClone(task)
+  }
+
+  async function loadTaskGraph(teamName: string): Promise<Map<string, TeamTask.Info>> {
+    const cached = taskGraphCache.get(teamName)
+    if (cached) return cached
+
+    const graph = new Map<string, TeamTask.Info>()
+    const keys = await Storage.list(["team_task", teamName])
+    for (const key of keys) {
+      const task = await Storage.read<TeamTask.Info>(key).catch(() => undefined)
+      if (task) graph.set(task.id, task)
+    }
+    taskGraphCache.set(teamName, graph)
+    return graph
+  }
+
+  function upsertCachedTask(task: TeamTask.Info) {
+    const graph = taskGraphCache.get(task.teamName)
+    if (!graph) return
+    graph.set(task.id, cloneTask(task))
+  }
+
+  function removeCachedTask(teamName: string, taskID: string) {
+    const graph = taskGraphCache.get(teamName)
+    if (!graph) return
+    graph.delete(taskID)
+  }
+
+  function clearTaskGraph(teamName: string) {
+    taskGraphCache.delete(teamName)
+  }
+
   export async function create(input: {
     name: string
     leadSessionID: string
     config?: Team.Config
   }): Promise<Team.Info> {
     validateName(input.name, "team name")
+    clearTaskGraph(input.name)
     const info: Team.Info = {
       name: input.name,
       members: [],
@@ -159,6 +194,7 @@ export namespace TeamManager {
       },
     }
     await Storage.write(["team_task", input.teamName, id], task)
+    upsertCachedTask(task)
     Bus.publish(TeamTask.Event.Created, { task })
     log.info("task created", { teamName: input.teamName, id })
     return task
@@ -168,17 +204,19 @@ export namespace TeamManager {
     teamName: string,
     taskId: string,
   ): Promise<TeamTask.Info | undefined> {
-    return Storage.read<TeamTask.Info>(["team_task", teamName, taskId]).catch(
-      () => undefined,
-    )
+    const cached = taskGraphCache.get(teamName)?.get(taskId)
+    if (cached) return cloneTask(cached)
+    return Storage.read<TeamTask.Info>(["team_task", teamName, taskId]).catch(() => undefined)
   }
 
   async function detectCycle(
     teamName: string,
     fromId: string,
     toId: string,
+    graph?: Map<string, TeamTask.Info>,
   ): Promise<boolean> {
     if (fromId === toId) return true
+    const taskGraph = graph ?? (await loadTaskGraph(teamName))
     const visited = new Set<string>()
     const stack = [toId]
     while (stack.length > 0) {
@@ -186,7 +224,7 @@ export namespace TeamManager {
       if (current === fromId) return true
       if (visited.has(current)) continue
       visited.add(current)
-      const task = await Storage.read<TeamTask.Info>(["team_task", teamName, current]).catch(() => undefined)
+      const task = taskGraph.get(current)
       if (!task) continue
       for (const dep of task.blocks) {
         if (!visited.has(dep)) stack.push(dep)
@@ -209,18 +247,19 @@ export namespace TeamManager {
       addBlockedBy?: string[]
     },
   ): Promise<TeamTask.Info> {
+    const graph = await loadTaskGraph(teamName)
     // Perform cycle detection AND task update atomically inside Storage.update
     // to avoid TOCTOU race between detectCycle check and the mutation
     if (updates.addBlocks) {
       for (const targetId of updates.addBlocks) {
-        if (await detectCycle(teamName, taskId, targetId)) {
+        if (await detectCycle(teamName, taskId, targetId, graph)) {
           throw new Error(`Circular dependency detected: task ${taskId} cannot block task ${targetId}`)
         }
       }
     }
     if (updates.addBlockedBy) {
       for (const targetId of updates.addBlockedBy) {
-        if (await detectCycle(teamName, targetId, taskId)) {
+        if (await detectCycle(teamName, targetId, taskId, graph)) {
           throw new Error(`Circular dependency detected: task ${taskId} cannot be blocked by task ${targetId}`)
         }
       }
@@ -272,6 +311,7 @@ export namespace TeamManager {
         draft.time.updated = Date.now()
       },
     )
+    upsertCachedTask(task)
     Bus.publish(TeamTask.Event.Updated, { task })
 
     // Update reciprocal dependencies
@@ -280,8 +320,11 @@ export namespace TeamManager {
         await Storage.update<TeamTask.Info>(["team_task", teamName, targetId], (draft) => {
           if (!draft.blockedBy.includes(taskId)) draft.blockedBy.push(taskId)
           draft.time.updated = Date.now()
+        }).then((updatedTarget) => {
+          upsertCachedTask(updatedTarget)
         }).catch(() => {
           log.warn("addBlocks: target task not found", { teamName, targetId })
+          removeCachedTask(teamName, targetId)
         })
       }
     }
@@ -290,26 +333,32 @@ export namespace TeamManager {
         await Storage.update<TeamTask.Info>(["team_task", teamName, targetId], (draft) => {
           if (!draft.blocks.includes(taskId)) draft.blocks.push(taskId)
           draft.time.updated = Date.now()
+        }).then((updatedTarget) => {
+          upsertCachedTask(updatedTarget)
         }).catch(() => {
           log.warn("addBlockedBy: target task not found", { teamName, targetId })
+          removeCachedTask(teamName, targetId)
         })
       }
     }
 
     // Auto-unblock dependents when task is completed
     if (updates.status === "completed") {
-      await unblockDependents(teamName, taskId)
+      await unblockDependents(teamName, taskId, graph)
     }
 
     return task
   }
 
-  async function unblockDependents(teamName: string, completedTaskId: string) {
+  async function unblockDependents(
+    teamName: string,
+    completedTaskId: string,
+    graph?: Map<string, TeamTask.Info>,
+  ) {
     // Use the completed task's `blocks` array to only check dependent tasks
     // instead of scanning all tasks in the team
-    const completedTask = await Storage.read<TeamTask.Info>(
-      ["team_task", teamName, completedTaskId],
-    ).catch(() => undefined)
+    const taskGraph = graph ?? (await loadTaskGraph(teamName))
+    const completedTask = taskGraph.get(completedTaskId)
     if (!completedTask) return
 
     for (const dependentId of completedTask.blocks) {
@@ -321,6 +370,7 @@ export namespace TeamManager {
         },
       ).catch(() => undefined)
       if (!updated) continue
+      upsertCachedTask(updated)
 
       Bus.publish(TeamTask.Event.Updated, { task: updated })
       if (updated.blockedBy.length === 0) {
@@ -334,12 +384,10 @@ export namespace TeamManager {
   }
 
   export async function listTasks(teamName: string): Promise<TeamTask.Info[]> {
-    const keys = await Storage.list(["team_task", teamName])
-    const tasks: TeamTask.Info[] = []
-    for (const key of keys) {
-      const task = await Storage.read<TeamTask.Info>(key).catch(() => undefined)
-      if (task && task.status !== "deleted") tasks.push(task)
-    }
+    const graph = await loadTaskGraph(teamName)
+    const tasks = Array.from(graph.values())
+      .filter((task) => task.status !== "deleted")
+      .map((task) => cloneTask(task))
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
     return tasks.sort((a, b) => {
       const pa = priorityOrder[a.priority ?? "medium"] ?? 2
@@ -355,6 +403,7 @@ export namespace TeamManager {
       await Storage.remove(key)
     }
     await Storage.remove(["team_counter", teamName])
+    clearTaskGraph(teamName)
   }
 
   // Message operations

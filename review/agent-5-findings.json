@@ -1,0 +1,80 @@
+﻿[
+  {
+    "id": "A5-001",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "high",
+    "path": "packages/lobster/src/util/queue.ts",
+    "line": 33,
+    "evidence": "Worker queue drains with `shift()` in loops over cloned arrays.",
+    "impact": "Queue throughput degrades with large item counts due to O(n) removals.",
+    "recommendation": "Use index/ring-buffer or pop-based strategy for O(1) dequeue.",
+    "effort": "s",
+    "owner_area": "util"
+  },
+  {
+    "id": "A5-002",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/memory/manager.ts",
+    "line": 212,
+    "evidence": "Memory list path reads all keys then `Promise.all` reads all values.",
+    "impact": "Cold reads can saturate I/O and heap on large memory stores.",
+    "recommendation": "Batch reads with bounded concurrency and incremental pagination.",
+    "effort": "m",
+    "owner_area": "memory"
+  },
+  {
+    "id": "A5-003",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/memory/manager.ts",
+    "line": 133,
+    "evidence": "Search ignores keyword index and scans lowercase content for all entries.",
+    "impact": "Memory search remains O(n) as store grows.",
+    "recommendation": "Use keyword index candidate narrowing before substring checks.",
+    "effort": "m",
+    "owner_area": "memory"
+  },
+  {
+    "id": "A5-004",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "high",
+    "path": "packages/lobster/src/storage/storage.ts",
+    "line": 223,
+    "evidence": "Storage list performs full-tree glob scan and sort for each list call.",
+    "impact": "Prefix list requests pay global directory walk and sorting overhead.",
+    "recommendation": "Walk scoped prefixes or keep key index cache to avoid full scans.",
+    "effort": "m",
+    "owner_area": "storage"
+  },
+  {
+    "id": "A5-005",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/config/config.ts",
+    "line": 80,
+    "evidence": "Auth discovery fetches run sequentially with per-endpoint timeout.",
+    "impact": "Slow providers can delay startup/config load by multiple seconds.",
+    "recommendation": "Parallelize well-known fetches with bounded concurrency.",
+    "effort": "m",
+    "owner_area": "config"
+  },
+  {
+    "id": "A5-006",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/config/config.ts",
+    "line": 187,
+    "evidence": "Per-directory command/agent/mode/plugin loaders run serial scans.",
+    "impact": "Multiple `.lobster` roots amplify startup I/O latency.",
+    "recommendation": "Run loaders in parallel or unify into single directory pass.",
+    "effort": "m",
+    "owner_area": "config"
+  }
+]

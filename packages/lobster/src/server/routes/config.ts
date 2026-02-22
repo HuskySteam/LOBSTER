@@ -7,8 +7,62 @@ import { mapValues } from "remeda"
 import { errors } from "../error"
 import { Log } from "../../util/log"
 import { lazy } from "../../util/lazy"
+import { fileURLToPath } from "url"
+import { Filesystem } from "../../util/filesystem"
+import { Instance } from "../../project/instance"
+import { Global } from "../../global"
 
 const log = Log.create({ service: "server" })
+const NPM_PACKAGE_NAME = /^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/
+const NPM_VERSION_TAG = /^[a-zA-Z0-9._~^*-]+$/
+
+function parseNpmSpecifier(spec: string) {
+  const lastAt = spec.lastIndexOf("@")
+  if (lastAt <= 0) {
+    return {
+      pkg: spec,
+      version: undefined as string | undefined,
+    }
+  }
+  return {
+    pkg: spec.slice(0, lastAt),
+    version: spec.slice(lastAt + 1),
+  }
+}
+
+function isTrustedFilePluginSpecifier(spec: string) {
+  try {
+    const url = new URL(spec)
+    if (url.protocol !== "file:") return false
+    const resolved = fileURLToPath(url)
+    return (
+      Filesystem.contains(Instance.directory, resolved) ||
+      Filesystem.contains(Global.Path.cache, resolved) ||
+      Filesystem.contains(Global.Path.data, resolved)
+    )
+  } catch {
+    return false
+  }
+}
+
+function isTrustedPluginSpecifier(spec: string) {
+  if (spec.startsWith("github:")) {
+    return /^github:[^/\s]+\/[^/\s]+(?:\/[^?#\s]+)*$/.test(spec)
+  }
+
+  if (spec.startsWith("https://github.com/")) {
+    return /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+(?:\/[^?#\s]+)*\/?$/.test(spec)
+  }
+
+  if (spec.startsWith("file://")) {
+    return isTrustedFilePluginSpecifier(spec)
+  }
+
+  const { pkg, version } = parseNpmSpecifier(spec)
+  if (!NPM_PACKAGE_NAME.test(pkg)) return false
+  if (!version) return true
+  return NPM_VERSION_TAG.test(version)
+}
 
 export const ConfigRoutes = lazy(() =>
   new Hono()
@@ -54,6 +108,15 @@ export const ConfigRoutes = lazy(() =>
       validator("json", Config.Info),
       async (c) => {
         const config = c.req.valid("json")
+        const untrustedPlugins = (config.plugin ?? []).filter((specifier) => !isTrustedPluginSpecifier(specifier))
+        if (untrustedPlugins.length > 0) {
+          return c.json(
+            {
+              error: `Untrusted plugin specifier: ${untrustedPlugins[0]}`,
+            },
+            { status: 400 },
+          )
+        }
         await Config.update(config)
         return c.json(config)
       },

@@ -1,0 +1,80 @@
+﻿[
+  {
+    "id": "A4-001",
+    "category": "performance",
+    "severity": "high",
+    "confidence": "medium",
+    "path": "packages/lobster/src/server/routes/tui.ts",
+    "line": 21,
+    "evidence": "`Promise.race` with queue response can time out without removing pending resolver.",
+    "impact": "Resolver buildup can exhaust queue limits and break control channel.",
+    "recommendation": "Add cancellation-aware queue waits that remove pending resolvers on timeout.",
+    "effort": "m",
+    "owner_area": "server"
+  },
+  {
+    "id": "A4-002",
+    "category": "quality",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/server/routes/session.ts",
+    "line": 741,
+    "evidence": "Streaming prompt route lacks abort propagation into prompt execution.",
+    "impact": "Disconnected clients still consume provider compute and server resources.",
+    "recommendation": "Wire stream abort signal to prompt cancellation.",
+    "effort": "m",
+    "owner_area": "server"
+  },
+  {
+    "id": "A4-003",
+    "category": "quality",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/server/routes/session.ts",
+    "line": 772,
+    "evidence": "Async prompt path starts background promise without awaited/caught error path.",
+    "impact": "Unhandled rejections can hide failures and destabilize route behavior.",
+    "recommendation": "Await or explicitly catch/log prompt execution failures.",
+    "effort": "s",
+    "owner_area": "server"
+  },
+  {
+    "id": "A4-004",
+    "category": "quality",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/acp/session.ts",
+    "line": 8,
+    "evidence": "ACP session manager retains loaded sessions without explicit eviction path.",
+    "impact": "Long-lived agent processes risk unbounded in-memory session growth.",
+    "recommendation": "Implement remove/prune lifecycle for inactive session entries.",
+    "effort": "m",
+    "owner_area": "acp"
+  },
+  {
+    "id": "A4-005",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/acp/agent.ts",
+    "line": 72,
+    "evidence": "Usage updates re-fetch full session history per prompt/resume/fork/command.",
+    "impact": "Per-request latency grows with conversation size and adds bandwidth cost.",
+    "recommendation": "Use delta usage tracking from latest assistant message only.",
+    "effort": "m",
+    "owner_area": "acp"
+  },
+  {
+    "id": "A4-006",
+    "category": "quality",
+    "severity": "high",
+    "confidence": "medium",
+    "path": "packages/lobster/src/lsp/index.ts",
+    "line": 79,
+    "evidence": "LSP client registry does not evict dead/crashed clients before reuse.",
+    "impact": "Language features can remain broken until full server restart.",
+    "recommendation": "Observe process/connection exit and respawn clean client entries.",
+    "effort": "m",
+    "owner_area": "lsp"
+  }
+]

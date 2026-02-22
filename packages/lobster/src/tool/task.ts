@@ -31,6 +31,33 @@ try {
 
 const EXPLORE_KEYWORDS = ["find", "search", "look", "where", "locate", "grep", "pattern", "file", "read", "understand", "analyze", "codebase"]
 const GENERAL_KEYWORDS = ["implement", "write", "create", "build", "fix", "refactor", "modify", "test", "update", "add", "change", "delete", "remove"]
+type TaskToolSummaryPart = {
+  id: string
+  tool: string
+  state: {
+    status: string
+    title?: string
+  }
+}
+
+function summarizeRecentToolParts(messages: MessageV2.WithParts[]): TaskToolSummaryPart[] {
+  const byID = new Map<string, TaskToolSummaryPart>()
+  for (const msg of messages) {
+    if (msg.info.role !== "assistant") continue
+    for (const part of msg.parts) {
+      if (part.type !== "tool") continue
+      byID.set(part.id, {
+        id: part.id,
+        tool: part.tool,
+        state: {
+          status: part.state.status,
+          title: part.state.status === "completed" ? part.state.title : undefined,
+        },
+      })
+    }
+  }
+  return Array.from(byID.values()).sort((a, b) => (a.id > b.id ? 1 : -1))
+}
 
 function routeTask(prompt: string, agents: Agent.Info[]): string {
   const lower = prompt.toLowerCase()
@@ -359,7 +386,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
 
       // Synchronous execution path (original behavior)
       const messageID = Identifier.ascending("message")
-      const parts: Record<string, { id: string; tool: string; state: { status: string; title?: string } }> = {}
+      const parts: Record<string, TaskToolSummaryPart> = {}
       const unsub = Bus.subscribe(MessageV2.Event.PartUpdated, async (evt) => {
         if (evt.properties.part.sessionID !== session.id) return
         if (evt.properties.part.messageID === messageID) return
@@ -421,18 +448,11 @@ export const TaskTool = Tool.define("task", async (ctx) => {
         unsub()
       })
 
-      const messages = await Session.messages({ sessionID: session.id })
-      const summary = messages
-        .filter((x) => x.info.role === "assistant")
-        .flatMap((msg) => msg.parts.filter((x: any) => x.type === "tool") as MessageV2.ToolPart[])
-        .map((part) => ({
-          id: part.id,
-          tool: part.tool,
-          state: {
-            status: part.state.status,
-            title: part.state.status === "completed" ? part.state.title : undefined,
-          },
-        }))
+      let summary = Object.values(parts).sort((a, b) => (a.id > b.id ? 1 : -1))
+      if (summary.length === 0) {
+        const recentMessages = await Session.messages({ sessionID: session.id, limit: 24 }).catch(() => [])
+        summary = summarizeRecentToolParts(recentMessages)
+      }
       const text = result.parts.findLast((x) => x.type === "text")?.text ?? ""
 
       const output = [

@@ -1,0 +1,80 @@
+﻿[
+  {
+    "id": "A6-001",
+    "category": "performance",
+    "severity": "high",
+    "confidence": "high",
+    "path": "packages/slack/src/index.ts",
+    "line": 28,
+    "evidence": "Session TTL eviction short-circuits when map size <= cap, skipping stale cleanup.",
+    "impact": "Stale Slack session state remains resident and can grow memory over time.",
+    "recommendation": "Always run TTL-based sweep independent of size cap checks.",
+    "effort": "s",
+    "owner_area": "slack"
+  },
+  {
+    "id": "A6-002",
+    "category": "quality",
+    "severity": "high",
+    "confidence": "high",
+    "path": "packages/slack/src/index.ts",
+    "line": 46,
+    "evidence": "Event stream loop has no outer error handling for stream failure.",
+    "impact": "Transient stream errors can crash bot process.",
+    "recommendation": "Wrap stream loop in try/catch and recover gracefully.",
+    "effort": "s",
+    "owner_area": "slack"
+  },
+  {
+    "id": "A6-003",
+    "category": "quality",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/slack/src/index.ts",
+    "line": 46,
+    "evidence": "Subscription is one-shot and lacks reconnection/backoff loop.",
+    "impact": "Dropped stream can leave notifications permanently inactive.",
+    "recommendation": "Add retry loop with bounded exponential backoff.",
+    "effort": "m",
+    "owner_area": "slack"
+  },
+  {
+    "id": "A6-004",
+    "category": "quality",
+    "severity": "high",
+    "confidence": "medium",
+    "path": "packages/sdk/js/src/server.ts",
+    "line": 42,
+    "evidence": "Startup timeout/abort rejects without killing spawned lobster process.",
+    "impact": "Aborted starts can leak child processes and cause port/resource exhaustion.",
+    "recommendation": "Kill child process on timeout/abort/error paths before reject.",
+    "effort": "s",
+    "owner_area": "sdk"
+  },
+  {
+    "id": "A6-005",
+    "category": "quality",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/sdk/js/src/client.ts",
+    "line": 8,
+    "evidence": "Default client wrapper disables timeout by forcing `req.timeout = false`.",
+    "impact": "Hung requests can block sockets and degrade reliability under failure.",
+    "recommendation": "Use configurable timeout defaults and preserve abort semantics.",
+    "effort": "s",
+    "owner_area": "sdk"
+  },
+  {
+    "id": "A6-006",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/sdk/js/src/server.ts",
+    "line": 42,
+    "evidence": "Startup output buffer/listeners continue growing after readiness detected.",
+    "impact": "Long-running sessions retain avoidable memory and parsing overhead.",
+    "recommendation": "Detach listeners and stop buffering once ready signal is matched.",
+    "effort": "m",
+    "owner_area": "sdk"
+  }
+]

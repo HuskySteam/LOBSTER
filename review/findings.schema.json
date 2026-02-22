@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Codebase Review Finding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "category",
+    "severity",
+    "confidence",
+    "path",
+    "line",
+    "evidence",
+    "impact",
+    "recommendation",
+    "effort",
+    "owner_area"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "enum": ["performance", "quality", "security"]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low"]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "line": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "evidence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "impact": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recommendation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "effort": {
+      "type": "string",
+      "enum": ["s", "m", "l"]
+    },
+    "owner_area": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -9,6 +9,17 @@ import { MCP } from "../../mcp"
 import { zodToJsonSchema } from "zod-to-json-schema"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
+import { Flag } from "../../flag/flag"
+
+const WorktreeRemoveRequest = z.object({
+  directory: Worktree.remove.schema.shape.directory,
+  confirm: z.boolean().optional(),
+})
+
+const WorktreeResetRequest = z.object({
+  directory: Worktree.reset.schema.shape.directory,
+  confirm: z.boolean().optional(),
+})
 
 export const ExperimentalRoutes = lazy(() =>
   new Hono()
@@ -107,7 +118,22 @@ export const ExperimentalRoutes = lazy(() =>
       validator("json", Worktree.create.schema),
       async (c) => {
         const body = c.req.valid("json")
-        const worktree = await Worktree.create(body)
+        if (!Flag.LOBSTER_SERVER_PASSWORD && body?.startCommand?.trim()) {
+          return c.json(
+            {
+              error: "startCommand is disabled unless LOBSTER_SERVER_PASSWORD is configured.",
+            },
+            { status: 400 },
+          )
+        }
+        const sanitized =
+          !Flag.LOBSTER_SERVER_PASSWORD && body
+            ? {
+                ...body,
+                startCommand: undefined,
+              }
+            : body
+        const worktree = await Worktree.create(sanitized)
         return c.json(worktree)
       },
     )
@@ -151,10 +177,18 @@ export const ExperimentalRoutes = lazy(() =>
           ...errors(400),
         },
       }),
-      validator("json", Worktree.remove.schema),
+      validator("json", WorktreeRemoveRequest),
       async (c) => {
         const body = c.req.valid("json")
-        await Worktree.remove(body)
+        if (!Flag.LOBSTER_SERVER_PASSWORD && body.confirm !== true) {
+          return c.json(
+            {
+              error: "Destructive action requires confirm=true when server password is not configured.",
+            },
+            { status: 400 },
+          )
+        }
+        await Worktree.remove({ directory: body.directory })
         await Project.removeSandbox(Instance.project.id, body.directory)
         return c.json(true)
       },
@@ -177,10 +211,18 @@ export const ExperimentalRoutes = lazy(() =>
           ...errors(400),
         },
       }),
-      validator("json", Worktree.reset.schema),
+      validator("json", WorktreeResetRequest),
       async (c) => {
         const body = c.req.valid("json")
-        await Worktree.reset(body)
+        if (!Flag.LOBSTER_SERVER_PASSWORD && body.confirm !== true) {
+          return c.json(
+            {
+              error: "Destructive action requires confirm=true when server password is not configured.",
+            },
+            { status: 400 },
+          )
+        }
+        await Worktree.reset({ directory: body.directory })
         return c.json(true)
       },
     )

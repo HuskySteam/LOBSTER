@@ -28,6 +28,53 @@ import open from "open"
 export namespace MCP {
   const log = Log.create({ service: "mcp" })
   const DEFAULT_TIMEOUT = 30_000
+  const TOOLS_CACHE_TTL_MS = 10_000
+  const REMOTE_CONNECT_RETRY_ATTEMPTS = 3
+  const REMOTE_CONNECT_RETRY_BASE_MS = 200
+  const REMOTE_CONNECT_RETRY_MAX_MS = 2_000
+
+  type CachedTool = {
+    key: string
+    tool: Tool
+  }
+  type ToolCacheEntry = {
+    expiresAt: number
+    timeout: number | undefined
+    tools: CachedTool[]
+  }
+
+  function retryBackoffDelayMs(attempt: number): number {
+    return Math.min(REMOTE_CONNECT_RETRY_BASE_MS * 2 ** Math.max(0, attempt - 1), REMOTE_CONNECT_RETRY_MAX_MS)
+  }
+
+  async function sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
+  function isTransientConnectError(error: Error): boolean {
+    const message = error.message.toLowerCase()
+    if (message.includes("timed out") || message.includes("timeout")) return true
+    if (message.includes("econnreset")) return true
+    if (message.includes("econnrefused")) return true
+    if (message.includes("enotfound")) return true
+    if (message.includes("eai_again")) return true
+    if (message.includes("network")) return true
+    if (message.includes("temporarily unavailable")) return true
+    if (message.includes("503") || message.includes("502") || message.includes("504")) return true
+    return false
+  }
+
+  function sanitizeMcpKey(value: string): string {
+    return value.replace(/[^a-zA-Z0-9_-]/g, "_")
+  }
+
+  function ensureUniqueToolKey(result: Record<string, Tool>, baseKey: string): string {
+    if (!result[baseKey]) return baseKey
+    log.warn("mcp tool name collision, appending suffix", { key: baseKey })
+    let suffix = 2
+    while (result[`${baseKey}_${suffix}`]) suffix++
+    return `${baseKey}_${suffix}`
+  }
 
   export const Resource = z
     .object({
@@ -113,6 +160,7 @@ export namespace MCP {
   function registerNotificationHandlers(client: MCPClient, serverName: string) {
     client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
       log.info("tools list changed notification received", { server: serverName })
+      toolCache.delete(serverName)
       Bus.publish(ToolsChanged, { server: serverName })
     })
   }
@@ -151,6 +199,7 @@ export namespace MCP {
   // Store transports for OAuth servers to allow finishing auth
   type TransportWithAuth = StreamableHTTPClientTransport | SSEClientTransport
   const pendingOAuthTransports = new Map<string, TransportWithAuth>()
+  const toolCache = new Map<string, ToolCacheEntry>()
 
   // Prompt cache types
   type PromptInfo = Awaited<ReturnType<MCPClient["listPrompts"]>>["prompts"][number]
@@ -207,6 +256,7 @@ export namespace MCP {
         ),
       )
       pendingOAuthTransports.clear()
+      toolCache.clear()
     },
   )
 
@@ -264,12 +314,14 @@ export namespace MCP {
         error: "unknown error",
       }
       s.status[name] = status
+      toolCache.delete(name)
       return {
         status,
       }
     }
     if (!result.mcpClient) {
       s.status[name] = result.status
+      toolCache.delete(name)
       return {
         status: s.status,
       }
@@ -281,6 +333,7 @@ export namespace MCP {
         log.error("Failed to close existing MCP client", { name, error })
       })
     }
+    toolCache.delete(name)
     s.clients[name] = result.mcpClient
     s.status[name] = result.status
 
@@ -346,63 +399,86 @@ export namespace MCP {
       let lastError: Error | undefined
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
       for (const { name, transport } of transports) {
-        try {
+        for (let attempt = 1; attempt <= REMOTE_CONNECT_RETRY_ATTEMPTS; attempt++) {
           const client = new Client({
             name: "lobster",
             version: Installation.VERSION,
           })
-          await withTimeout(client.connect(transport), connectTimeout)
-          registerNotificationHandlers(client, key)
-          mcpClient = client
-          log.info("connected", { key, transport: name })
-          status = { status: "connected" }
-          break
-        } catch (error) {
-          lastError = error instanceof Error ? error : new Error(String(error))
 
-          // Handle OAuth-specific errors
-          if (error instanceof UnauthorizedError) {
-            log.info("mcp server requires authentication", { key, transport: name })
-
-            // Check if this is a "needs registration" error
-            if (lastError.message.includes("registration") || lastError.message.includes("client_id")) {
-              status = {
-                status: "needs_client_registration" as const,
-                error: "Server does not support dynamic client registration. Please provide clientId in config.",
-              }
-              // Show toast for needs_client_registration
-              Bus.publish(TuiEvent.ToastShow, {
-                title: "MCP Authentication Required",
-                message: `Server "${key}" requires a pre-registered client ID. Add clientId to your config.`,
-                variant: "warning",
-                duration: 8000,
-              }).catch((e) => log.debug("failed to show toast", { error: e }))
-            } else {
-              // Store transport for later finishAuth call
-              pendingOAuthTransports.set(key, transport)
-              status = { status: "needs_auth" as const }
-              // Show toast for needs_auth
-              Bus.publish(TuiEvent.ToastShow, {
-                title: "MCP Authentication Required",
-                message: `Server "${key}" requires authentication. Run: lobster mcp auth ${key}`,
-                variant: "warning",
-                duration: 8000,
-              }).catch((e) => log.debug("failed to show toast", { error: e }))
-            }
+          try {
+            await withTimeout(client.connect(transport), connectTimeout)
+            registerNotificationHandlers(client, key)
+            mcpClient = client
+            log.info("connected", { key, transport: name, attempt })
+            status = { status: "connected" }
             break
-          }
+          } catch (error) {
+            await client.close().catch(() => {})
+            lastError = error instanceof Error ? error : new Error(String(error))
 
-          log.debug("transport connection failed", {
-            key,
-            transport: name,
-            url: mcp.url,
-            error: lastError.message,
-          })
-          status = {
-            status: "failed" as const,
-            error: lastError.message,
+            // Handle OAuth-specific errors
+            if (error instanceof UnauthorizedError) {
+              log.info("mcp server requires authentication", { key, transport: name })
+
+              // Check if this is a "needs registration" error
+              if (lastError.message.includes("registration") || lastError.message.includes("client_id")) {
+                status = {
+                  status: "needs_client_registration" as const,
+                  error: "Server does not support dynamic client registration. Please provide clientId in config.",
+                }
+                // Show toast for needs_client_registration
+                Bus.publish(TuiEvent.ToastShow, {
+                  title: "MCP Authentication Required",
+                  message: `Server "${key}" requires a pre-registered client ID. Add clientId to your config.`,
+                  variant: "warning",
+                  duration: 8000,
+                }).catch((e) => log.debug("failed to show toast", { error: e }))
+              } else {
+                // Store transport for later finishAuth call
+                pendingOAuthTransports.set(key, transport)
+                status = { status: "needs_auth" as const }
+                // Show toast for needs_auth
+                Bus.publish(TuiEvent.ToastShow, {
+                  title: "MCP Authentication Required",
+                  message: `Server "${key}" requires authentication. Run: lobster mcp auth ${key}`,
+                  variant: "warning",
+                  duration: 8000,
+                }).catch((e) => log.debug("failed to show toast", { error: e }))
+              }
+              break
+            }
+
+            const shouldRetry = attempt < REMOTE_CONNECT_RETRY_ATTEMPTS && isTransientConnectError(lastError)
+            if (shouldRetry) {
+              const delay = retryBackoffDelayMs(attempt)
+              log.warn("transport connection failed, retrying", {
+                key,
+                transport: name,
+                url: mcp.url,
+                attempt,
+                delay,
+                error: lastError.message,
+              })
+              await sleep(delay)
+              continue
+            }
+
+            log.debug("transport connection failed", {
+              key,
+              transport: name,
+              url: mcp.url,
+              attempt,
+              error: lastError.message,
+            })
+            status = {
+              status: "failed" as const,
+              error: lastError.message,
+            }
           }
         }
+
+        if (mcpClient) break
+        if (status?.status === "needs_auth" || status?.status === "needs_client_registration") break
       }
     }
 
@@ -481,6 +557,7 @@ export namespace MCP {
           error,
         })
       })
+      toolCache.delete(key)
       status = {
         status: "failed",
         error: "Failed to get tools",
@@ -555,7 +632,10 @@ export namespace MCP {
           log.error("Failed to close existing MCP client", { name, error })
         })
       }
+      toolCache.delete(name)
       s.clients[name] = result.mcpClient
+    } else {
+      toolCache.delete(name)
     }
   }
 
@@ -568,6 +648,7 @@ export namespace MCP {
       })
       delete s.clients[name]
     }
+    toolCache.delete(name)
     s.status[name] = { status: "disabled" }
   }
 
@@ -585,6 +666,20 @@ export namespace MCP {
         continue
       }
 
+      const mcpConfig = config[clientName]
+      const entry = isMcpConfigured(mcpConfig) ? mcpConfig : undefined
+      const timeout = entry?.timeout ?? defaultTimeout
+
+      const now = Date.now()
+      const cached = toolCache.get(clientName)
+      if (cached && cached.expiresAt > now && cached.timeout === timeout) {
+        for (const item of cached.tools) {
+          const finalKey = ensureUniqueToolKey(result, item.key)
+          result[finalKey] = item.tool
+        }
+        continue
+      }
+
       const toolsResult = await client.listTools().catch((e) => {
         log.error("failed to get tools", { clientName, error: e.message })
         const failedStatus = {
@@ -593,26 +688,35 @@ export namespace MCP {
         }
         s.status[clientName] = failedStatus
         delete s.clients[clientName]
+        toolCache.delete(clientName)
         return undefined
       })
       if (!toolsResult) {
         continue
       }
-      const mcpConfig = config[clientName]
-      const entry = isMcpConfigured(mcpConfig) ? mcpConfig : undefined
-      const timeout = entry?.timeout ?? defaultTimeout
+
+      const convertedTools: CachedTool[] = []
+      const seenClientKeys = new Set<string>()
       for (const mcpTool of toolsResult.tools) {
-        const sanitizedClientName = clientName.replace(/[^a-zA-Z0-9_-]/g, "_")
-        const sanitizedToolName = mcpTool.name.replace(/[^a-zA-Z0-9_-]/g, "_")
-        let key = sanitizedClientName + "_" + sanitizedToolName
-        if (result[key]) {
-          log.warn("mcp tool name collision, appending suffix", { key })
+        const baseKey = `${sanitizeMcpKey(clientName)}_${sanitizeMcpKey(mcpTool.name)}`
+        let key = baseKey
+        if (seenClientKeys.has(key)) {
           let suffix = 2
-          while (result[`${key}_${suffix}`]) suffix++
-          key = `${key}_${suffix}`
+          while (seenClientKeys.has(`${baseKey}_${suffix}`)) suffix++
+          key = `${baseKey}_${suffix}`
         }
-        result[key] = await convertMcpTool(mcpTool, client, timeout)
+        seenClientKeys.add(key)
+        const tool = await convertMcpTool(mcpTool, client, timeout)
+        convertedTools.push({ key, tool })
+        const finalKey = ensureUniqueToolKey(result, key)
+        result[finalKey] = tool
       }
+
+      toolCache.set(clientName, {
+        expiresAt: now + TOOLS_CACHE_TTL_MS,
+        timeout,
+        tools: convertedTools,
+      })
     }
     return result
   }

@@ -7,8 +7,6 @@ import { useLocal } from "../../context/local"
 
 const EMPTY_TODO: never[] = []
 const EMPTY_DIFF: never[] = []
-const EMPTY_MESSAGES: never[] = []
-const EMPTY_PARTS: never[] = []
 
 function Divider() {
   const { theme } = useTheme()
@@ -23,25 +21,17 @@ export function Sidebar(props: { sessionID: string }) {
   const lsp = useAppStore((s) => s.lsp)
   const todo = useAppStore((s) => s.todo[props.sessionID] ?? EMPTY_TODO)
   const diff = useAppStore((s) => s.session_diff[props.sessionID] ?? EMPTY_DIFF)
-  const messages = useAppStore((s) => s.message[props.sessionID] ?? EMPTY_MESSAGES)
-  const parts = useAppStore((s) => s.part)
+  const sessionTextTokens = useAppStore((s) => s.session_text_tokens[props.sessionID] ?? 0)
   const teams = useAppStore((s) => s.teams)
   const vcs = useAppStore((s) => s.vcs)
   const path = useAppStore((s) => s.path)
 
-  // Compute context token usage from messages
   const tokenInfo = useMemo(() => {
-    let total = 0
-    for (const msg of messages) {
-      const msgParts = parts[msg.id] ?? EMPTY_PARTS
-      for (const part of msgParts) {
-        if (part.type === "text") {
-          total += Math.ceil(((part as any).text?.length ?? 0) / 4)
-        }
-      }
+    return {
+      tokens: sessionTextTokens,
+      display: sessionTextTokens > 1000 ? `${(sessionTextTokens / 1000).toFixed(1)}k` : `${sessionTextTokens}`,
     }
-    return { tokens: total, display: total > 1000 ? `${(total / 1000).toFixed(1)}k` : `${total}` }
-  }, [messages, parts])
+  }, [sessionTextTokens])
 
   const mcpEntries = useMemo(() =>
     Object.entries(mcp).sort(([a], [b]) => a.localeCompare(b)),

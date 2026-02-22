@@ -19,6 +19,10 @@ import { lazy } from "../../util/lazy"
 
 const log = Log.create({ service: "server" })
 
+function isCancelledPromptError(error: unknown) {
+  return error instanceof Error && error.message === "Session cancelled"
+}
+
 export const SessionRoutes = lazy(() =>
   new Hono()
     .get(
@@ -738,13 +742,27 @@ export const SessionRoutes = lazy(() =>
       ),
       validator("json", SessionPrompt.PromptInput.omit({ sessionID: true })),
       async (c) => {
+        const sessionID = c.req.valid("param").sessionID
+        const body = c.req.valid("json")
         c.status(200)
         c.header("Content-Type", "application/json")
         return stream(c, async (stream) => {
-          const sessionID = c.req.valid("param").sessionID
-          const body = c.req.valid("json")
-          const msg = await SessionPrompt.prompt({ ...body, sessionID })
-          stream.write(JSON.stringify(msg))
+          let aborted = false
+          stream.onAbort(() => {
+            aborted = true
+            SessionPrompt.cancel(sessionID)
+          })
+
+          try {
+            const msg = await SessionPrompt.prompt({ ...body, sessionID })
+            if (aborted) return
+            await stream.write(JSON.stringify(msg))
+          } catch (error) {
+            if (aborted && isCancelledPromptError(error)) {
+              return
+            }
+            throw error
+          }
         })
       },
     )
@@ -770,13 +788,18 @@ export const SessionRoutes = lazy(() =>
       ),
       validator("json", SessionPrompt.PromptInput.omit({ sessionID: true })),
       async (c) => {
-        c.status(204)
-        c.header("Content-Type", "application/json")
-        return stream(c, async () => {
-          const sessionID = c.req.valid("param").sessionID
-          const body = c.req.valid("json")
-          SessionPrompt.prompt({ ...body, sessionID })
+        const sessionID = c.req.valid("param").sessionID
+        const body = c.req.valid("json")
+
+        void SessionPrompt.prompt({ ...body, sessionID }).catch((error) => {
+          if (isCancelledPromptError(error)) {
+            log.info("prompt_async cancelled", { sessionID })
+            return
+          }
+          log.error("prompt_async failed", { sessionID, error })
         })
+
+        return c.body(null, 204)
       },
     )
     .post(

@@ -16,18 +16,78 @@ const TuiRequest = z.object({
 type TuiRequest = z.infer<typeof TuiRequest>
 
 const request = new AsyncQueue<TuiRequest>()
-const response = new AsyncQueue<any>()
+const RESPONSE_TIMEOUT_MS = 30_000
+const MAX_PENDING_RESPONSE_WAITERS = 10_000
+const MAX_QUEUED_RESPONSES = 100_000
+const responseQueue: any[] = []
+type ResponseWaiter = {
+  resolve(value: any): void
+  timeout: ReturnType<typeof setTimeout>
+}
+const responseWaiters: ResponseWaiter[] = []
 
-export async function callTui(ctx: Context) {
+function popQueuedResponse() {
+  return responseQueue.shift()
+}
+
+function removeWaiter(waiter: ResponseWaiter) {
+  const index = responseWaiters.indexOf(waiter)
+  if (index >= 0) {
+    responseWaiters.splice(index, 1)
+  }
+}
+
+function enqueueResponse(body: any) {
+  const waiter = responseWaiters.shift()
+  if (waiter) {
+    clearTimeout(waiter.timeout)
+    waiter.resolve(body)
+    return
+  }
+
+  if (responseQueue.length >= MAX_QUEUED_RESPONSES) {
+    throw new Error(`TUI control response queue limit reached (${MAX_QUEUED_RESPONSES})`)
+  }
+
+  responseQueue.push(body)
+}
+
+function waitForResponse(timeoutMs: number) {
+  const queued = popQueuedResponse()
+  if (queued !== undefined) {
+    return Promise.resolve(queued)
+  }
+
+  if (responseWaiters.length >= MAX_PENDING_RESPONSE_WAITERS) {
+    return Promise.reject(
+      new Error(`TUI control pending response waiter limit reached (${MAX_PENDING_RESPONSE_WAITERS})`),
+    )
+  }
+
+  return new Promise<any>((resolve, reject) => {
+    let waiter!: ResponseWaiter
+    waiter = {
+      resolve(value) {
+        removeWaiter(waiter)
+        resolve(value)
+      },
+      timeout: setTimeout(() => {
+        removeWaiter(waiter)
+        reject(new Error(`TUI control request timed out after ${Math.ceil(timeoutMs / 1000)}s`))
+      }, timeoutMs),
+    }
+
+    responseWaiters.push(waiter)
+  })
+}
+
+export async function callTui(ctx: Context, timeoutMs = RESPONSE_TIMEOUT_MS) {
   const body = await ctx.req.json()
   request.push({
     path: ctx.req.path,
     body,
   })
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("TUI control request timed out after 30s")), 30_000),
-  )
-  return Promise.race([response.next(), timeout])
+  return waitForResponse(timeoutMs)
 }
 
 const TuiControlRoutes = new Hono()
@@ -73,7 +133,7 @@ const TuiControlRoutes = new Hono()
     validator("json", z.any()),
     async (c) => {
       const body = c.req.valid("json")
-      response.push(body)
+      enqueueResponse(body)
       return c.json(true)
     },
   )

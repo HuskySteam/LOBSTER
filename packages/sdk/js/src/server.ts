@@ -18,6 +18,8 @@ export type TuiOptions = {
   config?: Config
 }
 
+const STARTUP_OUTPUT_LIMIT = 64 * 1024
+
 export async function createLobsterServer(options?: ServerOptions) {
   options = Object.assign(
     {
@@ -40,45 +42,107 @@ export async function createLobsterServer(options?: ServerOptions) {
   })
 
   const url = await new Promise<string>((resolve, reject) => {
-    const id = setTimeout(() => {
-      reject(new Error(`Timeout waiting for server to start after ${options.timeout}ms`))
-    }, options.timeout)
+    const timeoutMs = options.timeout ?? 5000
+    let settled = false
     let output = ""
-    proc.stdout?.on("data", (chunk) => {
-      output += chunk.toString()
-      const lines = output.split("\n")
-      for (const line of lines) {
-        if (line.startsWith("lobster server listening")) {
-          const match = line.match(/on\s+(https?:\/\/[^\s]+)/)
-          if (!match) {
-            throw new Error(`Failed to parse server url from output: ${line}`)
-          }
-          clearTimeout(id)
-          resolve(match[1]!)
+    let lineBuffer = ""
+
+    const appendOutput = (chunk: string) => {
+      output += chunk
+      if (output.length > STARTUP_OUTPUT_LIMIT) {
+        output = output.slice(-STARTUP_OUTPUT_LIMIT)
+      }
+    }
+
+    const terminate = () => {
+      if (proc.killed || (proc.exitCode !== null && proc.exitCode !== undefined)) return
+      proc.kill()
+    }
+
+    const onStdoutData = (chunk: Buffer | string) => {
+      if (settled) return
+      const text = chunk.toString()
+      appendOutput(text)
+      lineBuffer += text
+
+      const lines = lineBuffer.split(/\r?\n/)
+      lineBuffer = lines.pop() ?? ""
+
+      for (const raw of lines) {
+        const line = raw.trim()
+        if (!line.startsWith("lobster server listening")) continue
+
+        const match = line.match(/on\s+(https?:\/\/[^\s]+)/)
+        if (!match) {
+          fail(new Error(`Failed to parse server url from output: ${line}`), true)
           return
         }
+
+        succeed(match[1]!)
+        return
       }
-    })
-    proc.stderr?.on("data", (chunk) => {
-      output += chunk.toString()
-    })
-    proc.on("exit", (code) => {
-      clearTimeout(id)
+    }
+
+    const onStderrData = (chunk: Buffer | string) => {
+      if (settled) return
+      appendOutput(chunk.toString())
+    }
+
+    const onExit = (code: number | null) => {
+      if (settled) return
       let msg = `Server exited with code ${code}`
       if (output.trim()) {
         msg += `\nServer output: ${output}`
       }
-      reject(new Error(msg))
-    })
-    proc.on("error", (error) => {
-      clearTimeout(id)
+      fail(new Error(msg))
+    }
+
+    const onError = (error: Error) => {
+      if (settled) return
+      fail(error, true)
+    }
+
+    const onAbort = () => {
+      if (settled) return
+      fail(new Error("Aborted"), true)
+    }
+
+    const timeoutId = setTimeout(() => {
+      fail(new Error(`Timeout waiting for server to start after ${timeoutMs}ms`), true)
+    }, timeoutMs)
+
+    const cleanup = () => {
+      clearTimeout(timeoutId)
+      proc.stdout?.off("data", onStdoutData)
+      proc.stderr?.off("data", onStderrData)
+      proc.off("exit", onExit)
+      proc.off("error", onError)
+      options.signal?.removeEventListener("abort", onAbort)
+    }
+
+    const succeed = (nextUrl: string) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(nextUrl)
+    }
+
+    const fail = (error: Error, killProcess = false) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      if (killProcess) terminate()
       reject(error)
-    })
-    if (options.signal) {
-      options.signal.addEventListener("abort", () => {
-        clearTimeout(id)
-        reject(new Error("Aborted"))
-      })
+    }
+
+    proc.stdout?.on("data", onStdoutData)
+    proc.stderr?.on("data", onStderrData)
+    proc.on("exit", onExit)
+    proc.on("error", onError)
+    options.signal?.addEventListener("abort", onAbort, { once: true })
+
+    if (options.signal?.aborted) {
+      onAbort()
     }
   })
 

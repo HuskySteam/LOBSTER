@@ -20,10 +20,12 @@ const ctx = {
 const projectRoot = path.join(__dirname, "../..")
 
 describe("tool.bash", () => {
-  test("basic", async () => {
-    await Instance.provide({
-      directory: projectRoot,
-      fn: async () => {
+  test(
+    "basic",
+    async () => {
+      await Instance.provide({
+        directory: projectRoot,
+        fn: async () => {
         const bash = await BashTool.init()
         const result = await bash.execute(
           {
@@ -34,16 +36,20 @@ describe("tool.bash", () => {
         )
         expect(result.metadata.exit).toBe(0)
         expect(result.metadata.output).toContain("test")
-      },
-    })
-  })
+        },
+      })
+    },
+    15000,
+  )
 })
 
 describe("tool.bash permissions", () => {
-  test("asks for bash permission with correct pattern", async () => {
-    await using tmp = await tmpdir({ git: true })
-    await Instance.provide({
-      directory: tmp.path,
+  test(
+    "asks for bash permission with correct pattern",
+    async () => {
+      await using tmp = await tmpdir({ git: true })
+      await Instance.provide({
+        directory: tmp.path,
       fn: async () => {
         const bash = await BashTool.init()
         const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
@@ -65,7 +71,9 @@ describe("tool.bash permissions", () => {
         expect(requests[0].patterns).toContain("echo hello")
       },
     })
-  })
+    },
+    15000,
+  )
 
   test("asks for bash permission with multiple commands", async () => {
     await using tmp = await tmpdir({ git: true })

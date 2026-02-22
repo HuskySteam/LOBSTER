@@ -18,6 +18,17 @@ import { CompactionWeights } from "./compaction-weights"
 
 export namespace SessionCompaction {
   const log = Log.create({ service: "session.compaction" })
+  type PruneCandidate = {
+    part: MessageV2.ToolPart
+    score: number
+    tokens: number
+  }
+  type PruneCandidateSnapshot = {
+    version: number
+    total: number
+    candidates: PruneCandidate[]
+  }
+  const pruneCandidateCache = new Map<string, PruneCandidateSnapshot>()
 
   export const Event = {
     Compacted: BusEvent.define(
@@ -39,8 +50,8 @@ export namespace SessionCompaction {
     return count > usable
   }
 
-  export const PRUNE_MINIMUM = 5_000  // was 20_000 — prune earlier to save tokens
-  export const PRUNE_PROTECT = 15_000 // was 40_000 — keep less old data in context
+  export const PRUNE_MINIMUM = 5_000 // was 20_000, prune earlier to save tokens
+  export const PRUNE_PROTECT = 15_000 // was 40_000, keep less old data in context
 
   export function adaptivePruneMinimum(usageRatio: number): number {
     if (usageRatio > 0.8) return 10_000
@@ -49,18 +60,14 @@ export namespace SessionCompaction {
 
   const PRUNE_PROTECTED_TOOLS = ["skill"]
 
-  // goes backwards through parts until there are 40_000 tokens worth of tool
-  // calls. then erases output of previous tool calls. idea is to throw away old
-  // tool calls that are no longer relevant.
-  export async function prune(input: { sessionID: string; usageRatio?: number }) {
-    const config = await Config.get()
-    if (config.compaction?.prune === false) return
-    log.info("pruning")
-    const msgs = await Session.messages({ sessionID: input.sessionID })
+  export function invalidatePruneCache(sessionID: string) {
+    pruneCandidateCache.delete(sessionID)
+  }
+
+  function collectPruneCandidates(msgs: MessageV2.WithParts[]) {
     let total = 0
-    const candidates: Array<{ part: MessageV2.ToolPart; score: number; tokens: number }> = []
+    const candidates: PruneCandidate[] = []
     let userTurns = 0
-    const pruneMin = adaptivePruneMinimum(input.usageRatio ?? 0)
 
     loop: for (let msgIndex = msgs.length - 1; msgIndex >= 0; msgIndex--) {
       const msg = msgs[msgIndex]
@@ -80,9 +87,30 @@ export namespace SessionCompaction {
       }
     }
 
-    // Sort by score ascending — prune lowest importance first
     candidates.sort((a, b) => a.score - b.score)
+    return { total, candidates }
+  }
 
+  // Goes backwards through parts until there are enough completed tool calls,
+  // then erases output of older low-value tool calls.
+  export async function prune(input: { sessionID: string; usageRatio?: number }) {
+    const config = await Config.get()
+    if (config.compaction?.prune === false) return
+    log.info("pruning")
+    const pruneMin = adaptivePruneMinimum(input.usageRatio ?? 0)
+    const version = Session.mutationVersion(input.sessionID)
+
+    let snapshot = pruneCandidateCache.get(input.sessionID)
+    if (!snapshot || snapshot.version !== version) {
+      const msgs = await Session.messages({ sessionID: input.sessionID })
+      snapshot = {
+        version,
+        ...collectPruneCandidates(msgs),
+      }
+      pruneCandidateCache.set(input.sessionID, snapshot)
+    }
+
+    const { total, candidates } = snapshot
     const target = total - PRUNE_PROTECT
     if (target <= pruneMin) {
       log.info("not enough to prune", { total, target, pruneMin })
@@ -105,6 +133,7 @@ export namespace SessionCompaction {
           await Session.updatePart(part)
         }
       }
+      invalidatePruneCache(input.sessionID)
       log.info("pruned", { count: toPrune.length })
     }
   }

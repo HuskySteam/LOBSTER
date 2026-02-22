@@ -1,0 +1,93 @@
+﻿[
+  {
+    "id": "A2-001",
+    "category": "performance",
+    "severity": "high",
+    "confidence": "high",
+    "path": "packages/lobster/src/provider/transform.ts",
+    "line": 219,
+    "evidence": "Image/file modality checks stringify payloads multiple times.",
+    "impact": "Large attachments incur avoidable CPU and GC overhead.",
+    "recommendation": "Use metadata/mediaType and cache MIME derivation once per part.",
+    "effort": "m",
+    "owner_area": "provider"
+  },
+  {
+    "id": "A2-002",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/provider/transform.ts",
+    "line": 215,
+    "evidence": "Message transform pipeline performs multiple full-array cloning passes.",
+    "impact": "Long context payloads pay repeated allocation and traversal costs.",
+    "recommendation": "Fuse transform passes and short-circuit when no changes are needed.",
+    "effort": "m",
+    "owner_area": "provider"
+  },
+  {
+    "id": "A2-003",
+    "category": "performance",
+    "severity": "high",
+    "confidence": "medium",
+    "path": "packages/lobster/src/provider/provider.ts",
+    "line": 966,
+    "evidence": "Outgoing OpenAI payload is parsed and re-serialized to strip IDs.",
+    "impact": "Adds full JSON parse/stringify overhead on hot request path.",
+    "recommendation": "Strip IDs earlier before serialization and send payload untouched.",
+    "effort": "m",
+    "owner_area": "provider"
+  },
+  {
+    "id": "A2-004",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "high",
+    "path": "packages/lobster/src/mcp/auth.ts",
+    "line": 60,
+    "evidence": "Token reads/writes parse full mcp-auth JSON file on each access.",
+    "impact": "Auth-heavy MCP calls become disk I/O and JSON parse bound.",
+    "recommendation": "Use in-memory map with debounced persistence.",
+    "effort": "m",
+    "owner_area": "mcp"
+  },
+  {
+    "id": "A2-005",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/mcp/index.ts",
+    "line": 574,
+    "evidence": "Tool listing re-fetches and re-converts all MCP tools every invocation.",
+    "impact": "UI and command paths repeatedly hit network/schema conversion overhead.",
+    "recommendation": "Add per-client TTL cache and reuse converted tool descriptors.",
+    "effort": "m",
+    "owner_area": "mcp"
+  },
+  {
+    "id": "A2-006",
+    "category": "quality",
+    "severity": "high",
+    "confidence": "medium",
+    "path": "packages/lobster/src/mcp/index.ts",
+    "line": 329,
+    "evidence": "Client create path marks MCP failed after single transport pass without retry.",
+    "impact": "Transient outages can leave MCP permanently down until manual recovery.",
+    "recommendation": "Add bounded retry with backoff before terminal failed state.",
+    "effort": "m",
+    "owner_area": "mcp"
+  },
+  {
+    "id": "A2-007",
+    "category": "performance",
+    "severity": "medium",
+    "confidence": "medium",
+    "path": "packages/lobster/src/provider/transform.ts",
+    "line": 734,
+    "evidence": "Gemini schema sanitization deep-clones schema per invocation.",
+    "impact": "Repeated schema usage spends avoidable CPU on large object graphs.",
+    "recommendation": "Memoize sanitized schemas by provider/model/schema identity.",
+    "effort": "s",
+    "owner_area": "provider"
+  }
+]

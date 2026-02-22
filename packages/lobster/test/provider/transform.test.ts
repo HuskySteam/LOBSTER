@@ -2020,3 +2020,126 @@ describe("ProviderTransform.variants", () => {
     })
   })
 })
+
+describe("ProviderTransform.message - fast path and mime derivation", () => {
+  const openaiModel = {
+    id: "openai/gpt-5",
+    providerID: "openai",
+    api: {
+      id: "gpt-5",
+      url: "https://api.openai.com",
+      npm: "@ai-sdk/openai",
+    },
+    name: "GPT-5",
+    capabilities: {
+      temperature: true,
+      reasoning: true,
+      attachment: true,
+      toolcall: true,
+      input: { text: true, audio: false, image: true, video: false, pdf: false },
+      output: { text: true, audio: false, image: false, video: false, pdf: false },
+      interleaved: false,
+    },
+    cost: { input: 0.03, output: 0.06, cache: { read: 0.001, write: 0.002 } },
+    limit: { context: 128000, output: 4096 },
+    status: "active",
+    options: {},
+    headers: {},
+  } as any
+
+  test("returns original references when no transforms are needed", () => {
+    const msgs = [
+      {
+        role: "user",
+        content: [{ type: "text", text: "hello" }],
+      },
+    ] as any[]
+
+    const result = ProviderTransform.message(msgs, openaiModel, {})
+
+    expect(result).toBe(msgs)
+    expect(result[0]).toBe(msgs[0])
+    expect(result[0].content).toBe(msgs[0].content)
+  })
+
+  test("uses mediaType for image modality checks without stringifying image payload", () => {
+    const noStringifyImage = {
+      toString() {
+        throw new Error("image payload should not be stringified")
+      },
+    }
+    const noImageModel = {
+      ...openaiModel,
+      capabilities: {
+        ...openaiModel.capabilities,
+        input: { text: true, audio: false, image: false, video: false, pdf: false },
+      },
+    } as any
+    const msgs = [
+      {
+        role: "user",
+        content: [{ type: "image", image: noStringifyImage, mediaType: "image/png" }],
+      },
+    ] as any[]
+
+    const result = ProviderTransform.message(msgs, noImageModel, {})
+
+    expect(result[0].content[0]).toEqual({
+      type: "text",
+      text: "ERROR: Cannot read image (this model does not support image input). Inform the user.",
+    })
+  })
+})
+
+describe("ProviderTransform.schema - memoization", () => {
+  const geminiModelA = {
+    providerID: "google",
+    api: {
+      id: "gemini-3-pro",
+    },
+  } as any
+
+  const geminiModelB = {
+    providerID: "google",
+    api: {
+      id: "gemini-2.5-pro",
+    },
+  } as any
+
+  test("reuses sanitized schema for the same model and schema identity", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        rows: {
+          type: "array",
+          items: {
+            type: "array",
+            items: {},
+          },
+        },
+      },
+    } as any
+
+    const first = ProviderTransform.schema(geminiModelA, schema)
+    const second = ProviderTransform.schema(geminiModelA, schema)
+
+    expect(second).toBe(first)
+  })
+
+  test("does not share memoized schema across different model identities", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        value: {
+          type: "integer",
+          enum: [1, 2],
+        },
+      },
+    } as any
+
+    const first = ProviderTransform.schema(geminiModelA, schema)
+    const second = ProviderTransform.schema(geminiModelB, schema)
+
+    expect(second).not.toBe(first)
+  })
+})
