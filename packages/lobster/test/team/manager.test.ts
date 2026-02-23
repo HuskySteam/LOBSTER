@@ -1,7 +1,16 @@
 import { describe, test, expect, mock, beforeEach, afterAll } from "bun:test"
+import { NamedError } from "@lobster-ai/util/error"
+import z from "zod"
 
 // In-memory storage backing
 const store = new Map<string, any>()
+
+const MockNotFoundError = NamedError.create(
+  "NotFoundError",
+  z.object({
+    message: z.string(),
+  }),
+)
 
 function storeKey(key: string[]): string {
   return key.join("/")
@@ -13,17 +22,18 @@ function storePrefix(prefix: string[]): string {
 
 mock.module("../../src/storage/storage", () => ({
   Storage: {
+    NotFoundError: MockNotFoundError,
     async write(key: string[], content: any) {
       store.set(storeKey(key), structuredClone(content))
     },
     async read<T>(key: string[]): Promise<T> {
       const k = storeKey(key)
-      if (!store.has(k)) throw new Error("NotFound: " + k)
+      if (!store.has(k)) throw new MockNotFoundError({ message: "Resource not found: " + k })
       return structuredClone(store.get(k)) as T
     },
     async update<T>(key: string[], fn: (draft: T) => void): Promise<T> {
       const k = storeKey(key)
-      if (!store.has(k)) throw new Error("NotFound: " + k)
+      if (!store.has(k)) throw new MockNotFoundError({ message: "Resource not found: " + k })
       const content = structuredClone(store.get(k)) as T
       fn(content)
       store.set(k, structuredClone(content))
