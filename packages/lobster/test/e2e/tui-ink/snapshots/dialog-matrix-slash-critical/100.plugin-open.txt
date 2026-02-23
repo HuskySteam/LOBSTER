@@ -14,7 +14,7 @@
   │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-sentiment.ts                       │
   │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-team.ts                            │
   │                                                                                              │
-  │  tab switch  up/down navigate  x remove  esc close                                           │
+  │  tab switch  up/down navigate  ctrl+x remove  esc close                                      │
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │

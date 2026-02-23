@@ -6,6 +6,7 @@ import { useAppStore } from "../store"
 import { useSDK } from "../context/sdk"
 import { useDialog } from "../ui/dialog"
 import { useHotkeyInputGuard } from "../ui/hotkey-input-guard"
+import { isCtrlShortcut } from "../ui/hotkey"
 import { Spinner } from "./spinner"
 import { dedupeMarketplaceBySpec, loadPluginMarketplace, pluginSpecName, type MarketplacePlugin } from "./plugin-marketplace"
 import { EmptyState, KeyHints, PanelHeader, SegmentedTabs, StatusBadge } from "../ui/chrome"
@@ -177,7 +178,7 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
       return
     }
     if (selected >= length) setSelected(length - 1)
-  }, [installed.length, selected, tab, visibleMarketplace.length])
+  }, [selected, tab, visibleInstalled.length, visibleMarketplace.length])
 
   useInput((ch, key) => {
     if (key.escape) {
@@ -193,7 +194,7 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
     if (tab === "installed") {
       if (key.upArrow) setSelected((value) => Math.max(0, value - 1))
       if (key.downArrow) setSelected((value) => Math.min(visibleInstalled.length - 1, value + 1))
-      if (ch === "x" || key.delete || key.backspace) {
+      if (isCtrlShortcut(ch, key, "x")) {
         markHotkeyConsumed()
         const item = visibleInstalled[selected]
         if (item) void removePlugin(item.raw)
@@ -357,7 +358,7 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
               )
             })
           )}
-          <KeyHints items={["tab switch", "up/down navigate", "x remove", "esc close"]} />
+          <KeyHints items={["tab switch", "up/down navigate", "ctrl+x remove", "esc close"]} />
         </Box>
       )}
 
