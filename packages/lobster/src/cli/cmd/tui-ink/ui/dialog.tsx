@@ -27,24 +27,32 @@ export function DialogProvider(props: { children: ReactNode }) {
   return (
     <DialogContext.Provider value={{ content, replace, clear }}>
       {content ? null : <Box flexDirection="column">{props.children}</Box>}
-      {content && <DialogOverlay onClose={clear}>{content}</DialogOverlay>}
+      {content ? (
+        <Box width="100%" height="100%" justifyContent="center" alignItems="center" paddingLeft={1} paddingRight={1}>
+          <DialogOverlay>{content}</DialogOverlay>
+        </Box>
+      ) : null}
     </DialogContext.Provider>
   )
 }
 
-function DialogOverlay(props: { children: ReactNode; onClose: () => void }) {
+function DialogOverlay(props: { children: ReactNode }) {
   const { theme } = useTheme()
   const { stdout } = useStdout()
-  const maxHeight = Math.max((stdout?.rows ?? 24) - 4, 6)
+  const rows = stdout?.rows ?? 24
+  const cols = stdout?.columns ?? 80
+  const maxHeight = Math.max(rows - 6, 8)
+  const width = Math.max(Math.min(cols - 4, 120), 56)
 
   return (
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor={theme.border}
+      borderColor={theme.borderActive}
       paddingLeft={1}
       paddingRight={1}
       height={maxHeight}
+      width={width}
       overflow="hidden"
     >
       {props.children}

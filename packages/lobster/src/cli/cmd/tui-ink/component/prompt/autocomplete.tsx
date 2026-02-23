@@ -3,6 +3,7 @@ import { Box, Text, useStdout } from "ink"
 import React, { useMemo } from "react"
 import { useTheme } from "../../theme"
 import { computeAutocompleteLayout, truncateWithEllipsis } from "./autocomplete-layout"
+import { useDesignTokens } from "../../ui/design"
 
 export interface AutocompleteOption {
   label: string
@@ -18,6 +19,7 @@ interface AutocompleteProps {
 
 export function Autocomplete({ options, selected, maxVisible = 8 }: AutocompleteProps) {
   const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const { stdout } = useStdout()
   const popupWidth = useMemo(
     () => Math.max(30, Math.min(120, (stdout?.columns ?? 80) - 4)),
@@ -45,7 +47,7 @@ export function Autocomplete({ options, selected, maxVisible = 8 }: Autocomplete
       flexDirection="column"
       marginLeft={1}
       borderStyle="round"
-      borderColor={theme.border}
+      borderColor={tokens.panel.borderActive}
       paddingLeft={1}
       paddingRight={1}
       width={popupWidth}
@@ -63,13 +65,17 @@ export function Autocomplete({ options, selected, maxVisible = 8 }: Autocomplete
         const label = truncateWithEllipsis(opt.label, layout.labelWidth).padEnd(layout.labelWidth, " ")
         const description = truncateWithEllipsis(opt.description ?? "", layout.descriptionWidth)
         return (
-          <Box key={opt.value + idx} flexDirection="row" overflow="hidden">
-            <Text color={isSelected ? theme.secondary : theme.text} bold={isSelected}>
+          <Box
+            key={opt.value + idx}
+            flexDirection="row"
+            overflow="hidden"
+          >
+            <Text color={isSelected ? tokens.list.selectedText : theme.text} bold={isSelected} inverse={isSelected}>
               {marker}
               {label}
             </Text>
             {layout.showDescription && opt.description && (
-              <Text color={isSelected ? theme.secondary : theme.textMuted} dimColor={!isSelected}>
+              <Text color={isSelected ? tokens.list.selectedText : theme.textMuted} dimColor={!isSelected}>
                 {" "}
                 {description}
               </Text>

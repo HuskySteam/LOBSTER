@@ -25,6 +25,11 @@ type ShellContext = {
   packageDirTarget: string
 }
 
+type RunnerContext = ShellContext & {
+  bunExecutable: string
+  packageDirForBun: string
+}
+
 type CommandResult = {
   stdout: string
   stderr: string
@@ -119,6 +124,10 @@ function bashQuote(value: string) {
   return `'${value.replace(/'/g, `'\"'\"'`)}'`
 }
 
+function isWindowsPath(value: string) {
+  return /^[a-zA-Z]:\\/.test(value) || value.startsWith("\\\\")
+}
+
 function sanitizeLabel(label: string) {
   return label.replace(/[^a-zA-Z0-9_-]/g, "-")
 }
@@ -199,7 +208,7 @@ async function resolveShellContext() {
   } satisfies ShellContext
 }
 
-async function preflight(context: ShellContext) {
+async function preflight(context: ShellContext): Promise<RunnerContext> {
   console.log("Running preflight checks...")
 
   const tmuxCheck = await runShell(context, "command -v tmux", { allowFailure: true })
@@ -211,12 +220,35 @@ async function preflight(context: ShellContext) {
   if (bunCheck.exitCode !== 0) {
     throw new Error("bun not found in target shell. Install bun before running this harness.")
   }
+  const bunExecutable = bunCheck.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean)
+  if (!bunExecutable) {
+    throw new Error("bun command resolved to an empty path in target shell.")
+  }
+  let packageDirForBun = context.packageDirTarget
+  if (context.viaWsl && /^\/mnt\/[a-z]\//i.test(bunExecutable)) {
+    const convertedProjectPath = await runShell(context, `wslpath -w ${bashQuote(context.packageDirTarget)}`)
+    packageDirForBun = convertedProjectPath.stdout.trim()
+    if (!packageDirForBun) {
+      throw new Error("Failed to resolve Windows project path for WSL Bun interop.")
+    }
+  }
 
   const tmuxVersion = (await runShell(context, "tmux -V")).stdout.trim()
-  const bunVersion = (await runShell(context, "bun --version")).stdout.trim()
+  const bunVersion = (await runShell(context, `${bashQuote(bunExecutable)} --version`)).stdout.trim()
   console.log(`- tmux: ${tmuxVersion}`)
-  console.log(`- bun: ${bunVersion}`)
+  console.log(`- bun: ${bunVersion} (${bunExecutable})`)
   console.log(`- shell mode: ${context.viaWsl ? "windows->wsl" : "native"}`)
+  if (packageDirForBun !== context.packageDirTarget) {
+    console.log(`- bun path mode: windows-interop (${packageDirForBun})`)
+  }
+  return {
+    ...context,
+    bunExecutable,
+    packageDirForBun,
+  }
 }
 
 function resolveWidths(scenario: ScenarioDefinition, override: number[] | undefined) {
@@ -243,9 +275,11 @@ async function capturePane(context: ShellContext, sessionName: string) {
   return capture.stdout
 }
 
-function createStartupCommand(runtimeRoot: string, packageDirTarget: string) {
-  const entrypoint = `${packageDirTarget}/src/index.ts`
-  const projectPath = packageDirTarget
+function createStartupCommand(runtimeRoot: string, context: RunnerContext) {
+  const projectPath = context.packageDirForBun
+  const entrypoint = isWindowsPath(projectPath)
+    ? path.win32.join(projectPath, "src", "index.ts")
+    : `${projectPath}/src/index.ts`
   const envVars: Record<string, string> = {
     TERM: "xterm-256color",
     LOBSTER_TEST_HOME: `${runtimeRoot}/home`,
@@ -262,7 +296,7 @@ function createStartupCommand(runtimeRoot: string, packageDirTarget: string) {
     .map(([key, value]) => `${key}=${bashQuote(value)}`)
     .join(" ")
 
-  return `cd /tmp && ${assignments} /root/.bun/bin/bun run --conditions=browser ${bashQuote(entrypoint)} ${bashQuote(projectPath)} --ui ink`
+  return `cd /tmp && stty -ixon && ${assignments} ${bashQuote(context.bunExecutable)} run --conditions=browser ${bashQuote(entrypoint)} ${bashQuote(projectPath)} --ui ink`
 }
 
 async function waitForUIReady(context: ShellContext, sessionName: string, timeoutMs: number) {
@@ -280,7 +314,7 @@ async function waitForUIReady(context: ShellContext, sessionName: string, timeou
 }
 
 async function runScenario(
-  context: ShellContext,
+  context: RunnerContext,
   scenario: ScenarioDefinition,
   width: number,
   runArtifactDir: string,
@@ -292,7 +326,7 @@ async function runScenario(
 
   const sessionName = `lobster-e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const runtimeRoot = `/tmp/${sessionName}`
-  const startup = createStartupCommand(runtimeRoot, context.packageDirTarget)
+  const startup = createStartupCommand(runtimeRoot, context)
   await Bun.write(path.join(scenarioDir, "startup.command.txt"), startup + "\n")
 
   const result: ScenarioResult = {
@@ -516,8 +550,8 @@ async function main() {
     throw new Error("No scenarios selected")
   }
 
-  const context = await resolveShellContext()
-  await preflight(context)
+  const shellContext = await resolveShellContext()
+  const context = await preflight(shellContext)
 
   await fs.mkdir(ARTIFACT_ROOT, { recursive: true })
   await fs.mkdir(SNAPSHOT_ROOT, { recursive: true })

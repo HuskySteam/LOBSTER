@@ -1,8 +1,9 @@
 /** @jsxImportSource react */
 import { Box, Text, useInput } from "ink"
 import React from "react"
-import { useTheme } from "../theme"
 import { useDialog } from "./dialog"
+import { KeyHints, PanelHeader, StatusBadge } from "./chrome"
+import { useDesignTokens } from "./design"
 
 const shortcuts = [
   { key: "Tab", desc: "Cycle agent" },
@@ -15,7 +16,7 @@ const shortcuts = [
 ] as const
 
 export function DialogHelp() {
-  const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const dialog = useDialog()
 
   useInput((_ch, key) => {
@@ -24,22 +25,21 @@ export function DialogHelp() {
 
   return (
     <Box flexDirection="column" paddingLeft={1} paddingRight={1}>
-      <Text color={theme.text} bold>
-        Keyboard Shortcuts
-      </Text>
+      <PanelHeader title="Keyboard Shortcuts" right="esc close" />
       <Box flexDirection="column" marginTop={1}>
         {shortcuts.map((s) => (
           <Box key={s.key} gap={2}>
             <Box width={12}>
-              <Text color={theme.accent} bold>{s.key}</Text>
+              <Text color={tokens.text.accent} bold>{s.key}</Text>
             </Box>
-            <Text color={theme.textMuted}>{s.desc}</Text>
+            <Text color={tokens.text.muted}>{s.desc}</Text>
           </Box>
         ))}
       </Box>
       <Box marginTop={1}>
-        <Text color={theme.textMuted}>Press esc or enter to close</Text>
+        <StatusBadge tone="accent" label="enter/esc close" />
       </Box>
+      <KeyHints items={["enter close", "esc close"]} />
     </Box>
   )
 }

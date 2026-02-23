@@ -56,7 +56,7 @@ type HotkeyMatrixEntry = {
 }
 
 const DIALOG_CLOSED_EXPECTATION: ScenarioExpectation = {
-  required: ["build |", "Type a message"],
+  required: ["[build]", "Type a message"],
   forbidden: ["esc close"],
   softRequired: ["^P commands"],
 }
@@ -101,13 +101,13 @@ const SLASH_DIALOG_MATRIX: DialogMatrixEntry[] = [
   {
     command: "help",
     openExpectation: {
-      required: ["Keyboard Shortcuts", "Press esc or enter to close"],
+      required: ["Keyboard Shortcuts", "enter/esc close"],
     },
   },
   {
     command: "plugin",
     openExpectation: {
-      required: ["Plugins", "Installed", "Marketplace", "tab switch", "esc close"],
+      required: ["Plugin Manager", "Installed", "Marketplace", "esc close"],
     },
   },
   {
@@ -163,14 +163,6 @@ const HOTKEY_DIALOG_MATRIX: HotkeyMatrixEntry[] = [
     leakedPrompt: "> a",
     openExpectation: {
       required: ["Select agent", "esc close"],
-    },
-  },
-  {
-    id: "sessions",
-    key: "C-s",
-    leakedPrompt: "> s",
-    openExpectation: {
-      required: ["Sessions", "esc close"],
     },
   },
   {
@@ -260,8 +252,8 @@ const SCENARIOS: ScenarioDefinition[] = [
     startupWaitMs: 45_000,
     steps: [],
     finalExpectation: {
-      required: ["LOBSTER Code", "build |", "Type a message"],
-      softRequired: ["Welcome back", "Tips for getting started", "^P commands"],
+      required: ["LOBSTER Code", "[build]", "Type a message"],
+      softRequired: ["Welcome back", "Operator Notes", "^P commands"],
     },
   },
   {
@@ -299,7 +291,7 @@ const SCENARIOS: ScenarioDefinition[] = [
         kind: "capture",
         label: "closed",
         expectation: {
-          required: ["build |", "Type a message"],
+          required: ["[build]", "Type a message"],
           forbidden: ["Commands", "Search commands", "esc close", "> p"],
         },
       },
@@ -323,7 +315,7 @@ const SCENARIOS: ScenarioDefinition[] = [
           required: ["Commands", "session"],
           oneOf: [["/sessions", "Browse sessions"]],
           forbidden: ["> p"],
-          softRequired: ["/new Start a new session"],
+          softRequired: ["/new - Start a new session"],
         },
       },
     ],
@@ -371,7 +363,7 @@ const SCENARIOS: ScenarioDefinition[] = [
         kind: "capture",
         label: "closed",
         expectation: {
-          required: ["build |", "Type a message"],
+          required: ["[build]", "Type a message"],
           forbidden: ["Sessions", "No results found", "> d", "> r", "> dr"],
         },
       },
@@ -394,6 +386,37 @@ const SCENARIOS: ScenarioDefinition[] = [
     steps: buildHotkeyDialogMatrixSteps(HOTKEY_DIALOG_MATRIX),
   },
   {
+    id: "plugin-marketplace-critical",
+    title: "Plugin marketplace opens and closes cleanly from slash command",
+    category: "critical",
+    widths: [100],
+    startupWaitMs: 45_000,
+    steps: [
+      { kind: "text", text: "/plugin marketplace", note: "Open marketplace tab directly" },
+      { kind: "keys", keys: ["Enter"] },
+      { kind: "wait", ms: 700 },
+      {
+        kind: "capture",
+        label: "open",
+        expectation: {
+          required: ["Marketplace", "Filter marketplace", "esc close"],
+          oneOf: [["Plugin Manager", "[MARKETPLACE]"]],
+          forbidden: ["> /plugin marketplace"],
+        },
+      },
+      { kind: "keys", keys: ["Escape"], note: "Close plugin manager" },
+      { kind: "wait", ms: 300 },
+      {
+        kind: "capture",
+        label: "closed",
+        expectation: {
+          required: ["[build]", "Type a message"],
+          forbidden: ["Plugin Manager", "esc close", "> /plugin marketplace"],
+        },
+      },
+    ],
+  },
+  {
     id: "home-idle-responsive",
     title: "Home screen remains readable across widths",
     category: "responsive",
@@ -401,7 +424,7 @@ const SCENARIOS: ScenarioDefinition[] = [
     startupWaitMs: 45_000,
     steps: [],
     finalExpectation: {
-      required: ["build |", "Type a message"],
+      required: ["[build]", "Type a message"],
       softRequired: ["LOBSTER Code", "Welcome back"],
     },
   },

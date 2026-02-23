@@ -1,16 +1,17 @@
 /** @jsxImportSource react */
 import { Box } from "ink"
 import React, { useMemo } from "react"
-import { useTheme } from "../theme"
 import { useAppStore } from "../store"
 import { Spinner } from "./spinner"
 import path from "path"
+import { StatusBadge } from "../ui/chrome"
+import { useDesignTokens } from "../ui/design"
 
 const EMPTY_MESSAGES: never[] = []
 const EMPTY_PARTS: never[] = []
 
 export function ActivityBar(props: { sessionID: string }) {
-  const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const sessionStatus = useAppStore((s) => s.session_status[props.sessionID])
   const messages = useAppStore((s) => s.message[props.sessionID] ?? EMPTY_MESSAGES)
   const parts = useAppStore((s) => s.part)
@@ -49,9 +50,11 @@ export function ActivityBar(props: { sessionID: string }) {
   if (!isBusy || !activityInfo) return null
 
   return (
-    <Box flexShrink={0} paddingLeft={2} paddingRight={2}>
-      <Spinner color={theme.primary}>
-        {activityInfo.text}{activityInfo.count}
+    <Box flexShrink={0} paddingLeft={2} paddingRight={2} gap={1}>
+      <StatusBadge tone="accent" label="busy" />
+      <Spinner color={tokens.text.accent}>
+        {activityInfo.text}
+        {activityInfo.count}
       </Spinner>
     </Box>
   )

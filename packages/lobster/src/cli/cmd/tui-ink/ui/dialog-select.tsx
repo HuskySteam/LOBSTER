@@ -3,10 +3,11 @@ import { Box, Text, useInput } from "ink"
 import TextInput from "ink-text-input"
 import React, { useState, useMemo, useCallback, useEffect, type ReactNode } from "react"
 import { Keybind } from "@/util/keybind"
-import { useTheme } from "../theme"
 import { useDialog } from "./dialog"
 import { matchDialogSelectKeybind } from "./dialog-select-keybind"
 import { useHotkeyInputGuard } from "./hotkey-input-guard"
+import { EmptyState, KeyHints, PanelHeader, StatusBadge } from "./chrome"
+import { useDesignTokens } from "./design"
 
 export interface DialogSelectOption<T = any> {
   title: string
@@ -22,6 +23,7 @@ export interface DialogSelectProps<T> {
   placeholder?: string
   options: DialogSelectOption<T>[]
   current?: T
+  isEqual?: (left: T, right: T) => boolean
   onSelect?: (option: DialogSelectOption<T>) => void
   onFilter?: (query: string) => void
   onMove?: (option: DialogSelectOption<T> | undefined) => void
@@ -36,11 +38,23 @@ export interface DialogSelectProps<T> {
 }
 
 export function DialogSelect<T>(props: DialogSelectProps<T>) {
-  const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const dialog = useDialog()
   const { markHotkeyConsumed, wrapOnChange } = useHotkeyInputGuard()
   const [selected, setSelected] = useState(0)
   const [filter, setFilter] = useState("")
+
+  const isEqual = useMemo(() => {
+    if (props.isEqual) return props.isEqual
+    return (left: T, right: T) => {
+      if (Object.is(left, right)) return true
+      try {
+        return JSON.stringify(left) === JSON.stringify(right)
+      } catch {
+        return false
+      }
+    }
+  }, [props.isEqual])
 
   const filtered = useMemo(() => {
     const items = props.options.filter((x) => !x.disabled)
@@ -86,13 +100,13 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     setSelected((prev) => {
       let next = prev
       if (props.current !== undefined) {
-        const idx = flat.findIndex((x) => JSON.stringify(x.value) === JSON.stringify(props.current))
+        const idx = flat.findIndex((x) => isEqual(x.value, props.current as T))
         if (idx >= 0) next = idx
       }
       if (next >= flat.length) next = flat.length - 1
       return prev === next ? prev : next
     })
-  }, [flat, props.current])
+  }, [flat, props.current, isEqual])
 
   const handleFilter = useCallback(
     (value: string) => {
@@ -165,15 +179,10 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
   return (
     <Box flexDirection="column" paddingLeft={1} paddingRight={1}>
-      <Box justifyContent="space-between">
-        <Text color={theme.text} bold>
-          {props.title}
-        </Text>
-        <Text color={theme.textMuted}>esc close</Text>
-      </Box>
+      <PanelHeader title={props.title} right="esc close" />
 
       <Box marginTop={1}>
-        <Text color={theme.textMuted}>{"> "}</Text>
+        <Text color={tokens.text.accent}>{"> "}</Text>
         <TextInput
           value={filter}
           onChange={guardedFilterChange}
@@ -182,48 +191,64 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
       </Box>
 
       {flat.length === 0 ? (
-        <Box marginTop={1}>
-          <Text color={theme.textMuted}>No results found</Text>
-        </Box>
+        <EmptyState title="No results found" detail="Adjust your search query." />
       ) : (
         <Box flexDirection="column" marginTop={1}>
-          {scrollOffset > 0 && <Text color={theme.textMuted}>  ... {scrollOffset} more above</Text>}
+          {scrollOffset > 0 && <Text color={tokens.text.muted}>  ... {scrollOffset} more above</Text>}
           {visibleItems.map((opt) => {
             const idx = globalIndex++
             const isSelected = idx === selected
-            const isCurrent =
-              props.current !== undefined && JSON.stringify(opt.value) === JSON.stringify(props.current)
+            const isCurrent = props.current !== undefined && isEqual(opt.value, props.current as T)
+            const marker = isSelected ? ">" : " "
             return (
-              <Box key={idx} flexDirection="row">
-                <Text color={isCurrent ? theme.primary : theme.textMuted}>{isCurrent ? "* " : "  "}</Text>
-                <Text color={isSelected ? theme.secondary : theme.text} bold={isSelected}>
+              <Box
+                key={`${idx}:${opt.title}`}
+                flexDirection="row"
+                paddingLeft={1}
+                paddingRight={1}
+              >
+                <Text color={isSelected ? tokens.list.selectedText : tokens.list.marker}>
+                  {marker}{" "}
+                </Text>
+                <Text
+                  color={isSelected ? tokens.list.selectedText : tokens.text.primary}
+                  bold={isSelected}
+                  inverse={isSelected}
+                >
                   {opt.title}
                 </Text>
-                {opt.description && <Text color={theme.textMuted}> {opt.description}</Text>}
-                {opt.footer && <Text color={theme.textMuted}> {opt.footer}</Text>}
+                {isCurrent ? (
+                  <>
+                    <Text color={isSelected ? tokens.list.selectedText : tokens.text.muted}> </Text>
+                    <StatusBadge label="current" tone={isSelected ? "accent" : "muted"} />
+                  </>
+                ) : null}
+                {opt.description ? (
+                  <Text color={isSelected ? tokens.list.selectedText : tokens.text.muted}> {"-"} {opt.description}</Text>
+                ) : null}
+                {opt.footer ? (
+                  <Text color={isSelected ? tokens.list.selectedText : tokens.text.muted}> {"|"} {opt.footer}</Text>
+                ) : null}
               </Box>
             )
           })}
           {scrollOffset + maxVisible < flat.length && (
-            <Text color={theme.textMuted}>{"  "}... {flat.length - scrollOffset - maxVisible} more below</Text>
+            <Text color={tokens.text.muted}>{"  "}... {flat.length - scrollOffset - maxVisible} more below</Text>
           )}
         </Box>
       )}
 
       {props.footer ?? (
-        <Box marginTop={1} gap={2}>
-          <Text color={theme.textMuted}>up/down navigate</Text>
-          <Text color={theme.textMuted}>enter select</Text>
-          <Text color={theme.textMuted}>esc close</Text>
-          {activeKeybinds.map((item) => (
-            <Text
-              key={`${item.title}:${item.keybind ? Keybind.toString(item.keybind) : ""}`}
-              color={theme.textMuted}
-            >
-              {item.title} {item.keybind ? Keybind.toString(item.keybind) : ""}
-            </Text>
-          ))}
-        </Box>
+        <KeyHints
+          items={[
+            "up/down navigate",
+            "enter select",
+            "esc close",
+            ...activeKeybinds.map((item) =>
+              `${item.title} ${item.keybind ? Keybind.toString(item.keybind) : ""}`.trim(),
+            ),
+          ]}
+        />
       )}
     </Box>
   )

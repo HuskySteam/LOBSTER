@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import React, { useMemo, useRef, useCallback } from "react"
+import React, { useMemo, useCallback } from "react"
 import { useTheme } from "../theme"
 import { useDialog } from "../ui/dialog"
 import { DialogSelect, type DialogSelectOption } from "../ui/dialog-select"
@@ -7,7 +7,6 @@ import { DialogSelect, type DialogSelectOption } from "../ui/dialog-select"
 export function DialogThemeList() {
   const themeCtx = useTheme()
   const dialog = useDialog()
-  const initial = useRef(themeCtx.selected)
 
   const options = useMemo<DialogSelectOption<string>[]>(() => {
     const all = themeCtx.all()
@@ -32,6 +31,7 @@ export function DialogThemeList() {
       placeholder="Search themes..."
       options={options}
       current={themeCtx.selected}
+      isEqual={(left, right) => left === right}
       onSelect={handleSelect}
     />
   )

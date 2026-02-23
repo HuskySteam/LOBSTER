@@ -1,9 +1,10 @@
 /** @jsxImportSource react */
 import { Box, Text } from "ink"
 import React from "react"
-import { useTheme } from "../../theme"
 import { Spinner } from "../spinner"
 import type { ReactNode } from "react"
+import { useDesignTokens } from "../../ui/design"
+import { StatusBadge } from "../../ui/chrome"
 
 export function BlockTool(props: {
   title: string
@@ -11,19 +12,32 @@ export function BlockTool(props: {
   error?: string
   spinner?: boolean
 }) {
-  const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const title = props.title.replace(/^# /, "")
 
   return (
-    <Box flexDirection="column" paddingLeft={2} marginTop={1} gap={0}>
-      {props.spinner ? (
-        <Spinner><Text bold>{title}</Text></Spinner>
-      ) : (
-        <Text color={theme.text} bold>{title}</Text>
-      )}
+    <Box
+      flexDirection="column"
+      paddingLeft={1}
+      paddingRight={1}
+      paddingTop={1}
+      paddingBottom={1}
+      marginTop={1}
+      gap={0}
+      borderStyle="round"
+      borderColor={tokens.panel.border}
+    >
+      <Box gap={1}>
+        <StatusBadge tone="accent" label="tool" />
+        {props.spinner ? (
+          <Spinner><Text color={tokens.text.primary} bold>{title}</Text></Spinner>
+        ) : (
+          <Text color={tokens.text.primary} bold>{title}</Text>
+        )}
+      </Box>
       {props.children}
       {props.error && (
-        <Text color={theme.error}>{props.error}</Text>
+        <Text color={tokens.status.error}>{props.error}</Text>
       )}
     </Box>
   )

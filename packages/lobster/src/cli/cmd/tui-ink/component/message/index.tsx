@@ -1,9 +1,10 @@
 /** @jsxImportSource react */
 import { Box, Text } from "ink"
 import React from "react"
-import { useTheme, type ThemeColors } from "../../theme"
 import { AgentBadge } from "../agent-badge"
 import { Spinner } from "../spinner"
+import { StatusBadge } from "../../ui/chrome"
+import { useDesignTokens } from "../../ui/design"
 import { TextPart } from "./text-part"
 import {
   BashTool,
@@ -31,14 +32,14 @@ export function MessageRow(props: {
   showThinking?: boolean
   showTimestamps?: boolean
 }) {
-  const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const { message, parts } = props
 
   if (message.role === "user") {
     return (
       <UserMessage
         parts={parts}
-        theme={theme}
+        theme={tokens}
         timestamp={props.showTimestamps ? message.time?.created : undefined}
       />
     )
@@ -49,7 +50,7 @@ export function MessageRow(props: {
       <AssistantMessage
         message={message}
         parts={parts}
-        theme={theme}
+        theme={tokens}
         isLast={props.isLast}
         showThinking={props.showThinking ?? true}
         timestamp={props.showTimestamps ? message.time?.created : undefined}
@@ -64,7 +65,7 @@ export function MessageRow(props: {
 
 function UserMessage(props: {
   parts: Array<Record<string, any>>
-  theme: ThemeColors
+  theme: ReturnType<typeof useDesignTokens>
   timestamp?: number
 }) {
   const textParts = props.parts.filter((p) => p.type === "text" && !p.synthetic)
@@ -73,16 +74,17 @@ function UserMessage(props: {
 
   return (
     <Box marginBottom={1} flexDirection="column">
-      {props.timestamp && (
-        <Box paddingLeft={2}>
-          <Text color={props.theme.textMuted} dimColor>
+      <Box gap={1}>
+        <StatusBadge tone="muted" label="user" />
+        {props.timestamp ? (
+          <Text color={props.theme.text.muted} dimColor>
             {new Date(props.timestamp).toLocaleTimeString()}
           </Text>
-        </Box>
-      )}
-      <Box>
-        <Text color={props.theme.accent} bold>{"> "}</Text>
-        <Text color={props.theme.text}>{text}</Text>
+        ) : null}
+      </Box>
+      <Box paddingLeft={1}>
+        <Text color={props.theme.text.accent} bold>{"> "}</Text>
+        <Text color={props.theme.text.primary}>{text}</Text>
       </Box>
     </Box>
   )
@@ -93,7 +95,7 @@ function UserMessage(props: {
 function AssistantMessage(props: {
   message: { id: string; role: string; agent?: string }
   parts: Array<Record<string, any>>
-  theme: ThemeColors
+  theme: ReturnType<typeof useDesignTokens>
   isLast: boolean
   showThinking: boolean
   timestamp?: number
@@ -107,16 +109,15 @@ function AssistantMessage(props: {
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      {props.timestamp && (
-        <Box paddingLeft={2}>
-          <Text color={theme.textMuted} dimColor>
+      <Box gap={1}>
+        <StatusBadge tone="accent" label={message.agent ?? "assistant"} />
+        {props.timestamp ? (
+          <Text color={theme.text.muted} dimColor>
             {new Date(props.timestamp).toLocaleTimeString()}
           </Text>
-        </Box>
-      )}
-      {message.agent && (
-        <AgentBadge name={message.agent} variant="dot" color={theme.secondary} />
-      )}
+        ) : null}
+      </Box>
+      {message.agent ? <AgentBadge name={message.agent} variant="dot" color={theme.text.accent} /> : null}
       {parts.map((part) => (
         <PartView key={part.id} part={part} theme={theme} showThinking={showThinking} />
       ))}
@@ -131,7 +132,11 @@ function AssistantMessage(props: {
 
 // ─── Part Dispatcher ──────────────────────────────────────
 
-function PartView(props: { part: Record<string, any>; theme: ThemeColors; showThinking: boolean }) {
+function PartView(props: {
+  part: Record<string, any>
+  theme: ReturnType<typeof useDesignTokens>
+  showThinking: boolean
+}) {
   const { part, theme } = props
 
   if (part.type === "text") {
@@ -145,7 +150,7 @@ function PartView(props: { part: Record<string, any>; theme: ThemeColors; showTh
     if (!text) return null
     return (
       <Box flexDirection="column" marginTop={1} paddingLeft={1}>
-        <Text color={theme.textMuted} dimColor italic>Thinking: {text.slice(0, 200)}{text.length > 200 ? "..." : ""}</Text>
+        <Text color={theme.text.muted} dimColor italic>Thinking: {text.slice(0, 200)}{text.length > 200 ? "..." : ""}</Text>
       </Box>
     )
   }
@@ -157,7 +162,7 @@ function PartView(props: { part: Record<string, any>; theme: ThemeColors; showTh
   if (part.type === "step-start") {
     return (
       <Box>
-        <Text color={theme.textMuted} dimColor>
+        <Text color={theme.text.muted} dimColor>
           --- step {part.step ?? ""} ---
         </Text>
       </Box>

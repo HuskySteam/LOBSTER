@@ -1,14 +1,15 @@
 /** @jsxImportSource react */
 import { Box, Text, useInput } from "ink"
 import React, { useState, useCallback, useEffect } from "react"
-import { useTheme } from "../../theme"
 import { useSDK } from "../../context/sdk"
 import { useKeybind } from "../../context/keybind"
 import type { QuestionRequest } from "@lobster-ai/sdk/v2"
+import { KeyHints, PanelHeader, StatusBadge } from "../../ui/chrome"
+import { useDesignTokens } from "../../ui/design"
 
 export function QuestionPrompt(props: { request: QuestionRequest }) {
   const { sync } = useSDK()
-  const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const { setBlocker } = useKeybind()
   const [tabIndex, setTabIndex] = useState(0)
   const [selected, setSelected] = useState(0)
@@ -20,8 +21,6 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
   const options = question?.options ?? []
   const isMulti = question?.multiple === true
 
-  // Register blocker so global keybinds (Esc, Ctrl+C) don't fire
-  // Use request ID to avoid collisions when multiple question prompts are mounted
   const blockerID = `question-${props.request.id}`
   useEffect(() => {
     setBlocker(blockerID, true)
@@ -100,7 +99,6 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
       setTabIndex((i) => (i + 1) % total)
       setSelected(0)
     }
-    // Number shortcuts
     const digit = Number(ch)
     if (!Number.isNaN(digit) && digit >= 1 && digit <= options.length) {
       const opt = options[digit - 1]
@@ -111,18 +109,20 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
   return (
     <Box
       flexDirection="column"
-      borderStyle="single"
-      borderColor={theme.accent}
+      borderStyle="round"
+      borderColor={tokens.panel.borderActive}
       paddingLeft={1}
       paddingRight={1}
+      marginTop={1}
     >
-      {/* Tabs for multi-question */}
-      {!single && (
+      <PanelHeader title="Question" right="esc dismiss" />
+
+      {!single ? (
         <Box gap={1} marginBottom={1}>
           {questions.map((q, i) => (
             <Text
               key={i}
-              color={i === tabIndex ? theme.text : theme.textMuted}
+              color={i === tabIndex ? tokens.text.primary : tokens.text.muted}
               bold={i === tabIndex}
               inverse={i === tabIndex}
             >
@@ -130,21 +130,23 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
             </Text>
           ))}
           <Text
-            color={isConfirmTab ? theme.text : theme.textMuted}
+            color={isConfirmTab ? tokens.text.primary : tokens.text.muted}
             bold={isConfirmTab}
             inverse={isConfirmTab}
           >
             {" Confirm "}
           </Text>
         </Box>
-      )}
+      ) : null}
 
-      {/* Question content */}
-      {!isConfirmTab && question && (
+      {!isConfirmTab && question ? (
         <Box flexDirection="column">
-          <Text color={theme.text} bold>
+          <Box gap={1}>
+            <StatusBadge tone="accent" label={question.header} />
+            {isMulti ? <StatusBadge tone="muted" label="multi-select" /> : null}
+          </Box>
+          <Text color={tokens.text.primary} bold>
             {question.question}
-            {isMulti ? " (select all that apply)" : ""}
           </Text>
 
           <Box flexDirection="column" marginTop={1}>
@@ -154,53 +156,48 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
               return (
                 <Box key={i} flexDirection="column">
                   <Box>
-                    <Text color={isSelected ? theme.secondary : theme.textMuted}>
-                      {`${i + 1}. `}
-                    </Text>
+                    <Text color={isSelected ? tokens.list.marker : tokens.text.muted}>{`${i + 1}. `}</Text>
                     <Text
-                      color={isSelected ? theme.secondary : isPicked ? theme.success : theme.text}
+                      color={isSelected ? tokens.text.accent : isPicked ? tokens.status.success : tokens.text.primary}
                       bold={isSelected}
                     >
                       {isMulti ? `[${isPicked ? "x" : " "}] ` : ""}
                       {opt.label}
                     </Text>
                   </Box>
-                  {opt.description && (
+                  {opt.description ? (
                     <Box paddingLeft={3}>
-                      <Text color={theme.textMuted}>{opt.description}</Text>
+                      <Text color={tokens.text.muted}>{opt.description}</Text>
                     </Box>
-                  )}
+                  ) : null}
                 </Box>
               )
             })}
           </Box>
         </Box>
-      )}
+      ) : null}
 
-      {/* Confirm tab */}
-      {isConfirmTab && (
+      {isConfirmTab ? (
         <Box flexDirection="column">
-          <Text color={theme.text} bold>Review your answers:</Text>
+          <Text color={tokens.text.primary} bold>Review your answers:</Text>
           {questions.map((q, i) => (
             <Box key={i} paddingLeft={1}>
-              <Text color={theme.textMuted}>{q.header}: </Text>
-              <Text color={(answers[i] ?? []).length > 0 ? theme.text : theme.error}>
+              <Text color={tokens.text.muted}>{q.header}: </Text>
+              <Text color={(answers[i] ?? []).length > 0 ? tokens.text.primary : tokens.status.error}>
                 {(answers[i] ?? []).join(", ") || "(not answered)"}
               </Text>
             </Box>
           ))}
         </Box>
-      )}
+      ) : null}
 
-      {/* Hints */}
-      <Box marginTop={1} gap={2}>
-        {!single && <Text color={theme.textMuted}>tab switch</Text>}
-        {!isConfirmTab && <Text color={theme.textMuted}>{"↑↓ select"}</Text>}
-        <Text color={theme.textMuted}>
-          enter {isConfirmTab ? "submit" : isMulti ? "toggle" : single ? "submit" : "confirm"}
-        </Text>
-        <Text color={theme.textMuted}>esc dismiss</Text>
-      </Box>
+      <KeyHints
+        items={
+          !single
+            ? ["tab switch", "up/down select", "enter confirm", "esc dismiss"]
+            : ["up/down select", "enter submit", "esc dismiss"]
+        }
+      />
     </Box>
   )
 }
