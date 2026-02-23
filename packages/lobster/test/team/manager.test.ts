@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test"
+import { describe, test, expect, mock, beforeEach, afterAll } from "bun:test"
 
 // In-memory storage backing
 const store = new Map<string, any>()
@@ -56,18 +56,6 @@ mock.module("../../src/bus", () => ({
   },
 }))
 
-// Suppress logging
-mock.module("../../src/util/log", () => ({
-  Log: {
-    create: () => ({
-      info: () => {},
-      warn: () => {},
-      error: () => {},
-      debug: () => {},
-    }),
-  },
-}))
-
 const { TeamManager } = await import("../../src/team/manager")
 const { Team } = await import("../../src/team/team")
 const { TeamTask } = await import("../../src/team/task")
@@ -75,6 +63,10 @@ const { TeamTask } = await import("../../src/team/task")
 beforeEach(() => {
   store.clear()
   busEvents.length = 0
+})
+
+afterAll(() => {
+  mock.restore()
 })
 
 // ========================================================================
