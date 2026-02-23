@@ -1,12 +1,13 @@
 /** @jsxImportSource react */
 import { Box, Text, useInput } from "ink"
 import React, { useState, useCallback, useMemo, useEffect } from "react"
-import { useTheme } from "../../theme"
 import { useSDK } from "../../context/sdk"
 import { useKeybind } from "../../context/keybind"
 import { useAppStore } from "../../store"
 import type { PermissionRequest } from "@lobster-ai/sdk/v2"
 import path from "path"
+import { KeyHints, PanelHeader, StatusBadge } from "../../ui/chrome"
+import { useDesignTokens } from "../../ui/design"
 
 function normalizePath(input?: string) {
   if (!input) return ""
@@ -47,21 +48,18 @@ function describePermission(request: PermissionRequest, input: Record<string, an
 
 export function PermissionPrompt(props: { request: PermissionRequest }) {
   const { sync } = useSDK()
-  const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const { setBlocker } = useKeybind()
   const [selected, setSelected] = useState(0)
   const options = ["Allow once", "Allow always", "Reject"] as const
   const allParts = useAppStore((s) => s.part)
 
-  // Register blocker so global keybinds (Esc, Ctrl+C) don't fire
-  // Use request ID to avoid collisions when multiple permission prompts are mounted
   const blockerID = `permission-${props.request.id}`
   useEffect(() => {
     setBlocker(blockerID, true)
     return () => setBlocker(blockerID, false)
   }, [setBlocker, blockerID])
 
-  // Resolve tool input from parts
   const input = useMemo(() => {
     const tool = props.request.tool
     if (!tool) return {}
@@ -79,19 +77,19 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
   const handleSelect = useCallback(
     (option: number) => {
       switch (option) {
-        case 0: // Allow once
+        case 0:
           sync.client.permission.reply({
             reply: "once",
             requestID: props.request.id,
           })
           break
-        case 1: // Always
+        case 1:
           sync.client.permission.reply({
             reply: "always",
             requestID: props.request.id,
           })
           break
-        case 2: // Reject
+        case 2:
           sync.client.permission.reply({
             reply: "reject",
             requestID: props.request.id,
@@ -113,9 +111,8 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
       handleSelect(selected)
     }
     if (key.escape) {
-      handleSelect(2) // Reject
+      handleSelect(2)
     }
-    // Number shortcuts
     if (ch === "1") handleSelect(0)
     if (ch === "2") handleSelect(1)
     if (ch === "3") handleSelect(2)
@@ -124,25 +121,21 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
   return (
     <Box
       flexDirection="column"
-      borderStyle="single"
-      borderColor={theme.warning}
+      borderStyle="round"
+      borderColor={tokens.status.warning}
       paddingLeft={1}
       paddingRight={1}
+      marginTop={1}
     >
-      {/* Title */}
-      <Box gap={1}>
-        <Text color={theme.warning}>{"△"}</Text>
-        <Text color={theme.text} bold>Permission required</Text>
+      <PanelHeader title="Permission Required" right="esc reject" />
+      <StatusBadge tone="warning" label={props.request.permission} />
+
+      <Box paddingLeft={1} marginTop={1}>
+        <Text color={tokens.text.muted}>{description}</Text>
       </Box>
 
-      {/* Description */}
-      <Box paddingLeft={2} marginTop={1}>
-        <Text color={theme.textMuted}>{description}</Text>
-      </Box>
-
-      {/* Diff preview for edits */}
-      {props.request.permission === "edit" && typeof props.request.metadata?.diff === "string" && (
-        <Box paddingLeft={2} marginTop={1} flexDirection="column">
+      {props.request.permission === "edit" && typeof props.request.metadata?.diff === "string" ? (
+        <Box paddingLeft={1} marginTop={1} flexDirection="column">
           {(props.request.metadata.diff as string)
             .split("\n")
             .slice(0, 10)
@@ -150,26 +143,25 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
               <Text
                 key={i}
                 color={
-                  line.startsWith("+") ? theme.diffAdded
-                    : line.startsWith("-") ? theme.diffRemoved
-                    : theme.textMuted
+                  line.startsWith("+") ? tokens.status.success
+                    : line.startsWith("-") ? tokens.status.error
+                    : tokens.text.muted
                 }
               >
                 {line}
               </Text>
             ))}
-          {(props.request.metadata.diff as string).split("\n").length > 10 && (
-            <Text color={theme.textMuted}>... ({(props.request.metadata.diff as string).split("\n").length - 10} more lines)</Text>
-          )}
+          {(props.request.metadata.diff as string).split("\n").length > 10 ? (
+            <Text color={tokens.text.muted}>... ({(props.request.metadata.diff as string).split("\n").length - 10} more lines)</Text>
+          ) : null}
         </Box>
-      )}
+      ) : null}
 
-      {/* Options */}
       <Box marginTop={1} gap={1}>
         {options.map((opt, i) => (
           <Box key={i} paddingLeft={1} paddingRight={1}>
             <Text
-              color={i === selected ? theme.text : theme.textMuted}
+              color={i === selected ? tokens.text.primary : tokens.text.muted}
               bold={i === selected}
               inverse={i === selected}
             >
@@ -179,12 +171,7 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
         ))}
       </Box>
 
-      {/* Hints */}
-      <Box marginTop={1} gap={2}>
-        <Text color={theme.textMuted}>{"←→ select"}</Text>
-        <Text color={theme.textMuted}>{"enter confirm"}</Text>
-        <Text color={theme.textMuted}>{"esc reject"}</Text>
-      </Box>
+      <KeyHints items={["left/right select", "enter confirm", "esc reject", "1/2/3 quick select"]} />
     </Box>
   )
 }

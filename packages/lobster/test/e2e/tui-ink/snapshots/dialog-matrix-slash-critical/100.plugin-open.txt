@@ -1,38 +1,36 @@
-╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│  Plugins                                                                              esc close  │
-│                                                                                                  │
-│  Installed (7)  Marketplace  Add  tab switch                                                    │
-│                                                                                                  │
-│  > [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-auto-context.ts                      │
-│    [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-cost-tracker.ts                      │
-│    [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-insights.ts                          │
-│    [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-memory.ts                            │
-│    [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-orchestrator.ts                      │
-│    [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-sentiment.ts                         │
-│    [file] /mnt/c/VIBEATHON/lobster/.lobster/plugins/lobster-team.ts                              │
-│                                                                                                  │
-│  up/down navigate  x remove                                                                      │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+  │  Plugin Manager 7 installed                                                       esc close  │
+  │  [INSTALLED]                                                                                 │
+  │                                                                                              │
+  │   Installed 7   Marketplace 0   Add                                                          │
+  │                                                                                              │
+  │  > Filter installed plugins...                                                               │
+  │                                                                                              │
+  │   > [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-auto-context.ts                    │
+  │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-cost-tracker.ts                    │
+  │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-insights.ts                        │
+  │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-memory.ts                          │
+  │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-orchestrator.ts                    │
+  │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-sentiment.ts                       │
+  │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-team.ts                            │
+  │                                                                                              │
+  │  tab switch  up/down navigate  ctrl+x remove  esc close                                      │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────╯

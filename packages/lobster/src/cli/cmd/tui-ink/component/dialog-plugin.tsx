@@ -2,15 +2,17 @@
 import { Box, Text, useInput } from "ink"
 import TextInput from "ink-text-input"
 import React, { useState, useMemo, useCallback, useEffect } from "react"
-import { useTheme } from "../theme"
 import { useAppStore } from "../store"
 import { useSDK } from "../context/sdk"
 import { useDialog } from "../ui/dialog"
 import { useHotkeyInputGuard } from "../ui/hotkey-input-guard"
+import { isCtrlShortcut } from "../ui/hotkey"
 import { Spinner } from "./spinner"
 import { dedupeMarketplaceBySpec, loadPluginMarketplace, pluginSpecName, type MarketplacePlugin } from "./plugin-marketplace"
+import { EmptyState, KeyHints, PanelHeader, SegmentedTabs, StatusBadge } from "../ui/chrome"
+import { useDesignTokens } from "../ui/design"
 
-type Tab = "installed" | "marketplace" | "add"
+export type PluginTab = "installed" | "marketplace" | "add"
 
 type InstalledPlugin = {
   name: string
@@ -19,13 +21,21 @@ type InstalledPlugin = {
   raw: string
 }
 
-const TAB_ORDER: Tab[] = ["installed", "marketplace", "add"]
+const TAB_ORDER: PluginTab[] = ["installed", "marketplace", "add"]
 
-function nextTab(tab: Tab, reverse = false): Tab {
+function nextTab(tab: PluginTab, reverse = false): PluginTab {
   const index = TAB_ORDER.indexOf(tab)
   if (index < 0) return "installed"
   if (reverse) return TAB_ORDER[(index - 1 + TAB_ORDER.length) % TAB_ORDER.length]
   return TAB_ORDER[(index + 1) % TAB_ORDER.length]
+}
+
+export function resolveInitialPluginTab(input: {
+  initialTab?: PluginTab
+  installedCount: number
+}): PluginTab {
+  if (input.initialTab) return input.initialTab
+  return input.installedCount > 0 ? "installed" : "marketplace"
 }
 
 function parseInstalledPlugin(spec: string): InstalledPlugin {
@@ -54,46 +64,72 @@ function parseInstalledPlugin(spec: string): InstalledPlugin {
 }
 
 interface DialogPluginProps {
-  initialTab?: Tab
+  initialTab?: PluginTab
 }
 
 export function DialogPlugin(props: DialogPluginProps = {}) {
-  const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const { sync } = useSDK()
   const dialog = useDialog()
   const { markHotkeyConsumed, wrapOnChange } = useHotkeyInputGuard()
   const config = useAppStore((s) => s.config)
-
-  const [tab, setTab] = useState<Tab>(props.initialTab ?? "installed")
+  const pluginSpecs = useMemo<string[]>(() => (config as { plugin?: string[] })?.plugin ?? [], [config])
+  const installed = useMemo<InstalledPlugin[]>(
+    () => pluginSpecs.map(parseInstalledPlugin).toSorted((a, b) => a.name.localeCompare(b.name)),
+    [pluginSpecs],
+  )
+  const [tab, setTab] = useState<PluginTab>(() =>
+    resolveInitialPluginTab({
+      initialTab: props.initialTab,
+      installedCount: installed.length,
+    }),
+  )
+  const [query, setQuery] = useState("")
   const [addInput, setAddInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState(0)
   const [marketplace, setMarketplace] = useState<MarketplacePlugin[]>([])
   const [marketplaceLoaded, setMarketplaceLoaded] = useState(false)
   const [marketplaceHadError, setMarketplaceHadError] = useState(false)
+  const [marketplaceFetchedAt, setMarketplaceFetchedAt] = useState<number | undefined>(undefined)
+
   const guardedAddInputChange = useMemo(
     () => wrapOnChange(setAddInput),
     [wrapOnChange],
   )
-
-  const pluginSpecs = useMemo<string[]>(() => (config as { plugin?: string[] })?.plugin ?? [], [config])
-  const installed = useMemo<InstalledPlugin[]>(
-    () => pluginSpecs.map(parseInstalledPlugin).toSorted((a, b) => a.name.localeCompare(b.name)),
-    [pluginSpecs],
+  const guardedQueryChange = useMemo(
+    () => wrapOnChange(setQuery),
+    [wrapOnChange],
   )
+
+  const visibleInstalled = useMemo(() => {
+    const filter = query.trim().toLowerCase()
+    if (!filter) return installed
+    return installed.filter((item) => {
+      if (item.name.toLowerCase().includes(filter)) return true
+      return item.label.toLowerCase().includes(filter)
+    })
+  }, [installed, query])
 
   const visibleMarketplace = useMemo(() => {
     const installedNames = new Set(installed.map((item) => item.name.toLowerCase()))
     const installedSpecs = new Set(pluginSpecs)
-    const filtered = marketplace.filter((item) => {
+    const deduped = marketplace.filter((item) => {
       if (installedNames.has(item.name.toLowerCase())) return false
       if (installedSpecs.has(item.spec)) return false
       return true
     })
-    return dedupeMarketplaceBySpec(filtered).toSorted((a, b) =>
+    const sorted = dedupeMarketplaceBySpec(deduped).toSorted((a, b) =>
       a.name.localeCompare(b.name) || a.source.localeCompare(b.source),
     )
-  }, [installed, marketplace, pluginSpecs])
+    const filter = query.trim().toLowerCase()
+    if (!filter) return sorted
+    return sorted.filter((item) => {
+      if (item.name.toLowerCase().includes(filter)) return true
+      if (item.source.toLowerCase().includes(filter)) return true
+      return item.description.toLowerCase().includes(filter)
+    })
+  }, [installed, marketplace, pluginSpecs, query])
 
   const loadMarketplace = useCallback(async () => {
     setMarketplaceLoaded(false)
@@ -104,6 +140,7 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
       const loaded = await loadPluginMarketplace(sources)
       setMarketplace(loaded.plugins)
       setMarketplaceHadError(loaded.hadError)
+      setMarketplaceFetchedAt(Date.now())
     } catch {
       setMarketplace([])
       setMarketplaceHadError(true)
@@ -118,14 +155,19 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
   }, [tab, loadMarketplace])
 
   useEffect(() => {
+    setQuery("")
+    setSelected(0)
+  }, [tab])
+
+  useEffect(() => {
     if (tab === "add") return
-    const length = tab === "installed" ? installed.length : visibleMarketplace.length
+    const length = tab === "installed" ? visibleInstalled.length : visibleMarketplace.length
     if (length === 0) {
       if (selected !== 0) setSelected(0)
       return
     }
     if (selected >= length) setSelected(length - 1)
-  }, [installed.length, selected, tab, visibleMarketplace.length])
+  }, [selected, tab, visibleInstalled.length, visibleMarketplace.length])
 
   useInput((ch, key) => {
     if (key.escape) {
@@ -136,15 +178,15 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
     if (key.tab) {
       markHotkeyConsumed()
       setTab((current) => nextTab(current, !!key.shift))
-      setSelected(0)
       return
     }
     if (tab === "installed") {
       if (key.upArrow) setSelected((value) => Math.max(0, value - 1))
-      if (key.downArrow) setSelected((value) => Math.min(installed.length - 1, value + 1))
-      if (ch === "x" || key.delete || key.backspace) {
+      if (key.downArrow) setSelected((value) => Math.min(visibleInstalled.length - 1, value + 1))
+      if (isCtrlShortcut(ch, key, "x")) {
         markHotkeyConsumed()
-        void removePlugin(selected)
+        const item = visibleInstalled[selected]
+        if (item) void removePlugin(item.raw)
       }
       return
     }
@@ -156,18 +198,21 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
         const item = visibleMarketplace[selected]
         if (item) void installPlugin(item.spec)
       }
+      if (isCtrlShortcut(ch, key, "r")) {
+        markHotkeyConsumed()
+        void loadMarketplace()
+      }
     }
   })
 
   const removePlugin = useCallback(
-    async (index: number) => {
-      const plugin = installed[index]
-      if (!plugin || loading) return
+    async (spec: string) => {
+      if (!spec || loading) return
       setLoading(true)
       try {
         const result = await sync.client.global.config.get()
         const current = result.data?.plugin ?? []
-        const next = current.filter((value) => value !== plugin.raw)
+        const next = current.filter((value) => value !== spec)
         await sync.client.global.config.update({ config: { plugin: next } })
         await sync.client.instance.dispose()
         await sync.bootstrap()
@@ -176,7 +221,7 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
         setLoading(false)
       }
     },
-    [installed, loading, sync],
+    [loading, sync],
   )
 
   const installPlugin = useCallback(
@@ -221,87 +266,147 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
 
   return (
     <Box flexDirection="column" paddingLeft={1} paddingRight={1}>
-      <Box justifyContent="space-between">
-        <Text color={theme.text} bold>Plugins</Text>
-        <Text color={theme.textMuted}>esc close</Text>
+      <PanelHeader
+        title="Plugin Manager"
+        subtitle={`${installed.length} installed`}
+        right="esc close"
+      />
+      <Box gap={1}>
+        <StatusBadge tone="accent" label={tab.toUpperCase()} />
+        {tab === "marketplace" && marketplaceFetchedAt ? (
+          <Text color={tokens.text.muted} dimColor>
+            updated {new Date(marketplaceFetchedAt).toLocaleTimeString()}
+          </Text>
+        ) : null}
       </Box>
 
-      <Box marginTop={1} gap={2}>
-        <Text color={tab === "installed" ? theme.primary : theme.textMuted} bold={tab === "installed"}>
-          Installed ({installed.length})
-        </Text>
-        <Text color={tab === "marketplace" ? theme.primary : theme.textMuted} bold={tab === "marketplace"}>
-          Marketplace
-        </Text>
-        <Text color={tab === "add" ? theme.primary : theme.textMuted} bold={tab === "add"}>
-          Add
-        </Text>
-        <Text color={theme.textMuted} dimColor>tab switch</Text>
-      </Box>
+      <SegmentedTabs
+        active={tab}
+        onSelect={setTab}
+        tabs={[
+          { id: "installed", label: "Installed", count: installed.length },
+          { id: "marketplace", label: "Marketplace", count: visibleMarketplace.length },
+          { id: "add", label: "Add" },
+        ]}
+      />
+
+      {tab !== "add" ? (
+        <Box>
+          <Text color={tokens.text.accent}>{"> "}</Text>
+            <TextInput
+              value={query}
+              onChange={guardedQueryChange}
+              placeholder={tab === "installed" ? "Filter installed plugins..." : "Filter marketplace..."}
+              focus={true}
+            />
+          </Box>
+      ) : null}
 
       {loading && (
-        <Box marginTop={1}><Spinner color={theme.accent} /> <Text color={theme.textMuted}>Working...</Text></Box>
+        <Box marginTop={1} gap={1}>
+          <Spinner color={tokens.text.accent} />
+          <Text color={tokens.text.muted}>Working...</Text>
+        </Box>
       )}
 
       {tab === "installed" && !loading && (
         <Box flexDirection="column" marginTop={1}>
-          {installed.length === 0 ? (
-            <Text color={theme.textMuted}>  No plugins installed. Press tab to add one.</Text>
+          {visibleInstalled.length === 0 ? (
+            <EmptyState
+              title={installed.length === 0 ? "No plugins installed." : "No installed plugins match your filter."}
+              detail="Press Tab to switch to Marketplace or Add."
+            />
           ) : (
-            installed.map((plugin, index) => {
+            visibleInstalled.map((plugin, index) => {
               const isSelected = index === selected
               return (
-                <Box key={plugin.raw}>
-                  <Text color={isSelected ? theme.secondary : theme.textMuted}>
+                <Box
+                  key={plugin.raw}
+                  paddingLeft={1}
+                  paddingRight={1}
+                >
+                  <Text
+                    color={isSelected ? tokens.list.selectedText : tokens.list.marker}
+                    backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                  >
                     {isSelected ? "> " : "  "}
                   </Text>
-                  <Text color={theme.accent}>[{plugin.tag}] </Text>
-                  <Text color={isSelected ? theme.text : theme.textMuted}>{plugin.label}</Text>
+                  <Text
+                    color={isSelected ? tokens.list.selectedText : tokens.text.accent}
+                    backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                  >
+                    [{plugin.tag}]{" "}
+                  </Text>
+                  <Text
+                    color={isSelected ? tokens.list.selectedText : tokens.text.primary}
+                    backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                  >
+                    {plugin.label}
+                  </Text>
                 </Box>
               )
             })
           )}
-          {installed.length > 0 && (
-            <Box marginTop={1} gap={2}>
-              <Text color={theme.textMuted}>up/down navigate</Text>
-              <Text color={theme.textMuted}>x remove</Text>
-            </Box>
-          )}
+          <KeyHints items={["tab switch", "up/down navigate", "ctrl+x remove", "esc close"]} />
         </Box>
       )}
 
       {tab === "marketplace" && !loading && (
         <Box flexDirection="column" marginTop={1}>
           {!marketplaceLoaded ? (
-            <Box><Spinner color={theme.accent} /> <Text color={theme.textMuted}>Loading marketplace...</Text></Box>
+            <Box gap={1}>
+              <Spinner color={tokens.text.accent} />
+              <Text color={tokens.text.muted}>Loading marketplace...</Text>
+            </Box>
           ) : visibleMarketplace.length === 0 ? (
-            <Text color={theme.textMuted}>
-              {marketplaceHadError ? "Could not load marketplaces" : "All marketplace plugins are installed"}
-            </Text>
+            <EmptyState
+              title={marketplaceHadError ? "Could not load marketplace sources." : "All marketplace plugins are installed."}
+              detail="Press Ctrl+R to refresh marketplace sources."
+            />
           ) : (
             <>
-              <Text color={theme.textMuted}>
+              <Text color={tokens.text.muted}>
                 {visibleMarketplace.length} available - Enter to install
               </Text>
               {visibleMarketplace.map((plugin, index) => {
                 const isSelected = index === selected
                 return (
-                  <Box key={`${plugin.source}:${plugin.spec}`}>
-                    <Text color={isSelected ? theme.secondary : theme.textMuted}>
+                  <Box
+                    key={`${plugin.source}:${plugin.spec}`}
+                    paddingLeft={1}
+                    paddingRight={1}
+                  >
+                    <Text
+                      color={isSelected ? tokens.list.selectedText : tokens.list.marker}
+                      backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                    >
                       {isSelected ? "> " : "  "}
                     </Text>
-                    <Text color={theme.accent}>[{plugin.source}] </Text>
-                    <Text color={isSelected ? theme.text : theme.textMuted}>{plugin.name}</Text>
+                    <Text
+                      color={isSelected ? tokens.list.selectedText : tokens.text.accent}
+                      backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                    >
+                      [{plugin.source}]{" "}
+                    </Text>
+                    <Text
+                      color={isSelected ? tokens.list.selectedText : tokens.text.primary}
+                      backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                    >
+                      {plugin.name}
+                    </Text>
                     {plugin.description ? (
-                      <Text color={theme.textMuted}> - {plugin.description}</Text>
+                      <Text
+                        color={isSelected ? tokens.list.selectedText : tokens.text.muted}
+                        backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                      >
+                        {" - "}
+                        {plugin.description}
+                      </Text>
                     ) : null}
                   </Box>
                 )
               })}
-              <Box marginTop={1} gap={2}>
-                <Text color={theme.textMuted}>up/down navigate</Text>
-                <Text color={theme.textMuted}>enter install</Text>
-              </Box>
+              <KeyHints items={["tab switch", "up/down navigate", "enter install", "ctrl+r refresh", "esc close"]} />
             </>
           )}
         </Box>
@@ -309,9 +414,9 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
 
       {tab === "add" && !loading && (
         <Box flexDirection="column" marginTop={1}>
-          <Text color={theme.textMuted}>Enter plugin spec (npm package, git URL, or file:// path):</Text>
+          <Text color={tokens.text.muted}>Enter plugin spec (npm package, git URL, or file:// path):</Text>
           <Box marginTop={1}>
-            <Text color={theme.textMuted}>{"> "}</Text>
+            <Text color={tokens.text.accent}>{"> "}</Text>
             <TextInput
               value={addInput}
               onChange={guardedAddInputChange}
@@ -320,7 +425,8 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
               focus={tab === "add"}
             />
           </Box>
-          <Text color={theme.textMuted} dimColor>Tip: /plugin install {"<name|spec>"}</Text>
+          <Text color={tokens.text.muted} dimColor>Tip: /plugin install {"<name|spec>"}</Text>
+          <KeyHints items={["tab switch", "enter add", "esc close"]} />
         </Box>
       )}
     </Box>

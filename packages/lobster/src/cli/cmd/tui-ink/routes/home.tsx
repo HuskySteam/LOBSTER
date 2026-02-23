@@ -1,7 +1,6 @@
 /** @jsxImportSource react */
 import { Box, Text, useInput, useStdout } from "ink"
 import React, { useCallback, useMemo } from "react"
-import { useTheme } from "../theme"
 import { useAppStore } from "../store"
 import { useRoute } from "../context/route"
 import { useSDK } from "../context/sdk"
@@ -10,6 +9,8 @@ import { Logo } from "../component/logo"
 import { Prompt } from "../component/prompt"
 import { DialogProvider as DialogProviderSetup } from "../component/dialog-provider"
 import { Identifier } from "@/id/id"
+import { EmptyState, KeyHints, PanelHeader, StatusBadge } from "../ui/chrome"
+import { separator, useDesignTokens } from "../ui/design"
 
 function truncateTitle(value: string, max = 36) {
   if (value.length <= max) return value
@@ -24,7 +25,7 @@ function formatSessionDate(value: number) {
 }
 
 export function Home() {
-  const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const { stdout } = useStdout()
   const route = useRoute()
   const { sync } = useSDK()
@@ -36,16 +37,13 @@ export function Home() {
   const username = process.env.USERNAME || process.env.USER || "there"
   const isCompact = (stdout?.columns ?? 96) < 96
   const recentSessions = useMemo(
-    () =>
-      [...sessions]
-        .sort((a, b) => b.time.updated - a.time.updated)
-        .slice(0, 4),
+    () => [...sessions].sort((a, b) => b.time.updated - a.time.updated).slice(0, 4),
     [sessions],
   )
   const rightDivider = useMemo(() => {
     const columns = stdout?.columns ?? 100
     const width = isCompact ? columns - 10 : Math.floor(columns * 0.4)
-    return "─".repeat(Math.max(18, Math.min(44, width)))
+    return separator(Math.max(18, Math.min(44, width)))
   }, [isCompact, stdout?.columns])
 
   const handleSubmit = useCallback(
@@ -77,13 +75,11 @@ export function Home() {
 
   return (
     <Box flexDirection="column" padding={1} height="100%">
-      <Box paddingLeft={1} marginBottom={1}>
-        <Text color={theme.primary} bold>LOBSTER Code</Text>
-      </Box>
+      <PanelHeader title="LOBSTER Code" right={hasProvider ? "connected" : "provider required"} />
 
       <Box
         borderStyle="round"
-        borderColor={theme.accent}
+        borderColor={tokens.panel.borderActive}
         flexDirection={isCompact ? "column" : "row"}
         paddingLeft={1}
         paddingRight={1}
@@ -91,23 +87,22 @@ export function Home() {
         paddingBottom={1}
       >
         <Box flexDirection="column" flexGrow={1} paddingRight={isCompact ? 0 : 2}>
-          <Text color={theme.text} bold>Welcome back {username}!</Text>
+          <Text color={tokens.text.primary} bold>Welcome back {username}!</Text>
           <Box marginTop={1} marginBottom={1} alignItems={isCompact ? "flex-start" : "center"}>
             <Logo />
           </Box>
 
           {hasProvider ? (
-            <Text color={theme.textMuted}>
-              {sessions.length} session{sessions.length === 1 ? "" : "s"} · {providers.length} provider
-              {providers.length === 1 ? "" : "s"} connected
-            </Text>
+            <Box gap={1}>
+              <StatusBadge tone="success" label={`${sessions.length} sessions`} />
+              <StatusBadge tone="accent" label={`${providers.length} providers`} />
+            </Box>
           ) : (
-            <Text color={theme.warning} bold>No providers connected</Text>
+            <StatusBadge tone="warning" label="no providers connected" />
           )}
 
-          <Text color={theme.textMuted}>
-            Press{" "}
-            <Text color={theme.text} bold>{hasProvider ? "/new" : "Enter"}</Text>
+          <Text color={tokens.text.muted}>
+            Press <Text color={tokens.text.primary} bold>{hasProvider ? "/new" : "Enter"}</Text>
             {hasProvider ? " to start a fresh session." : " or Ctrl+O to connect a provider."}
           </Text>
         </Box>
@@ -118,36 +113,36 @@ export function Home() {
           paddingLeft={isCompact ? 0 : 2}
           marginTop={isCompact ? 1 : 0}
           borderStyle="single"
-          borderColor={theme.borderSubtle}
+          borderColor={tokens.panel.border}
           borderLeft={!isCompact}
           borderTop={isCompact}
           borderBottom={false}
           borderRight={false}
         >
-          <Text color={theme.accent} bold>Tips for getting started</Text>
-          <Text color={theme.textMuted}>
+          <Text color={tokens.text.accent} bold>Operator Notes</Text>
+          <Text color={tokens.text.muted}>
             {hasProvider
               ? "Ask Lobster to scaffold, debug, or review code in this repo."
               : "Connect a provider first, then ask Lobster to create your first app."}
           </Text>
-          <Text color={theme.textMuted}>
-            Try <Text color={theme.text}>/model</Text>, <Text color={theme.text}>/agent</Text>, and{" "}
-            <Text color={theme.text}>/sessions</Text> to navigate faster.
+          <Text color={tokens.text.muted}>
+            Try <Text color={tokens.text.primary}>/model</Text>, <Text color={tokens.text.primary}>/agent</Text>, and{" "}
+            <Text color={tokens.text.primary}>/sessions</Text> to navigate faster.
           </Text>
 
           <Box marginTop={1}>
-            <Text color={theme.borderSubtle}>{rightDivider}</Text>
+            <Text color={tokens.text.muted}>{rightDivider}</Text>
           </Box>
 
           <Box marginTop={1} flexDirection="column">
-            <Text color={theme.accent} bold>Recent activity</Text>
+            <Text color={tokens.text.accent} bold>Recent activity</Text>
             {recentSessions.length === 0 ? (
-              <Text color={theme.textMuted}>No recent activity</Text>
+              <EmptyState title="No recent activity" />
             ) : (
               recentSessions.map((session) => (
-                <Text key={session.id} color={theme.text}>
+                <Text key={session.id} color={tokens.text.primary}>
                   - {truncateTitle(session.title || "Untitled session")}{" "}
-                  <Text color={theme.textMuted}>({formatSessionDate(session.time.updated)})</Text>
+                  <Text color={tokens.text.muted}>({formatSessionDate(session.time.updated)})</Text>
                 </Text>
               ))
             )}
@@ -155,6 +150,7 @@ export function Home() {
         </Box>
       </Box>
 
+      <KeyHints items={["tab agent", "Ctrl+M model", "Ctrl+S sessions", "Ctrl+P commands", "Ctrl+O connect"]} />
       <Box marginTop={1}>
         <Prompt onSubmit={handleSubmit} />
       </Box>

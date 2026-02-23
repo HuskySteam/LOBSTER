@@ -1,22 +1,33 @@
 /** @jsxImportSource react */
 import { Box, Text } from "ink"
 import React, { useMemo } from "react"
-import { useTheme } from "../../theme"
 import { useAppStore } from "../../store"
 import { useLocal } from "../../context/local"
+import { separator, useDesignTokens } from "../../ui/design"
+import { StatusBadge } from "../../ui/chrome"
 
 const EMPTY_TODO: never[] = []
 const EMPTY_DIFF: never[] = []
 const EMPTY_MESSAGES: never[] = []
 const EMPTY_PARTS: never[] = []
 
+function Section(props: { title: string; children: React.ReactNode }) {
+  const tokens = useDesignTokens()
+  return (
+    <Box flexDirection="column" marginBottom={1}>
+      <Text color={tokens.text.accent} bold>{props.title}</Text>
+      {props.children}
+    </Box>
+  )
+}
+
 function Divider() {
-  const { theme } = useTheme()
-  return <Text color={theme.textMuted}>{"─".repeat(34)}</Text>
+  const tokens = useDesignTokens()
+  return <Text color={tokens.text.muted}>{separator(34)}</Text>
 }
 
 export function Sidebar(props: { sessionID: string }) {
-  const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const local = useLocal()
   const agents = useAppStore((s) => s.agent.filter((x) => !x.hidden))
   const mcp = useAppStore((s) => s.mcp)
@@ -27,9 +38,7 @@ export function Sidebar(props: { sessionID: string }) {
   const parts = useAppStore((s) => s.part)
   const teams = useAppStore((s) => s.teams)
   const vcs = useAppStore((s) => s.vcs)
-  const path = useAppStore((s) => s.path)
 
-  // Compute context token usage from messages
   const tokenInfo = useMemo(() => {
     let total = 0
     for (const msg of messages) {
@@ -43,10 +52,7 @@ export function Sidebar(props: { sessionID: string }) {
     return { tokens: total, display: total > 1000 ? `${(total / 1000).toFixed(1)}k` : `${total}` }
   }, [messages, parts])
 
-  const mcpEntries = useMemo(() =>
-    Object.entries(mcp).sort(([a], [b]) => a.localeCompare(b)),
-  [mcp])
-
+  const mcpEntries = useMemo(() => Object.entries(mcp).sort(([a], [b]) => a.localeCompare(b)), [mcp])
   const connectedMcp = mcpEntries.filter(([, item]) => item.status === "connected").length
   const teamNames = Object.keys(teams)
   const activeTodos = todo.filter((t) => t.status !== "completed")
@@ -54,156 +60,136 @@ export function Sidebar(props: { sessionID: string }) {
   return (
     <Box
       flexDirection="column"
-      width={36}
+      width={38}
       borderStyle="single"
       borderLeft
       borderTop={false}
       borderBottom={false}
       borderRight={false}
-      borderColor={theme.textMuted}
+      borderColor={tokens.panel.border}
       paddingLeft={1}
       paddingRight={1}
       paddingTop={1}
     >
-      {/* Context */}
-      <Box flexDirection="column">
-        <Text color={theme.textMuted} bold>CONTEXT</Text>
-        <Text color={theme.text}>{tokenInfo.display} tokens</Text>
-        <Text color={theme.textMuted}>{local.model.parsed().provider}/{local.model.parsed().model}</Text>
-      </Box>
+      <Section title="CONTEXT">
+        <Box gap={1}>
+          <StatusBadge tone="accent" label={`${tokenInfo.display} tokens`} />
+          <StatusBadge tone="muted" label={local.model.parsed().provider} />
+        </Box>
+        <Text color={tokens.text.muted}>{local.model.parsed().model}</Text>
+      </Section>
       <Divider />
 
-      {/* Git */}
-      {vcs && (
+      {vcs ? (
         <>
-          <Box flexDirection="column">
-            <Text color={theme.textMuted} bold>GIT</Text>
-            <Text color={theme.text}>{(vcs as any).branch ?? "unknown"}</Text>
-          </Box>
+          <Section title="GIT">
+            <StatusBadge tone="success" label={(vcs as any).branch ?? "unknown"} />
+          </Section>
           <Divider />
         </>
-      )}
+      ) : null}
 
-      {/* Agents */}
-      {agents.length > 0 && (
+      {agents.length > 0 ? (
         <>
-          <Box flexDirection="column">
-            <Text color={theme.textMuted} bold>AGENTS</Text>
-            {agents.map((agent) => (
-              <Box key={agent.name} gap={1}>
-                <Text color={agent.name === local.agent.current().name ? theme.accent : theme.textMuted}>
-                  {agent.name === local.agent.current().name ? ">" : " "}
-                </Text>
-                <Text color={theme.text}>{agent.name}</Text>
-                {agent.name === local.agent.current().name && (
-                  <Text color={theme.textMuted}>(active)</Text>
-                )}
-              </Box>
-            ))}
-          </Box>
-          <Divider />
-        </>
-      )}
-
-      {/* Teams */}
-      {teamNames.length > 0 && (
-        <>
-          <Box flexDirection="column">
-            <Text color={theme.textMuted} bold>TEAMS ({teamNames.length})</Text>
-            {teamNames.map((name) => (
-              <Text key={name} color={theme.text}>{name}</Text>
-            ))}
-          </Box>
-          <Divider />
-        </>
-      )}
-
-      {/* Todo */}
-      {activeTodos.length > 0 && (
-        <>
-          <Box flexDirection="column">
-            <Text color={theme.textMuted} bold>TODO</Text>
-            {activeTodos.slice(0, 8).map((t, i) => {
-              const icon = t.status === "in_progress" ? "[~]" : "[ ]"
-              const color = t.status === "in_progress" ? theme.warning : theme.text
-              return <Text key={i} color={color}>{icon} {t.content.slice(0, 30)}</Text>
-            })}
-            {activeTodos.length > 8 && (
-              <Text color={theme.textMuted}>+{activeTodos.length - 8} more...</Text>
-            )}
-          </Box>
-          <Divider />
-        </>
-      )}
-
-      {/* Modified Files */}
-      {diff.length > 0 && (
-        <>
-          <Box flexDirection="column">
-            <Text color={theme.textMuted} bold>MODIFIED FILES</Text>
-            {diff.slice(0, 8).map((item, i) => (
-              <Box key={i} justifyContent="space-between">
-                <Text color={theme.text}>{(item as any).file?.slice(0, 20)}</Text>
-                <Box gap={1}>
-                  {(item as any).additions > 0 && (
-                    <Text color={theme.success}>+{(item as any).additions}</Text>
-                  )}
-                  {(item as any).deletions > 0 && (
-                    <Text color={theme.error}>-{(item as any).deletions}</Text>
-                  )}
-                </Box>
-              </Box>
-            ))}
-            {diff.length > 8 && (
-              <Text color={theme.textMuted}>+{diff.length - 8} more...</Text>
-            )}
-          </Box>
-          <Divider />
-        </>
-      )}
-
-      {/* MCP */}
-      {mcpEntries.length > 0 && (
-        <>
-          <Box flexDirection="column">
-            <Text color={theme.textMuted} bold>MCP ({connectedMcp} active)</Text>
-            {mcpEntries.slice(0, 6).map(([key, item]) => {
-              const color = item.status === "connected" ? theme.success
-                : item.status === "failed" ? theme.error
-                : theme.textMuted
+          <Section title="AGENTS">
+            {agents.map((agent) => {
+              const active = agent.name === local.agent.current().name
               return (
-                <Box key={key} gap={1}>
-                  <Text color={color}>*</Text>
-                  <Text color={theme.text}>{key.slice(0, 20)}</Text>
+                <Box key={agent.name} gap={1}>
+                  <Text color={active ? tokens.text.accent : tokens.text.muted}>{active ? ">" : "-"}</Text>
+                  <Text color={active ? tokens.text.primary : tokens.text.muted}>{agent.name}</Text>
                 </Box>
               )
             })}
-          </Box>
+          </Section>
           <Divider />
         </>
-      )}
+      ) : null}
 
-      {/* LSP */}
-      <Box flexDirection="column">
-        <Text color={theme.textMuted} bold>LSP</Text>
+      {teamNames.length > 0 ? (
+        <>
+          <Section title={`TEAMS (${teamNames.length})`}>
+            {teamNames.map((name) => (
+              <Text key={name} color={tokens.text.primary}>{name}</Text>
+            ))}
+          </Section>
+          <Divider />
+        </>
+      ) : null}
+
+      {activeTodos.length > 0 ? (
+        <>
+          <Section title="TASKS">
+            {activeTodos.slice(0, 8).map((item, index) => {
+              const tone = item.status === "in_progress" ? "warning" : "muted"
+              return (
+                <Box key={`${item.content}:${index}`} gap={1}>
+                  <StatusBadge tone={tone} label={item.status === "in_progress" ? "active" : "todo"} />
+                  <Text color={tokens.text.primary}>{item.content.slice(0, 24)}</Text>
+                </Box>
+              )
+            })}
+            {activeTodos.length > 8 ? <Text color={tokens.text.muted}>+{activeTodos.length - 8} more</Text> : null}
+          </Section>
+          <Divider />
+        </>
+      ) : null}
+
+      {diff.length > 0 ? (
+        <>
+          <Section title="MODIFIED FILES">
+            {diff.slice(0, 8).map((item, i) => (
+              <Box key={i} justifyContent="space-between">
+                <Text color={tokens.text.primary}>{(item as any).file?.slice(0, 20)}</Text>
+                <Box gap={1}>
+                  {(item as any).additions > 0 ? <Text color={tokens.status.success}>+{(item as any).additions}</Text> : null}
+                  {(item as any).deletions > 0 ? <Text color={tokens.status.error}>-{(item as any).deletions}</Text> : null}
+                </Box>
+              </Box>
+            ))}
+            {diff.length > 8 ? <Text color={tokens.text.muted}>+{diff.length - 8} more</Text> : null}
+          </Section>
+          <Divider />
+        </>
+      ) : null}
+
+      {mcpEntries.length > 0 ? (
+        <>
+          <Section title="MCP">
+            <Box gap={1}>
+              <StatusBadge tone="success" label={`${connectedMcp} connected`} />
+              <StatusBadge tone="muted" label={`${mcpEntries.length} total`} />
+            </Box>
+            {mcpEntries.slice(0, 6).map(([key, item]) => {
+              const color = item.status === "connected" ? tokens.status.success : item.status === "failed" ? tokens.status.error : tokens.status.warning
+              return (
+                <Box key={key} gap={1}>
+                  <Text color={color}>*</Text>
+                  <Text color={tokens.text.muted}>{key.slice(0, 24)}</Text>
+                </Box>
+              )
+            })}
+          </Section>
+          <Divider />
+        </>
+      ) : null}
+
+      <Section title="LSP">
         {lsp.length === 0 ? (
-          <Text color={theme.textMuted}>Activates as files are read</Text>
+          <Text color={tokens.text.muted}>Activates as files are read</Text>
         ) : (
           lsp.slice(0, 5).map((item) => (
             <Box key={item.id} gap={1}>
-              <Text color={item.status === "connected" ? theme.success : theme.error}>*</Text>
-              <Text color={theme.textMuted}>{item.id}</Text>
+              <Text color={item.status === "connected" ? tokens.status.success : tokens.status.error}>*</Text>
+              <Text color={tokens.text.muted}>{item.id}</Text>
             </Box>
           ))
         )}
-      </Box>
+      </Section>
 
-      {/* Spacer + Version */}
       <Box flexGrow={1} />
       <Box>
-        <Text color={theme.textMuted}>
-          <Text color={theme.accent}>*</Text> LOBSTER
-        </Text>
+        <StatusBadge tone="accent" label="LOBSTER" />
       </Box>
     </Box>
   )

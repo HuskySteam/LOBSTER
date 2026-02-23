@@ -1,9 +1,10 @@
 /** @jsxImportSource react */
 import { Box, Text } from "ink"
 import React from "react"
-import { useTheme } from "../../theme"
 import { Spinner } from "../spinner"
 import type { ReactNode } from "react"
+import { useDesignTokens } from "../../ui/design"
+import { StatusBadge } from "../../ui/chrome"
 
 export function InlineTool(props: {
   icon: string
@@ -14,7 +15,7 @@ export function InlineTool(props: {
   status: string
   error?: string
 }) {
-  const { theme } = useTheme()
+  const tokens = useDesignTokens()
 
   const isDenied =
     props.error?.includes("rejected permission") ||
@@ -23,33 +24,29 @@ export function InlineTool(props: {
 
   const isRunning = props.status === "running" || props.status === "pending"
 
-  const fg = isRunning ? theme.text
-    : props.complete ? theme.textMuted
-    : theme.text
+  const fg = isRunning ? tokens.text.primary
+    : props.complete ? tokens.text.muted
+    : tokens.text.primary
 
   if (isRunning && props.complete) {
     return (
-      <Box paddingLeft={2}>
+      <Box paddingLeft={1} gap={1}>
+        <StatusBadge tone="warning" label="running" />
         <Spinner>
-          <Text color={theme.text}>{props.children}</Text>
+          <Text color={tokens.text.primary}>{props.children}</Text>
         </Spinner>
       </Box>
     )
   }
 
   return (
-    <Box flexDirection="column" paddingLeft={2}>
-      <Text
-        color={fg}
-        strikethrough={isDenied}
-      >
-        {props.complete
-          ? <><Text color={props.iconColor ?? theme.accent} bold>{props.icon}</Text> {props.children}</>
-          : <>~ {props.pending}</>
-        }
-      </Text>
+    <Box flexDirection="column" paddingLeft={1}>
+      <Box>
+        {props.complete ? <StatusBadge tone="accent" label={props.icon} /> : <StatusBadge tone="muted" label="pending" />}
+        <Text color={fg} strikethrough={isDenied}> {props.complete ? props.children : props.pending}</Text>
+      </Box>
       {props.error && !isDenied && (
-        <Text color={theme.error}>{props.error}</Text>
+        <Text color={tokens.status.error}>{props.error}</Text>
       )}
     </Box>
   )

@@ -1,7 +1,16 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test"
+import { describe, test, expect, mock, beforeEach, afterAll } from "bun:test"
+import { NamedError } from "@lobster-ai/util/error"
+import z from "zod"
 
 // In-memory storage backing
 const store = new Map<string, any>()
+
+const MockNotFoundError = NamedError.create(
+  "NotFoundError",
+  z.object({
+    message: z.string(),
+  }),
+)
 
 function storeKey(key: string[]): string {
   return key.join("/")
@@ -13,17 +22,18 @@ function storePrefix(prefix: string[]): string {
 
 mock.module("../../src/storage/storage", () => ({
   Storage: {
+    NotFoundError: MockNotFoundError,
     async write(key: string[], content: any) {
       store.set(storeKey(key), structuredClone(content))
     },
     async read<T>(key: string[]): Promise<T> {
       const k = storeKey(key)
-      if (!store.has(k)) throw new Error("NotFound: " + k)
+      if (!store.has(k)) throw new MockNotFoundError({ message: "Resource not found: " + k })
       return structuredClone(store.get(k)) as T
     },
     async update<T>(key: string[], fn: (draft: T) => void): Promise<T> {
       const k = storeKey(key)
-      if (!store.has(k)) throw new Error("NotFound: " + k)
+      if (!store.has(k)) throw new MockNotFoundError({ message: "Resource not found: " + k })
       const content = structuredClone(store.get(k)) as T
       fn(content)
       store.set(k, structuredClone(content))
@@ -47,24 +57,44 @@ mock.module("../../src/storage/storage", () => ({
 }))
 
 const busEvents: Array<{ type: string; properties: any }> = []
+const busSubscriptions = new Map<string, Array<(event: { type: string; properties: any }) => void>>()
+
+function subscribeBus(type: string, callback: (event: { type: string; properties: any }) => void) {
+  const list = busSubscriptions.get(type) ?? []
+  list.push(callback)
+  busSubscriptions.set(type, list)
+  return () => {
+    const current = busSubscriptions.get(type)
+    if (!current) return
+    const idx = current.indexOf(callback)
+    if (idx >= 0) current.splice(idx, 1)
+  }
+}
 
 mock.module("../../src/bus", () => ({
   Bus: {
-    publish(def: { type: string }, properties: any) {
-      busEvents.push({ type: def.type, properties })
+    async publish(def: { type: string }, properties: any) {
+      const event = { type: def.type, properties }
+      busEvents.push(event)
+      const listeners = [...(busSubscriptions.get(def.type) ?? []), ...(busSubscriptions.get("*") ?? [])]
+      for (const listener of listeners) {
+        await listener(event)
+      }
     },
-  },
-}))
-
-// Suppress logging
-mock.module("../../src/util/log", () => ({
-  Log: {
-    create: () => ({
-      info: () => {},
-      warn: () => {},
-      error: () => {},
-      debug: () => {},
-    }),
+    subscribe(def: { type: string }, callback: (event: { type: string; properties: any }) => void) {
+      return subscribeBus(def.type, callback)
+    },
+    subscribeAll(callback: (event: { type: string; properties: any }) => void) {
+      return subscribeBus("*", callback)
+    },
+    once(
+      def: { type: string },
+      callback: (event: { type: string; properties: any }) => "done" | undefined,
+    ) {
+      const unsub = subscribeBus(def.type, (event) => {
+        if (callback(event) === "done") unsub()
+      })
+    },
   },
 }))
 
@@ -75,6 +105,11 @@ const { TeamTask } = await import("../../src/team/task")
 beforeEach(() => {
   store.clear()
   busEvents.length = 0
+  busSubscriptions.clear()
+})
+
+afterAll(() => {
+  mock.restore()
 })
 
 // ========================================================================

@@ -13,10 +13,13 @@ import { Sidebar } from "./sidebar"
 import { PermissionPrompt } from "./permission"
 import { QuestionPrompt } from "./question"
 import { Identifier } from "@/id/id"
+import { KeyHints, PanelHeader, StatusBadge } from "../../ui/chrome"
+import { separator, useDesignTokens } from "../../ui/design"
 
 const EMPTY_MESSAGES: never[] = []
 const EMPTY_PERMISSIONS: never[] = []
 const EMPTY_QUESTIONS: never[] = []
+const BLOCK_TOOL_CHROME_LINES = 5 // marginTop + border(top/bottom) + padding(top/bottom)
 
 /** Count rendered terminal rows for a string, accounting for soft-wrap at cols. */
 function wrappedLineCount(text: string, cols: number): number {
@@ -55,7 +58,7 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
       const raw = (meta.output ?? "").trim()
       const allLines = raw ? raw.split("\n") : []
       const outputRows = raw ? wrappedSliceCount(allLines, 10, cols) : 0
-      return 2 + outputRows + (allLines.length > 10 ? 1 : 0) + (state.error ? 1 : 0)
+      return BLOCK_TOOL_CHROME_LINES + 2 + outputRows + (allLines.length > 10 ? 1 : 0) + (state.error ? 1 : 0)
     }
     case "edit": {
       if (meta.diff === undefined) return inlineBase
@@ -66,12 +69,12 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
         ((meta.diagnostics?.[input.filePath] ?? []) as any[]).filter((x: any) => x.severity === 1).length,
         3,
       )
-      return 1 + diffRows + (allLines.length > 30 ? 1 : 0) + diagCount + (state.error ? 1 : 0)
+      return BLOCK_TOOL_CHROME_LINES + 1 + diffRows + (allLines.length > 30 ? 1 : 0) + diagCount + (state.error ? 1 : 0)
     }
     case "write": {
       if (meta.diagnostics === undefined) return inlineBase
       const diagCount = Math.min((meta.diagnostics?.[input.filePath] ?? []).length, 3)
-      return 1 + diagCount + (state.error ? 1 : 0)
+      return BLOCK_TOOL_CHROME_LINES + 1 + diagCount + (state.error ? 1 : 0)
     }
     case "apply_patch": {
       const files: any[] = meta.files ?? []
@@ -81,7 +84,7 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
       for (const f of files) {
         total += 1 + (f.diff ? wrappedSliceCount(f.diff.split("\n"), 15, cols) : 0)
       }
-      return total + (state.error ? 1 : 0)
+      return BLOCK_TOOL_CHROME_LINES + total + (state.error ? 1 : 0)
     }
     case "read": {
       const loaded: any[] = Array.isArray(meta.loaded) ? meta.loaded : []
@@ -91,13 +94,13 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
       if (input.description || input.subagent_type) {
         // BlockTool: title + description (description may wrap)
         const desc = String(input.description ?? "")
-        return 1 + Math.max(1, Math.ceil(desc.length / cols)) + (state.error ? 1 : 0)
+        return BLOCK_TOOL_CHROME_LINES + 1 + Math.max(1, Math.ceil(desc.length / cols)) + (state.error ? 1 : 0)
       }
       return inlineBase
     }
     case "todowrite": {
       const todos: any[] = input.todos ?? []
-      if (todos.length > 0) return 1 + todos.length + (state.error ? 1 : 0)
+      if (todos.length > 0) return BLOCK_TOOL_CHROME_LINES + 1 + todos.length + (state.error ? 1 : 0)
       return inlineBase
     }
     default:
@@ -107,6 +110,7 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
 
 export function Session(props: { sessionID: string }) {
   const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const { sync } = useSDK()
   const { stdout } = useStdout()
   const keybind = useKeybind()
@@ -264,6 +268,7 @@ export function Session(props: { sessionID: string }) {
 
   const title = session?.title ?? "Untitled"
   const cols = stdout?.columns ?? 80
+  const divider = separator(Math.max(Math.min(cols - (showSidebar ? 42 : 4), 120), 10))
 
   return (
     <Box flexDirection="row" height="100%">
@@ -271,15 +276,20 @@ export function Session(props: { sessionID: string }) {
       <Box flexDirection="column" flexGrow={1}>
         {/* Header */}
         <Box paddingLeft={2} paddingRight={2} flexShrink={0}>
-          <Text color={theme.primary} bold>LOBSTER</Text>
-          <Text color={theme.textMuted}> | </Text>
-          <Text color={theme.text}>{title.length > 50 ? title.slice(0, 47) + "..." : title}</Text>
-          <Text color={theme.textMuted}> | </Text>
-          <Text color={theme.textMuted}>{messages.length} msg</Text>
+          <PanelHeader
+            title="Session"
+            subtitle={title.length > 60 ? title.slice(0, 57) + "..." : title}
+            right={`${messages.length} msg`}
+          />
+        </Box>
+
+        <Box paddingLeft={2} paddingRight={2} gap={1} flexShrink={0}>
+          <StatusBadge tone="accent" label={showThinking ? "thinking on" : "thinking off"} />
+          <StatusBadge tone={showTimestamps ? "success" : "muted"} label={showTimestamps ? "time on" : "time off"} />
         </Box>
 
         <Box paddingLeft={2} paddingRight={2} flexShrink={0}>
-          <Text color={theme.textMuted}>{"─".repeat(Math.max(Math.min(cols - (showSidebar ? 42 : 4), 120), 10))}</Text>
+          <Text color={tokens.text.muted}>{divider}</Text>
         </Box>
 
         {/* Activity bar */}
@@ -318,11 +328,14 @@ export function Session(props: { sessionID: string }) {
         {/* Footer: cost + prompt */}
         <Box flexDirection="column" flexShrink={0}>
           <Box paddingLeft={2} paddingRight={2}>
-            <Text color={theme.textMuted}>{"─".repeat(Math.max(Math.min(cols - (showSidebar ? 42 : 4), 120), 10))}</Text>
+            <Text color={tokens.text.muted}>{divider}</Text>
           </Box>
           <Box paddingLeft={2} justifyContent="space-between" paddingRight={2}>
             <CostTracker sessionID={props.sessionID} />
-            <Text color={theme.textMuted}>Ctrl+U/D scroll  Ctrl+T sidebar</Text>
+            <Text color={tokens.text.muted}>scroll + layout controls</Text>
+          </Box>
+          <Box paddingLeft={2} paddingRight={2}>
+            <KeyHints items={["Ctrl+U up", "Ctrl+D down", "Ctrl+T sidebar"]} />
           </Box>
           <Prompt
             sessionID={props.sessionID}

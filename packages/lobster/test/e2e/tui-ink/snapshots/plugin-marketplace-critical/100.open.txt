@@ -1,0 +1,36 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+  │  [MARKETPLACE]rupdated <time>                                                 esc close  │
+  │                                                                                              │
+  │   Installed 7   Marketplace 45   Add                                                         │
+  │  > Filter marketplace...                                                                     │
+  │                                                                                              │
+  │  4> [claude-code] agent-sdk-dev - Development kit for working with the Claude Agent SDK      │
+  │    [claude-codclaude-opus-4-5-mig - Migrate your code and prompts from Sonnet 4.x and Opus   │
+  │    [claude-codcode-revi - Automated code review for pull requests using multiple             │
+  │    [claude-codecommit-comma - Commands for git commit workflows including commit, push,      │
+  │    [claude-coexplanatory-outp - Adds educational insights about implementation choices and   │
+  │    [claude-codfeature-d - Comprehensive feature development workflow with specialized put    │
+  │    [claude-codfrontend-de - Create distinctive, production-grade frontend interfaces with    │
+  │    [claude-codhookif - Easily create custom hooks to prevent unwanted behaviors by t         │
+  │    ]                analyzing conversation patterns or from explicit instructions. Define    │
+  │    [claude-colearning-output - Interactive learning mode that requests meaningful code       │
+  │     [LOBSTER] oh-my-opencode - Multi-model orchestration, agents, and pre-built tools        │
+  │     [LOBSTER] opencode-anthropic-auth - Anthropic API key authenticationroject directories   │
+  │    [LOBSTER] opencode-antigravity-auth - Google Gemini/Anthropic model access via IDE auth   │
+  │     [LOBSTER] opencode-beads - Issue tracker integration with commandssupport with           │
+  │     [LOBSTER] opencode-froggy - Hooks, specialized agents, and gitingest tools               │
+  │     [LOBSTER] opencode-ignore - Pattern-based file/directory filteringptsls                  │
+  │     [LOBSTER] opencode-mystatus - AI subscription quota checker                              │
+  │     [LOBSTER] opencode-optimal-model-temps - Temperature optimization per modeln             │
+  │     [LOBSTER] opencode-pilot - GitHub/Linear automation daemonth Planner, Coder, Reviewer    │
+  │     [LOBSTER] opencode-sessions - Multi-agent collaboration supporton loop                   │
+  │     [LOBSTER] opencode-smart-title - AI-powered session title generation                     │
+  │     [LOBSTER] opencode-swarm-plugin - Swarm-based agent coordinationeminder logic            │
+  │     [LOBSTER] opencode-worktree - Zero-friction git worktree automation                      │
+  │    [claude-codplugin-d - Comprehensive toolkit for developing Claude Code plugins.           │
+  │    [claude-copr-review-too - Comprehensive PR review agents specializing in comments, ds,    │
+  │    e]        lkit     agentests, error handling, type design, code quality, and code         │
+  │    [claude-codralph-wig - Interactive self-referential AI loops for iterative development.   │
+  │    [claude-cosecurity-guid - Security reminder hook that warns about potential security      │
+  │    e]        ance      worissues when editing files, including command injection, XSS, and   │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────╯

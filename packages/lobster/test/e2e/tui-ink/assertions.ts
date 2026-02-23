@@ -14,7 +14,11 @@ export type AssertionResult = {
 
 export function normalizeCapture(input: string) {
   const withoutAnsi = input.replace(ANSI_ESCAPE, "")
-  const normalizedNewline = withoutAnsi.replace(/\r\n?/g, "\n")
+  const withoutVolatileTimestamps = withoutAnsi.replace(
+    /updated \d{1,2}:\d{2}:\d{2}(?:\s?[AP]M)?/g,
+    "updated <time>",
+  )
+  const normalizedNewline = withoutVolatileTimestamps.replace(/\r\n?/g, "\n")
   const trimmedLines = normalizedNewline
     .split("\n")
     .map((line) => line.replace(/[ \t]+$/g, ""))

@@ -32,6 +32,8 @@ import { DialogReviewDashboard } from "../dialog-review-dashboard"
 import { DialogReviewResults } from "../dialog-review-results"
 import { DialogHealth } from "../dialog-health"
 import { DialogPatterns } from "../dialog-patterns"
+import { KeyHints, StatusBadge } from "../../ui/chrome"
+import { useDesignTokens } from "../../ui/design"
 import {
   clearPluginMarketplaceCache,
   findMarketplaceMatchesByName,
@@ -42,6 +44,7 @@ import {
 } from "../plugin-marketplace"
 import { Spinner } from "../spinner"
 import { Autocomplete, type AutocompleteOption } from "./autocomplete"
+import { normalizePromptInput } from "./input-normalize"
 import { BUILT_IN_COMMANDS, parseSlashCommand, resolveBuiltInCommand } from "./command-registry"
 import { Clipboard } from "@tui/util/clipboard"
 import { formatTranscript } from "@tui/util/transcript"
@@ -85,6 +88,7 @@ Be honest and specific in findings and suggestions.`
 
 export function Prompt(props: PromptProps) {
   const { theme } = useTheme()
+  const tokens = useDesignTokens()
   const exit = useExit()
   const route = useRoute()
   const { sync } = useSDK()
@@ -784,7 +788,7 @@ export function Prompt(props: PromptProps) {
   )
 
   const handleInputChange = useCallback((value: string) => {
-    const clean = value.replace(/[\x00-\x1f]/g, "")
+    const clean = normalizePromptInput(value)
     setInput(clean)
 
     if (clean.startsWith("/") && !clean.includes(" ")) {
@@ -975,16 +979,10 @@ export function Prompt(props: PromptProps) {
   return (
     <Box flexDirection="column">
       <Box paddingLeft={2} gap={1}>
-        <Text color={theme.secondary} bold>{currentAgent?.name ?? "build"}</Text>
-        <Text color={theme.textMuted}>|</Text>
-        <Text color={theme.textMuted}>{modelParsed.model}</Text>
-        <Text color={theme.textMuted} dimColor>({modelParsed.provider})</Text>
-        {isBusy && (
-          <>
-            <Text color={theme.textMuted}>|</Text>
-            <Spinner color={theme.primary} />
-          </>
-        )}
+        <StatusBadge tone="accent" label={currentAgent?.name ?? "build"} />
+        <StatusBadge tone="muted" label={modelParsed.model} />
+        <StatusBadge tone="muted" label={modelParsed.provider} />
+        {isBusy ? <Spinner color={tokens.text.accent} /> : null}
       </Box>
 
       {acMode && filteredOptions.length > 0 && !isBusy && (
@@ -992,9 +990,9 @@ export function Prompt(props: PromptProps) {
       )}
 
       <Box paddingLeft={1}>
-        <Text color={theme.accent}>{"> "}</Text>
+        <Text color={tokens.text.accent}>{"> "}</Text>
         {isBusy ? (
-          <Text color={theme.textMuted} dimColor>
+          <Text color={tokens.text.muted} dimColor>
             {interruptCount > 0 ? "Press Ctrl+C again to exit" : "Agent is working... Press Ctrl+C to interrupt"}
           </Text>
         ) : (
@@ -1009,19 +1007,13 @@ export function Prompt(props: PromptProps) {
       </Box>
 
       {!isBusy && !acMode && (
-        <Box paddingLeft={2} gap={2}>
-          <Text color={theme.textMuted} dimColor>tab agent</Text>
-          <Text color={theme.textMuted} dimColor>^M model</Text>
-          <Text color={theme.textMuted} dimColor>^S sessions</Text>
-          <Text color={theme.textMuted} dimColor>^P commands</Text>
-          <Text color={theme.textMuted} dimColor>^O connect</Text>
+        <Box paddingLeft={2}>
+          <KeyHints items={["tab agent", "^M model", "^S sessions", "^P commands", "^O connect"]} />
         </Box>
       )}
       {!isBusy && acMode && (
-        <Box paddingLeft={2} gap={2}>
-          <Text color={theme.textMuted} dimColor>up/down navigate</Text>
-          <Text color={theme.textMuted} dimColor>enter/tab select</Text>
-          <Text color={theme.textMuted} dimColor>esc dismiss</Text>
+        <Box paddingLeft={2}>
+          <KeyHints items={["up/down navigate", "enter/tab select", "esc dismiss"]} />
         </Box>
       )}
     </Box>
