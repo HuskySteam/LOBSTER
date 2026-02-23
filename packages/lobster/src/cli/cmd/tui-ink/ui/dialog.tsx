@@ -42,7 +42,7 @@ function DialogOverlay(props: { children: ReactNode }) {
   const rows = stdout?.rows ?? 24
   const cols = stdout?.columns ?? 80
   const maxHeight = Math.max(rows - 6, 8)
-  const width = Math.max(Math.min(cols - 4, 120), 56)
+  const width = Math.max(Math.min(cols - 4, 120), 20)
 
   return (
     <Box
