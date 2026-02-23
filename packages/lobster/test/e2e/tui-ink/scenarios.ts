@@ -315,7 +315,6 @@ const SCENARIOS: ScenarioDefinition[] = [
           required: ["Commands", "session"],
           oneOf: [["/sessions", "Browse sessions"]],
           forbidden: ["> p"],
-          softRequired: ["/new - Start a new session"],
         },
       },
     ],

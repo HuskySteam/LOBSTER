@@ -1,5 +1,5 @@
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-  │  [MARKETPLACE]rupdated 4:27:58 PM                                                 esc close  │
+  │  [MARKETPLACE]rupdated <time>                                                 esc close  │
   │                                                                                              │
   │   Installed 7   Marketplace 45   Add                                                         │
   │  > Filter marketplace...                                                                     │

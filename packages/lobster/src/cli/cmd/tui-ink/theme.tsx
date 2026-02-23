@@ -174,7 +174,7 @@ export function resolveTheme(themeJson: ThemeJson, mode: "dark" | "light"): Them
   // Optional keys with fallbacks
   colors.selectedListItemText = t.selectedListItemText !== undefined
     ? resolveColor(t.selectedListItemText as ColorValue, mode, defs, t)
-    : colors.background
+    : colors.text
   colors.backgroundMenu = t.backgroundMenu !== undefined
     ? resolveColor(t.backgroundMenu as ColorValue, mode, defs, t)
     : colors.backgroundElement

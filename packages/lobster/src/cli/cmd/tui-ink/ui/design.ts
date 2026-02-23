@@ -29,7 +29,63 @@ export interface InkDesignTokens {
   }
 }
 
+function parseHexColor(input: string) {
+  const value = input.trim()
+  const match = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(value)
+  if (!match) return
+  const raw = match[1]!
+  if (raw.length === 3) {
+    const r = Number.parseInt(raw[0]! + raw[0]!, 16)
+    const g = Number.parseInt(raw[1]! + raw[1]!, 16)
+    const b = Number.parseInt(raw[2]! + raw[2]!, 16)
+    return { r, g, b }
+  }
+  const r = Number.parseInt(raw.slice(0, 2), 16)
+  const g = Number.parseInt(raw.slice(2, 4), 16)
+  const b = Number.parseInt(raw.slice(4, 6), 16)
+  return { r, g, b }
+}
+
+function srgbToLinear(value: number) {
+  const normalized = value / 255
+  if (normalized <= 0.03928) return normalized / 12.92
+  return ((normalized + 0.055) / 1.055) ** 2.4
+}
+
+function relativeLuminance(input: string) {
+  const rgb = parseHexColor(input)
+  if (!rgb) return
+  const r = srgbToLinear(rgb.r)
+  const g = srgbToLinear(rgb.g)
+  const b = srgbToLinear(rgb.b)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+function contrastRatio(left: string, right: string) {
+  const l1 = relativeLuminance(left)
+  const l2 = relativeLuminance(right)
+  if (l1 === undefined || l2 === undefined) return 1
+  const lighter = Math.max(l1, l2)
+  const darker = Math.min(l1, l2)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+function pickReadableText(background: string, preferred: string, fallback: string) {
+  const candidates = Array.from(new Set([preferred, fallback, "#ffffff", "#000000"]))
+  let best = candidates[0] ?? fallback
+  let bestScore = -1
+  for (const candidate of candidates) {
+    const score = contrastRatio(background, candidate)
+    if (score <= bestScore) continue
+    best = candidate
+    bestScore = score
+  }
+  return best
+}
+
 function buildTokens(theme: ThemeColors): InkDesignTokens {
+  const selectedBackground = theme.primary
+  const selectedText = pickReadableText(selectedBackground, theme.selectedListItemText, theme.text)
   return {
     panel: {
       background: theme.backgroundPanel,
@@ -50,8 +106,8 @@ function buildTokens(theme: ThemeColors): InkDesignTokens {
       muted: theme.textMuted,
     },
     list: {
-      selectedBackground: theme.primary,
-      selectedText: theme.selectedListItemText,
+      selectedBackground,
+      selectedText,
       marker: theme.secondary,
     },
     spacing: {

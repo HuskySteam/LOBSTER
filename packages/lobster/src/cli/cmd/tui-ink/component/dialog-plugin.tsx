@@ -335,11 +335,24 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
                   paddingLeft={1}
                   paddingRight={1}
                 >
-                  <Text color={isSelected ? tokens.list.selectedText : tokens.list.marker}>
+                  <Text
+                    color={isSelected ? tokens.list.selectedText : tokens.list.marker}
+                    backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                  >
                     {isSelected ? "> " : "  "}
                   </Text>
-                  <Text color={isSelected ? tokens.list.selectedText : tokens.text.accent}>[{plugin.tag}] </Text>
-                  <Text color={isSelected ? tokens.list.selectedText : tokens.text.primary}>{plugin.label}</Text>
+                  <Text
+                    color={isSelected ? tokens.list.selectedText : tokens.text.accent}
+                    backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                  >
+                    [{plugin.tag}]{" "}
+                  </Text>
+                  <Text
+                    color={isSelected ? tokens.list.selectedText : tokens.text.primary}
+                    backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                  >
+                    {plugin.label}
+                  </Text>
                 </Box>
               )
             })
@@ -373,13 +386,32 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
                     paddingLeft={1}
                     paddingRight={1}
                   >
-                    <Text color={isSelected ? tokens.list.selectedText : tokens.list.marker}>
+                    <Text
+                      color={isSelected ? tokens.list.selectedText : tokens.list.marker}
+                      backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                    >
                       {isSelected ? "> " : "  "}
                     </Text>
-                    <Text color={isSelected ? tokens.list.selectedText : tokens.text.accent}>[{plugin.source}] </Text>
-                    <Text color={isSelected ? tokens.list.selectedText : tokens.text.primary}>{plugin.name}</Text>
+                    <Text
+                      color={isSelected ? tokens.list.selectedText : tokens.text.accent}
+                      backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                    >
+                      [{plugin.source}]{" "}
+                    </Text>
+                    <Text
+                      color={isSelected ? tokens.list.selectedText : tokens.text.primary}
+                      backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                    >
+                      {plugin.name}
+                    </Text>
                     {plugin.description ? (
-                      <Text color={isSelected ? tokens.list.selectedText : tokens.text.muted}> - {plugin.description}</Text>
+                      <Text
+                        color={isSelected ? tokens.list.selectedText : tokens.text.muted}
+                        backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                      >
+                        {" - "}
+                        {plugin.description}
+                      </Text>
                     ) : null}
                   </Box>
                 )

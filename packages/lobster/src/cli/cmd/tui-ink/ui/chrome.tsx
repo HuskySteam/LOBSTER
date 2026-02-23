@@ -62,7 +62,7 @@ export function KeyHints(props: { items: string[] }) {
   return (
     <Box gap={2} marginTop={1}>
       {props.items.map((item) => (
-        <Text key={item} color={tokens.text.muted} dimColor>
+        <Text key={item} color={tokens.text.muted}>
           {item}
         </Text>
       ))}

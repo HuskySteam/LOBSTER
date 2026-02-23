@@ -44,6 +44,7 @@ import {
 } from "../plugin-marketplace"
 import { Spinner } from "../spinner"
 import { Autocomplete, type AutocompleteOption } from "./autocomplete"
+import { normalizePromptInput } from "./input-normalize"
 import { BUILT_IN_COMMANDS, parseSlashCommand, resolveBuiltInCommand } from "./command-registry"
 import { Clipboard } from "@tui/util/clipboard"
 import { formatTranscript } from "@tui/util/transcript"
@@ -787,7 +788,7 @@ export function Prompt(props: PromptProps) {
   )
 
   const handleInputChange = useCallback((value: string) => {
-    const clean = value.replace(/[\x00-\x1f]/g, "")
+    const clean = normalizePromptInput(value)
     setInput(clean)
 
     if (clean.startsWith("/") && !clean.includes(" ")) {

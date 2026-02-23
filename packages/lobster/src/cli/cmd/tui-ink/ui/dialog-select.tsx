@@ -207,27 +207,45 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                 paddingLeft={1}
                 paddingRight={1}
               >
-                <Text color={isSelected ? tokens.list.selectedText : tokens.list.marker}>
+                <Text
+                  color={isSelected ? tokens.list.selectedText : tokens.list.marker}
+                  backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                >
                   {marker}{" "}
                 </Text>
                 <Text
                   color={isSelected ? tokens.list.selectedText : tokens.text.primary}
                   bold={isSelected}
-                  inverse={isSelected}
+                  backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
                 >
                   {opt.title}
                 </Text>
                 {isCurrent ? (
                   <>
-                    <Text color={isSelected ? tokens.list.selectedText : tokens.text.muted}> </Text>
+                    <Text
+                      color={isSelected ? tokens.list.selectedText : tokens.text.muted}
+                      backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                    >
+                      {" "}
+                    </Text>
                     <StatusBadge label="current" tone={isSelected ? "accent" : "muted"} />
                   </>
                 ) : null}
                 {opt.description ? (
-                  <Text color={isSelected ? tokens.list.selectedText : tokens.text.muted}> {"-"} {opt.description}</Text>
+                  <Text
+                    color={isSelected ? tokens.list.selectedText : tokens.text.muted}
+                    backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                  >
+                    {"-"} {opt.description}
+                  </Text>
                 ) : null}
                 {opt.footer ? (
-                  <Text color={isSelected ? tokens.list.selectedText : tokens.text.muted}> {"|"} {opt.footer}</Text>
+                  <Text
+                    color={isSelected ? tokens.list.selectedText : tokens.text.muted}
+                    backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                  >
+                    {"|"} {opt.footer}
+                  </Text>
                 ) : null}
               </Box>
             )

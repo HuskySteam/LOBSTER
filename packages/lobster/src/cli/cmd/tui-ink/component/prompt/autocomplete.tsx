@@ -70,12 +70,20 @@ export function Autocomplete({ options, selected, maxVisible = 8 }: Autocomplete
             flexDirection="row"
             overflow="hidden"
           >
-            <Text color={isSelected ? tokens.list.selectedText : theme.text} bold={isSelected} inverse={isSelected}>
+            <Text
+              color={isSelected ? tokens.list.selectedText : theme.text}
+              bold={isSelected}
+              backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+            >
               {marker}
               {label}
             </Text>
             {layout.showDescription && opt.description && (
-              <Text color={isSelected ? tokens.list.selectedText : theme.textMuted} dimColor={!isSelected}>
+              <Text
+                color={isSelected ? tokens.list.selectedText : theme.textMuted}
+                dimColor={!isSelected}
+                backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+              >
                 {" "}
                 {description}
               </Text>

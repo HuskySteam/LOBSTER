@@ -3,9 +3,9 @@
   │                                                                                              │
   │  > Search providers...                                                                       │
   │                                                                                              │
-  │   > Anthropic - (Claude Max or API key)                                                      │
+  │   > Anthropic- (Claude Max or API key)                                                       │
   │     GitHub Copilot                                                                           │
-  │     OpenAI - (ChatGPT Plus/Pro or API key)                                                   │
+  │     OpenAI- (ChatGPT Plus/Pro or API key)                                                    │
   │     Google                                                                                   │
   │     OpenRouter                                                                               │
   │     evroc                                                                                    │

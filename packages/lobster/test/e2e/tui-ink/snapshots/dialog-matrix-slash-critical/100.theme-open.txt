@@ -11,7 +11,7 @@
   │     github                                                                                   │
   │     gruvbox                                                                                  │
   │     kanagawa                                                                                 │
-  │   > lobster [current] | (current)                                                            │
+  │   > lobster [current]| (current)                                                             │
   │     lucent-orng                                                                              │
   │     material                                                                                 │
   │     matrix                                                                                   │
