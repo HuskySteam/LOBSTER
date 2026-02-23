@@ -19,6 +19,7 @@ import { separator, useDesignTokens } from "../../ui/design"
 const EMPTY_MESSAGES: never[] = []
 const EMPTY_PERMISSIONS: never[] = []
 const EMPTY_QUESTIONS: never[] = []
+const BLOCK_TOOL_CHROME_LINES = 5 // marginTop + border(top/bottom) + padding(top/bottom)
 
 /** Count rendered terminal rows for a string, accounting for soft-wrap at cols. */
 function wrappedLineCount(text: string, cols: number): number {
@@ -57,7 +58,7 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
       const raw = (meta.output ?? "").trim()
       const allLines = raw ? raw.split("\n") : []
       const outputRows = raw ? wrappedSliceCount(allLines, 10, cols) : 0
-      return 2 + outputRows + (allLines.length > 10 ? 1 : 0) + (state.error ? 1 : 0)
+      return BLOCK_TOOL_CHROME_LINES + 2 + outputRows + (allLines.length > 10 ? 1 : 0) + (state.error ? 1 : 0)
     }
     case "edit": {
       if (meta.diff === undefined) return inlineBase
@@ -68,12 +69,12 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
         ((meta.diagnostics?.[input.filePath] ?? []) as any[]).filter((x: any) => x.severity === 1).length,
         3,
       )
-      return 1 + diffRows + (allLines.length > 30 ? 1 : 0) + diagCount + (state.error ? 1 : 0)
+      return BLOCK_TOOL_CHROME_LINES + 1 + diffRows + (allLines.length > 30 ? 1 : 0) + diagCount + (state.error ? 1 : 0)
     }
     case "write": {
       if (meta.diagnostics === undefined) return inlineBase
       const diagCount = Math.min((meta.diagnostics?.[input.filePath] ?? []).length, 3)
-      return 1 + diagCount + (state.error ? 1 : 0)
+      return BLOCK_TOOL_CHROME_LINES + 1 + diagCount + (state.error ? 1 : 0)
     }
     case "apply_patch": {
       const files: any[] = meta.files ?? []
@@ -83,7 +84,7 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
       for (const f of files) {
         total += 1 + (f.diff ? wrappedSliceCount(f.diff.split("\n"), 15, cols) : 0)
       }
-      return total + (state.error ? 1 : 0)
+      return BLOCK_TOOL_CHROME_LINES + total + (state.error ? 1 : 0)
     }
     case "read": {
       const loaded: any[] = Array.isArray(meta.loaded) ? meta.loaded : []
@@ -93,13 +94,13 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
       if (input.description || input.subagent_type) {
         // BlockTool: title + description (description may wrap)
         const desc = String(input.description ?? "")
-        return 1 + Math.max(1, Math.ceil(desc.length / cols)) + (state.error ? 1 : 0)
+        return BLOCK_TOOL_CHROME_LINES + 1 + Math.max(1, Math.ceil(desc.length / cols)) + (state.error ? 1 : 0)
       }
       return inlineBase
     }
     case "todowrite": {
       const todos: any[] = input.todos ?? []
-      if (todos.length > 0) return 1 + todos.length + (state.error ? 1 : 0)
+      if (todos.length > 0) return BLOCK_TOOL_CHROME_LINES + 1 + todos.length + (state.error ? 1 : 0)
       return inlineBase
     }
     default:
@@ -352,4 +353,3 @@ export function Session(props: { sessionID: string }) {
     </Box>
   )
 }
-

@@ -155,17 +155,6 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
   }, [tab, loadMarketplace])
 
   useEffect(() => {
-    if (props.initialTab) return
-    setTab((current) => {
-      if (current !== "marketplace" && current !== "installed") return current
-      return resolveInitialPluginTab({
-        initialTab: undefined,
-        installedCount: installed.length,
-      })
-    })
-  }, [installed.length, props.initialTab])
-
-  useEffect(() => {
     setQuery("")
     setSelected(0)
   }, [tab])
