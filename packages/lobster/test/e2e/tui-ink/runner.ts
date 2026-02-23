@@ -296,7 +296,17 @@ function createStartupCommand(runtimeRoot: string, context: RunnerContext) {
     .map(([key, value]) => `${key}=${bashQuote(value)}`)
     .join(" ")
 
-  return `cd /tmp && stty -ixon && ${assignments} ${bashQuote(context.bunExecutable)} run --conditions=browser ${bashQuote(entrypoint)} ${bashQuote(projectPath)} --ui ink`
+  const unsetCiMarkers = [
+    "CI",
+    "CONTINUOUS_INTEGRATION",
+    "BUILD_NUMBER",
+    "RUN_ID",
+    "GITHUB_ACTIONS",
+  ]
+    .map((name) => `-u ${name}`)
+    .join(" ")
+
+  return `cd /tmp && stty -ixon && env ${unsetCiMarkers} ${assignments} ${bashQuote(context.bunExecutable)} run --conditions=browser ${bashQuote(entrypoint)} ${bashQuote(projectPath)} --ui ink`
 }
 
 async function waitForUIReady(context: ShellContext, sessionName: string, timeoutMs: number) {

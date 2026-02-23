@@ -249,7 +249,7 @@ const SCENARIOS: ScenarioDefinition[] = [
     title: "Home screen renders baseline layout",
     category: "critical",
     widths: [100],
-    startupWaitMs: 90_000,
+    startupWaitMs: 45_000,
     steps: [],
     finalExpectation: {
       required: ["LOBSTER Code", "[build]", "Type a message"],
