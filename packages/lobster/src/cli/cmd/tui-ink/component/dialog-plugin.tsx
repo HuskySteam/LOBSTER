@@ -209,7 +209,7 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
         const item = visibleMarketplace[selected]
         if (item) void installPlugin(item.spec)
       }
-      if (ch === "r") {
+      if (isCtrlShortcut(ch, key, "r")) {
         markHotkeyConsumed()
         void loadMarketplace()
       }
@@ -372,7 +372,7 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
           ) : visibleMarketplace.length === 0 ? (
             <EmptyState
               title={marketplaceHadError ? "Could not load marketplace sources." : "All marketplace plugins are installed."}
-              detail="Press r to refresh marketplace sources."
+              detail="Press Ctrl+R to refresh marketplace sources."
             />
           ) : (
             <>
@@ -417,7 +417,7 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
                   </Box>
                 )
               })}
-              <KeyHints items={["tab switch", "up/down navigate", "enter install", "r refresh", "esc close"]} />
+              <KeyHints items={["tab switch", "up/down navigate", "enter install", "ctrl+r refresh", "esc close"]} />
             </>
           )}
         </Box>
