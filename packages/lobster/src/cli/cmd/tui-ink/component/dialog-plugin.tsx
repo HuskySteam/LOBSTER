@@ -8,11 +8,16 @@ import { useDialog } from "../ui/dialog"
 import { useHotkeyInputGuard } from "../ui/hotkey-input-guard"
 import { isCtrlShortcut } from "../ui/hotkey"
 import { Spinner } from "./spinner"
-import { dedupeMarketplaceBySpec, loadPluginMarketplace, pluginSpecName, type MarketplacePlugin } from "./plugin-marketplace"
+import {
+  dedupeMarketplaceBySpec,
+  loadPluginMarketplace,
+  pluginSpecName,
+  type MarketplacePlugin,
+} from "./plugin-marketplace"
 import { EmptyState, KeyHints, PanelHeader, SegmentedTabs, StatusBadge } from "../ui/chrome"
 import { useDesignTokens } from "../ui/design"
 
-export type PluginTab = "installed" | "marketplace" | "add"
+type PluginTab = "installed" | "marketplace" | "add"
 
 type InstalledPlugin = {
   name: string
@@ -30,10 +35,7 @@ function nextTab(tab: PluginTab, reverse = false): PluginTab {
   return TAB_ORDER[(index + 1) % TAB_ORDER.length]
 }
 
-export function resolveInitialPluginTab(input: {
-  initialTab?: PluginTab
-  installedCount: number
-}): PluginTab {
+export function resolveInitialPluginTab(input: { initialTab?: PluginTab; installedCount: number }): PluginTab {
   if (input.initialTab) return input.initialTab
   return input.installedCount > 0 ? "installed" : "marketplace"
 }
@@ -93,14 +95,25 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
   const [marketplaceHadError, setMarketplaceHadError] = useState(false)
   const [marketplaceFetchedAt, setMarketplaceFetchedAt] = useState<number | undefined>(undefined)
 
-  const guardedAddInputChange = useMemo(
-    () => wrapOnChange(setAddInput),
-    [wrapOnChange],
-  )
-  const guardedQueryChange = useMemo(
-    () => wrapOnChange(setQuery),
-    [wrapOnChange],
-  )
+  const refreshAfterConfigChange = useCallback(async () => {
+    await sync.client.instance.dispose()
+    await sync.bootstrap()
+  }, [sync])
+
+  const switchTab = useCallback((next: PluginTab) => {
+    setTab(next)
+    setQuery("")
+    setSelected(0)
+  }, [])
+
+  const cycleTab = useCallback((reverse = false) => {
+    setTab((current) => nextTab(current, reverse))
+    setQuery("")
+    setSelected(0)
+  }, [])
+
+  const guardedAddInputChange = useMemo(() => wrapOnChange(setAddInput), [wrapOnChange])
+  const guardedQueryChange = useMemo(() => wrapOnChange(setQuery), [wrapOnChange])
 
   const visibleInstalled = useMemo(() => {
     const filter = query.trim().toLowerCase()
@@ -119,8 +132,8 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
       if (installedSpecs.has(item.spec)) return false
       return true
     })
-    const sorted = dedupeMarketplaceBySpec(deduped).toSorted((a, b) =>
-      a.name.localeCompare(b.name) || a.source.localeCompare(b.source),
+    const sorted = dedupeMarketplaceBySpec(deduped).toSorted(
+      (a, b) => a.name.localeCompare(b.name) || a.source.localeCompare(b.source),
     )
     const filter = query.trim().toLowerCase()
     if (!filter) return sorted
@@ -155,19 +168,13 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
   }, [tab, loadMarketplace])
 
   useEffect(() => {
-    setQuery("")
-    setSelected(0)
-  }, [tab])
-
-  useEffect(() => {
     if (tab === "add") return
     const length = tab === "installed" ? visibleInstalled.length : visibleMarketplace.length
-    if (length === 0) {
-      if (selected !== 0) setSelected(0)
-      return
-    }
-    if (selected >= length) setSelected(length - 1)
-  }, [selected, tab, visibleInstalled.length, visibleMarketplace.length])
+    setSelected((value) => {
+      if (length === 0) return value === 0 ? value : 0
+      return value >= length ? length - 1 : value
+    })
+  }, [tab, visibleInstalled.length, visibleMarketplace.length])
 
   useInput((ch, key) => {
     if (key.escape) {
@@ -177,7 +184,7 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
     }
     if (key.tab) {
       markHotkeyConsumed()
-      setTab((current) => nextTab(current, !!key.shift))
+      cycleTab(!!key.shift)
       return
     }
     if (tab === "installed") {
@@ -210,18 +217,18 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
       if (!spec || loading) return
       setLoading(true)
       try {
-        const result = await sync.client.global.config.get()
-        const current = result.data?.plugin ?? []
-        const next = current.filter((value) => value !== spec)
-        await sync.client.global.config.update({ config: { plugin: next } })
-        await sync.client.instance.dispose()
-        await sync.bootstrap()
+        await sync.client.global.config.get().then(async (result) => {
+          const current = result.data?.plugin ?? []
+          const next = current.filter((value) => value !== spec)
+          await sync.client.global.config.update({ config: { plugin: next } })
+          await refreshAfterConfigChange()
+        })
         setSelected((value) => Math.max(0, value - 1))
       } finally {
         setLoading(false)
       }
     },
-    [loading, sync],
+    [loading, refreshAfterConfigChange, sync],
   )
 
   const installPlugin = useCallback(
@@ -229,18 +236,17 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
       if (!spec.trim() || loading) return
       setLoading(true)
       try {
-        const result = await sync.client.global.config.get()
-        const current = result.data?.plugin ?? []
-        if (!current.includes(spec)) {
+        await sync.client.global.config.get().then(async (result) => {
+          const current = result.data?.plugin ?? []
+          if (current.includes(spec)) return
           await sync.client.global.config.update({ config: { plugin: [...current, spec] } })
-          await sync.client.instance.dispose()
-          await sync.bootstrap()
-        }
+          await refreshAfterConfigChange()
+        })
       } finally {
         setLoading(false)
       }
     },
-    [loading, sync],
+    [loading, refreshAfterConfigChange, sync],
   )
 
   const addPlugin = useCallback(
@@ -248,29 +254,25 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
       if (!spec.trim() || loading) return
       setLoading(true)
       try {
-        const result = await sync.client.global.config.get()
-        const current = result.data?.plugin ?? []
-        if (!current.includes(spec.trim())) {
-          await sync.client.global.config.update({ config: { plugin: [...current, spec.trim()] } })
-          await sync.client.instance.dispose()
-          await sync.bootstrap()
-        }
+        const trimmed = spec.trim()
+        await sync.client.global.config.get().then(async (result) => {
+          const current = result.data?.plugin ?? []
+          if (current.includes(trimmed)) return
+          await sync.client.global.config.update({ config: { plugin: [...current, trimmed] } })
+          await refreshAfterConfigChange()
+        })
         setAddInput("")
-        setTab("installed")
+        switchTab("installed")
       } finally {
         setLoading(false)
       }
     },
-    [loading, sync],
+    [loading, refreshAfterConfigChange, switchTab, sync],
   )
 
   return (
     <Box flexDirection="column" paddingLeft={1} paddingRight={1}>
-      <PanelHeader
-        title="Plugin Manager"
-        subtitle={`${installed.length} installed`}
-        right="esc close"
-      />
+      <PanelHeader title="Plugin Manager" subtitle={`${installed.length} installed`} right="esc close" />
       <Box gap={1}>
         <StatusBadge tone="accent" label={tab.toUpperCase()} />
         {tab === "marketplace" && marketplaceFetchedAt ? (
@@ -282,7 +284,7 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
 
       <SegmentedTabs
         active={tab}
-        onSelect={setTab}
+        onSelect={(value) => switchTab(value as PluginTab)}
         tabs={[
           { id: "installed", label: "Installed", count: installed.length },
           { id: "marketplace", label: "Marketplace", count: visibleMarketplace.length },
@@ -293,13 +295,13 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
       {tab !== "add" ? (
         <Box>
           <Text color={tokens.text.accent}>{"> "}</Text>
-            <TextInput
-              value={query}
-              onChange={guardedQueryChange}
-              placeholder={tab === "installed" ? "Filter installed plugins..." : "Filter marketplace..."}
-              focus={true}
-            />
-          </Box>
+          <TextInput
+            value={query}
+            onChange={guardedQueryChange}
+            placeholder={tab === "installed" ? "Filter installed plugins..." : "Filter marketplace..."}
+            focus={true}
+          />
+        </Box>
       ) : null}
 
       {loading && (
@@ -320,11 +322,7 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
             visibleInstalled.map((plugin, index) => {
               const isSelected = index === selected
               return (
-                <Box
-                  key={plugin.raw}
-                  paddingLeft={1}
-                  paddingRight={1}
-                >
+                <Box key={plugin.raw} paddingLeft={1} paddingRight={1}>
                   <Text
                     color={isSelected ? tokens.list.selectedText : tokens.list.marker}
                     backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
@@ -360,22 +358,18 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
             </Box>
           ) : visibleMarketplace.length === 0 ? (
             <EmptyState
-              title={marketplaceHadError ? "Could not load marketplace sources." : "All marketplace plugins are installed."}
+              title={
+                marketplaceHadError ? "Could not load marketplace sources." : "All marketplace plugins are installed."
+              }
               detail="Press Ctrl+R to refresh marketplace sources."
             />
           ) : (
             <>
-              <Text color={tokens.text.muted}>
-                {visibleMarketplace.length} available - Enter to install
-              </Text>
+              <Text color={tokens.text.muted}>{visibleMarketplace.length} available - Enter to install</Text>
               {visibleMarketplace.map((plugin, index) => {
                 const isSelected = index === selected
                 return (
-                  <Box
-                    key={`${plugin.source}:${plugin.spec}`}
-                    paddingLeft={1}
-                    paddingRight={1}
-                  >
+                  <Box key={`${plugin.source}:${plugin.spec}`} paddingLeft={1} paddingRight={1}>
                     <Text
                       color={isSelected ? tokens.list.selectedText : tokens.list.marker}
                       backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
@@ -425,7 +419,9 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
               focus={tab === "add"}
             />
           </Box>
-          <Text color={tokens.text.muted} dimColor>Tip: /plugin install {"<name|spec>"}</Text>
+          <Text color={tokens.text.muted} dimColor>
+            Tip: /plugin install {"<name|spec>"}
+          </Text>
           <KeyHints items={["tab switch", "enter add", "esc close"]} />
         </Box>
       )}

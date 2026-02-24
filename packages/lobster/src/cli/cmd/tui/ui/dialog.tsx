@@ -7,7 +7,7 @@ import { Clipboard } from "@tui/util/clipboard"
 import { useToast } from "./toast"
 import { RoundedBorder } from "@tui/component/border"
 
-export function Dialog(
+function Dialog(
   props: ParentProps<{
     size?: "medium" | "large"
     onClose: () => void
@@ -43,13 +43,7 @@ export function Dialog(
         borderColor={theme.border}
         customBorderChars={RoundedBorder}
       >
-        <box
-          backgroundColor={theme.backgroundPanel}
-          paddingTop={1}
-          paddingBottom={1}
-          paddingLeft={2}
-          paddingRight={2}
-        >
+        <box backgroundColor={theme.backgroundPanel} paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2}>
           {props.children}
         </box>
       </box>

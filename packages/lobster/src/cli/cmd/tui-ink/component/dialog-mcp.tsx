@@ -17,7 +17,10 @@ export function DialogMcp() {
   const entries = useMemo(() => Object.entries(mcp), [mcp])
 
   useInput((_ch, key) => {
-    if (key.escape) { dialog.clear(); return }
+    if (key.escape) {
+      dialog.clear()
+      return
+    }
     if (key.upArrow) setSelected((s) => Math.max(0, s - 1))
     if (key.downArrow) setSelected((s) => Math.min(entries.length - 1, s + 1))
     if (key.return || _ch === " ") {
@@ -37,8 +40,7 @@ export function DialogMcp() {
         mcpConfig[name] = { ...(mcpConfig[name] ?? {}), disabled: true }
       }
       await sync.client.global.config.update({ config: { mcp: mcpConfig } })
-      await sync.client.instance.dispose()
-      await sync.bootstrap()
+      await sync.client.instance.dispose().then(() => sync.bootstrap())
       setLoading(null)
     },
     [sync],
@@ -47,7 +49,9 @@ export function DialogMcp() {
   return (
     <Box flexDirection="column" paddingLeft={1} paddingRight={1}>
       <Box justifyContent="space-between">
-        <Text color={theme.text} bold>MCP Servers</Text>
+        <Text color={theme.text} bold>
+          MCP Servers
+        </Text>
         <Text color={theme.textMuted}>esc close</Text>
       </Box>
 
@@ -66,12 +70,13 @@ export function DialogMcp() {
             const icon = isLoading ? "◌" : isConnected ? "●" : isFailed ? "✖" : "○"
             return (
               <Box key={name}>
-                <Text color={isSelected ? theme.secondary : theme.textMuted}>
-                  {isSelected ? "> " : "  "}
-                </Text>
+                <Text color={isSelected ? theme.secondary : theme.textMuted}>{isSelected ? "> " : "  "}</Text>
                 <Text color={color}>{icon} </Text>
                 <Text color={isSelected ? theme.text : theme.textMuted}>{name}</Text>
-                <Text color={theme.textMuted} dimColor> {status.status}</Text>
+                <Text color={theme.textMuted} dimColor>
+                  {" "}
+                  {status.status}
+                </Text>
               </Box>
             )
           })}

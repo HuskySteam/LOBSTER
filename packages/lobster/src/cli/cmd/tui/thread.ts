@@ -170,9 +170,7 @@ export const TuiThreadCommand = cmd({
     }
 
     // Select UI framework
-    const tuiPromise = args.ui === "ink"
-      ? import("@tui-ink/app").then((m) => m.tui(tuiOptions))
-      : tui(tuiOptions)
+    const tuiPromise = args.ui === "ink" ? import("../tui-ink/app").then((m) => m.tui(tuiOptions)) : tui(tuiOptions)
 
     setTimeout(() => {
       client.call("checkUpgrade", { directory: cwd }).catch(() => {})

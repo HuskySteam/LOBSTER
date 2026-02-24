@@ -41,7 +41,7 @@ export type ScenarioDefinition = {
   finalExpectation?: ScenarioExpectation
 }
 
-export const DEFAULT_RESPONSIVE_WIDTHS = [80, 100, 120] as const
+const DEFAULT_RESPONSIVE_WIDTHS = [80, 100, 120] as const
 
 type DialogMatrixEntry = {
   command: string

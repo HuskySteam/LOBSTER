@@ -14,8 +14,8 @@ const MASCOT = [
 export function Logo() {
   return (
     <Box flexDirection="column" marginBottom={1}>
-      {MASCOT.map((line, index) => (
-        <Text key={`mascot-${index}`} color={MASCOT_COLOR} bold>
+      {MASCOT.map((line) => (
+        <Text key={line} color={MASCOT_COLOR} bold>
           {line}
         </Text>
       ))}

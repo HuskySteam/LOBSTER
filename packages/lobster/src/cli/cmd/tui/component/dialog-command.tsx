@@ -16,12 +16,12 @@ import type { KeybindsConfig } from "@lobster-ai/sdk/v2"
 type Context = ReturnType<typeof init>
 const ctx = createContext<Context>()
 
-export type Slash = {
+type Slash = {
   name: string
   aliases?: string[]
 }
 
-export type CommandOption = DialogSelectOption<string> & {
+type CommandOption = DialogSelectOption<string> & {
   keybind?: keyof KeybindsConfig
   suggested?: boolean
   slash?: Slash

@@ -119,12 +119,12 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
 
       {!single ? (
         <Box gap={1} marginBottom={1}>
-          {questions.map((q, i) => (
+          {questions.map((q, index) => (
             <Text
-              key={i}
-              color={i === tabIndex ? tokens.text.primary : tokens.text.muted}
-              bold={i === tabIndex}
-              inverse={i === tabIndex}
+              key={q.header}
+              color={index === tabIndex ? tokens.text.primary : tokens.text.muted}
+              bold={index === tabIndex}
+              inverse={index === tabIndex}
             >
               {` ${q.header} `}
             </Text>
@@ -150,13 +150,13 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
           </Text>
 
           <Box flexDirection="column" marginTop={1}>
-            {options.map((opt, i) => {
-              const isSelected = i === selected
+            {options.map((opt, index) => {
+              const isSelected = index === selected
               const isPicked = (answers[tabIndex] ?? []).includes(opt.label)
               return (
-                <Box key={i} flexDirection="column">
+                <Box key={opt.label} flexDirection="column">
                   <Box>
-                    <Text color={isSelected ? tokens.list.marker : tokens.text.muted}>{`${i + 1}. `}</Text>
+                    <Text color={isSelected ? tokens.list.marker : tokens.text.muted}>{`${index + 1}. `}</Text>
                     <Text
                       color={isSelected ? tokens.text.accent : isPicked ? tokens.status.success : tokens.text.primary}
                       bold={isSelected}
@@ -179,12 +179,14 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
 
       {isConfirmTab ? (
         <Box flexDirection="column">
-          <Text color={tokens.text.primary} bold>Review your answers:</Text>
-          {questions.map((q, i) => (
-            <Box key={i} paddingLeft={1}>
+          <Text color={tokens.text.primary} bold>
+            Review your answers:
+          </Text>
+          {questions.map((q, index) => (
+            <Box key={q.header} paddingLeft={1}>
               <Text color={tokens.text.muted}>{q.header}: </Text>
-              <Text color={(answers[i] ?? []).length > 0 ? tokens.text.primary : tokens.status.error}>
-                {(answers[i] ?? []).join(", ") || "(not answered)"}
+              <Text color={(answers[index] ?? []).length > 0 ? tokens.text.primary : tokens.status.error}>
+                {(answers[index] ?? []).join(", ") || "(not answered)"}
               </Text>
             </Box>
           ))}

@@ -55,10 +55,7 @@ const EMPTY_MSGS: never[] = []
 
 interface PromptProps {
   sessionID?: string
-  onSubmit: (
-    input: string,
-    options: { agent: string; model: { providerID: string; modelID: string } },
-  ) => void
+  onSubmit: (input: string, options: { agent: string; model: { providerID: string; modelID: string } }) => void
   showThinking?: boolean
   showTimestamps?: boolean
   onToggleThinking?: () => void
@@ -109,26 +106,26 @@ export function Prompt(props: PromptProps) {
   const [acTriggerPos, setAcTriggerPos] = useState(0)
   const [fileResults, setFileResults] = useState<string[]>([])
 
-  const sessionStatus = useAppStore((s) =>
-    props.sessionID ? s.session_status[props.sessionID] : undefined,
-  )
+  const sessionStatus = useAppStore((s) => (props.sessionID ? s.session_status[props.sessionID] : undefined))
   const commands = useAppStore((s) => s.command)
   const agents = useAppStore((s) => s.agent)
   const allParts = useAppStore((s) => s.part)
   const sessions = useAppStore((s) => s.session)
   const projectDir = useAppStore((s) => s.path.directory)
   const sessionMessages = useAppStore((s) =>
-    props.sessionID ? s.message[props.sessionID] ?? EMPTY_MSGS : EMPTY_MSGS,
+    props.sessionID ? (s.message[props.sessionID] ?? EMPTY_MSGS) : EMPTY_MSGS,
   )
-  const sessionInfo = useMemo(
-    () => sessions.find((x) => x.id === props.sessionID),
-    [sessions, props.sessionID],
-  )
+  const sessionInfo = useMemo(() => sessions.find((x) => x.id === props.sessionID), [sessions, props.sessionID])
 
   const isBusy = sessionStatus?.type === "busy"
   const currentAgent = local.agent.current()
   const currentModel = local.model.current()
   const modelParsed = local.model.parsed()
+
+  const refreshAfterConfigChange = useCallback(async () => {
+    await sync.client.instance.dispose()
+    await sync.bootstrap()
+  }, [sync])
 
   useEffect(() => {
     setBlocker("prompt-autocomplete", !!acMode)
@@ -385,7 +382,10 @@ export function Prompt(props: PromptProps) {
         const marketplace = await loadPluginMarketplace(sources)
         const matches = findMarketplaceMatchesByName(marketplace.plugins, value)
         if (matches.length > 1) {
-          const candidates = matches.slice(0, 4).map((item) => `- [${item.source}] ${item.spec}`).join("\n")
+          const candidates = matches
+            .slice(0, 4)
+            .map((item) => `- [${item.source}] ${item.spec}`)
+            .join("\n")
           const more = matches.length > 4 ? `\n...and ${matches.length - 4} more` : ""
           toast.show({
             message:
@@ -405,9 +405,9 @@ export function Prompt(props: PromptProps) {
           return
         }
 
-        await sync.client.global.config.update({ config: { plugin: [...currentPlugins, target] } })
-        await sync.client.instance.dispose()
-        await sync.bootstrap()
+        await sync.client.global.config
+          .update({ config: { plugin: [...currentPlugins, target] } })
+          .then(() => refreshAfterConfigChange())
         toast.show({ message: `Plugin installed: ${matched?.name ?? pluginSpecName(target)}`, variant: "success" })
         return
       }
@@ -430,16 +430,14 @@ export function Prompt(props: PromptProps) {
         }
         const removed = current[index]
         const next = [...current.slice(0, index), ...current.slice(index + 1)]
-        await sync.client.global.config.update({ config: { plugin: next } })
-        await sync.client.instance.dispose()
-        await sync.bootstrap()
+        await sync.client.global.config.update({ config: { plugin: next } }).then(() => refreshAfterConfigChange())
         toast.show({ message: `Plugin removed: ${pluginSpecName(removed ?? value)}`, variant: "success" })
         return
       }
 
       dialog.replace(<DialogPlugin />)
     },
-    [dialog, sync, toast],
+    [dialog, refreshAfterConfigChange, sync, toast],
   )
 
   const runBuiltInCommand = useCallback(
@@ -523,9 +521,9 @@ export function Prompt(props: PromptProps) {
               await sync.client.session.abort({ sessionID: props.sessionID }).catch(() => {})
             }
             const revertID = sessionInfo?.revert?.messageID
-            const target = [...sessionMessages].reverse().find(
-              (msg) => msg.role === "user" && (!revertID || msg.id < revertID),
-            )
+            const target = [...sessionMessages]
+              .reverse()
+              .find((msg) => msg.role === "user" && (!revertID || msg.id < revertID))
             if (!target) {
               toast.show({ message: "No user message to undo", variant: "warning" })
               break
@@ -569,17 +567,16 @@ export function Prompt(props: PromptProps) {
               toast.show({ message: "No active session to export", variant: "warning" })
               break
             }
-            const safeTitle = (sessionInfo.title || `session-${sessionInfo.id}`)
-              .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
-              .replace(/\s+/g, "-")
-              .replace(/-+/g, "-")
-              .replace(/^-|-$/g, "")
-              .slice(0, 80) || sessionInfo.id
+            const safeTitle =
+              (sessionInfo.title || `session-${sessionInfo.id}`)
+                .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+                .replace(/\s+/g, "-")
+                .replace(/-+/g, "-")
+                .replace(/^-|-$/g, "")
+                .slice(0, 80) || sessionInfo.id
             const targetArg = args.trim()
             const filename = targetArg || `${safeTitle}.md`
-            const targetPath = path.isAbsolute(filename)
-              ? filename
-              : path.join(projectDir || process.cwd(), filename)
+            const targetPath = path.isAbsolute(filename) ? filename : path.join(projectDir || process.cwd(), filename)
             await Bun.write(targetPath, transcript)
             toast.show({ message: `Transcript exported: ${targetPath}`, variant: "success", duration: 5000 })
             break
@@ -658,17 +655,20 @@ export function Prompt(props: PromptProps) {
           }
 
           lobster.setAnalysisRunning(true)
-          sync.client.session.prompt({
-            sessionID,
-            messageID: Identifier.ascending("message"),
-            agent: currentAgent.name,
-            model: currentModel,
-            parts: [{ id: Identifier.ascending("part"), type: "text", text: HEALTH_ANALYSIS_PROMPT }],
-          }).catch(() => {
-            toast.show({ message: "Failed to start health analysis", variant: "error" })
-          }).finally(() => {
-            lobster.setAnalysisRunning(false)
-          })
+          sync.client.session
+            .prompt({
+              sessionID,
+              messageID: Identifier.ascending("message"),
+              agent: currentAgent.name,
+              model: currentModel,
+              parts: [{ id: Identifier.ascending("part"), type: "text", text: HEALTH_ANALYSIS_PROMPT }],
+            })
+            .catch(() => {
+              toast.show({ message: "Failed to start health analysis", variant: "error" })
+            })
+            .finally(() => {
+              lobster.setAnalysisRunning(false)
+            })
         }
 
         return true
@@ -703,15 +703,11 @@ export function Prompt(props: PromptProps) {
   )
 
   const commandOptions = useMemo<AutocompleteOption[]>(() => {
-    const builtIn = BUILT_IN_COMMANDS
-      .filter((x) => !x.sessionOnly || !!props.sessionID)
-      .map((x) => ({
-        label: `/${x.name}`,
-        value: `builtin:${x.name}`,
-        description: x.aliases && x.aliases.length > 0
-          ? `${x.description} (${x.aliases.join(", ")})`
-          : x.description,
-      }))
+    const builtIn = BUILT_IN_COMMANDS.filter((x) => !x.sessionOnly || !!props.sessionID).map((x) => ({
+      label: `/${x.name}`,
+      value: `builtin:${x.name}`,
+      description: x.aliases && x.aliases.length > 0 ? `${x.description} (${x.aliases.join(", ")})` : x.description,
+    }))
     const sdkCmds = commands
       .filter((x) => !resolveBuiltInCommand(x.name))
       .map((x) => ({
@@ -746,8 +742,7 @@ export function Prompt(props: PromptProps) {
     if (!filterText) return source
     return source.filter(
       (opt) =>
-        opt.label.toLowerCase().includes(filterText) ||
-        (opt.description?.toLowerCase().includes(filterText) ?? false),
+        opt.label.toLowerCase().includes(filterText) || (opt.description?.toLowerCase().includes(filterText) ?? false),
     )
   }, [acMode, input, acTriggerPos, commandOptions, mentionOptions])
 
@@ -787,38 +782,38 @@ export function Prompt(props: PromptProps) {
     [acMode, acTriggerPos, input, clearInput, runBuiltInCommand],
   )
 
-  const handleInputChange = useCallback((value: string) => {
-    const clean = normalizePromptInput(value)
-    setInput(clean)
+  const handleInputChange = useCallback(
+    (value: string) => {
+      const clean = normalizePromptInput(value)
+      setInput(clean)
 
-    if (clean.startsWith("/") && !clean.includes(" ")) {
-      setAcMode("/")
-      setAcTriggerPos(0)
-      setAcIndex(0)
-      searchFiles("")
-      return
-    }
-
-    const lastAt = clean.lastIndexOf("@")
-    if (lastAt >= 0) {
-      const charBefore = lastAt === 0 ? undefined : clean[lastAt - 1]
-      const textAfter = clean.slice(lastAt + 1)
-      if ((charBefore === undefined || /\s/.test(charBefore)) && !textAfter.includes(" ")) {
-        setAcMode("@")
-        setAcTriggerPos(lastAt)
+      if (clean.startsWith("/") && !clean.includes(" ")) {
+        setAcMode("/")
+        setAcTriggerPos(0)
         setAcIndex(0)
-        searchFiles(textAfter)
+        searchFiles("")
         return
       }
-    }
 
-    setAcMode(false)
-    searchFiles("")
-  }, [searchFiles])
-  const guardedInputChange = useMemo(
-    () => wrapOnChange(handleInputChange),
-    [handleInputChange, wrapOnChange],
+      const lastAt = clean.lastIndexOf("@")
+      if (lastAt >= 0) {
+        const charBefore = lastAt === 0 ? undefined : clean[lastAt - 1]
+        const textAfter = clean.slice(lastAt + 1)
+        if ((charBefore === undefined || /\s/.test(charBefore)) && !textAfter.includes(" ")) {
+          setAcMode("@")
+          setAcTriggerPos(lastAt)
+          setAcIndex(0)
+          searchFiles(textAfter)
+          return
+        }
+      }
+
+      setAcMode(false)
+      searchFiles("")
+    },
+    [searchFiles],
   )
+  const guardedInputChange = useMemo(() => wrapOnChange(handleInputChange), [handleInputChange, wrapOnChange])
 
   const handleSubmit = useCallback(
     (value: string) => {

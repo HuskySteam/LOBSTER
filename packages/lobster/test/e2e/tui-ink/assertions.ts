@@ -7,17 +7,14 @@ export type AssertionIssue = {
   message: string
 }
 
-export type AssertionResult = {
+type AssertionResult = {
   errors: AssertionIssue[]
   warnings: AssertionIssue[]
 }
 
 export function normalizeCapture(input: string) {
   const withoutAnsi = input.replace(ANSI_ESCAPE, "")
-  const withoutVolatileTimestamps = withoutAnsi.replace(
-    /updated \d{1,2}:\d{2}:\d{2}(?:\s?[AP]M)?/g,
-    "updated <time>",
-  )
+  const withoutVolatileTimestamps = withoutAnsi.replace(/updated \d{1,2}:\d{2}:\d{2}(?:\s?[AP]M)?/g, "updated <time>")
   const normalizedNewline = withoutVolatileTimestamps.replace(/\r\n?/g, "\n")
   const trimmedLines = normalizedNewline
     .split("\n")

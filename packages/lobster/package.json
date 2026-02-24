@@ -7,6 +7,9 @@
   "private": true,
   "scripts": {
     "typecheck": "tsgo --noEmit",
+    "doctor": "bun run doctor:lint && bun run doctor:dead-code",
+    "doctor:lint": "npx -y react-doctor@latest . --verbose --no-dead-code",
+    "doctor:dead-code": "npx -y react-doctor@latest . --verbose --no-lint",
     "test": "bun test",
     "test:e2e:tui-ink": "bun run ./test/e2e/tui-ink/runner.ts --mode=all",
     "test:e2e:tui-ink:critical": "bun run ./test/e2e/tui-ink/runner.ts --mode=critical",

@@ -7,7 +7,7 @@ import { TextAttributes } from "@opentui/core"
 import z from "zod"
 import { TuiEvent } from "../event"
 
-export type ToastOptions = z.infer<typeof TuiEvent.ToastShow.properties>
+type ToastOptions = z.infer<typeof TuiEvent.ToastShow.properties>
 
 export function Toast() {
   const toast = useToast()
@@ -85,7 +85,7 @@ function init() {
   return toast
 }
 
-export type ToastContext = ReturnType<typeof init>
+type ToastContext = ReturnType<typeof init>
 
 const ctx = createContext<ToastContext>()
 

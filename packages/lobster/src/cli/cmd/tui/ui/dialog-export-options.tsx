@@ -5,7 +5,7 @@ import { createStore } from "solid-js/store"
 import { createSignal, onMount, Show, type JSX } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 
-export type DialogExportOptionsProps = {
+type DialogExportOptionsProps = {
   defaultFilename: string
   defaultThinking: boolean
   defaultToolDetails: boolean

@@ -97,21 +97,49 @@ import zenburn from "../tui/context/theme/zenburn.json" with { type: "json" }
 import carbonfox from "../tui/context/theme/carbonfox.json" with { type: "json" }
 import lobster from "../tui/context/theme/lobster.json" with { type: "json" }
 
-export const DEFAULT_THEMES: Record<string, ThemeJson> = {
-  aura, ayu, catppuccin,
+const DEFAULT_THEMES: Record<string, ThemeJson> = {
+  aura,
+  ayu,
+  catppuccin,
   "catppuccin-frappe": catppuccinFrappe,
   "catppuccin-macchiato": catppuccinMacchiato,
-  cobalt2, cursor, dracula, everforest, flexoki, github, gruvbox, kanagawa,
-  material, matrix, mercury, monokai, nightowl, nord,
+  cobalt2,
+  cursor,
+  dracula,
+  everforest,
+  flexoki,
+  github,
+  gruvbox,
+  kanagawa,
+  material,
+  matrix,
+  mercury,
+  monokai,
+  nightowl,
+  nord,
   "one-dark": onedark,
   "osaka-jade": osakaJade,
-  opencode, orng,
+  opencode,
+  orng,
   "lucent-orng": lucentOrng,
-  palenight, rosepine, solarized, synthwave84, tokyonight, vesper, vercel,
-  zenburn, carbonfox, lobster,
+  palenight,
+  rosepine,
+  solarized,
+  synthwave84,
+  tokyonight,
+  vesper,
+  vercel,
+  zenburn,
+  carbonfox,
+  lobster,
 } as Record<string, ThemeJson>
 
-function resolveColor(value: ColorValue, mode: "dark" | "light", defs: Record<string, string>, theme: Record<string, ColorValue | number>): string {
+function resolveColor(
+  value: ColorValue,
+  mode: "dark" | "light",
+  defs: Record<string, string>,
+  theme: Record<string, ColorValue | number>,
+): string {
   if (typeof value === "number") return ansiToHex(value)
   if (typeof value === "string") {
     if (value === "transparent" || value === "none") return ""
@@ -125,14 +153,30 @@ function resolveColor(value: ColorValue, mode: "dark" | "light", defs: Record<st
 
 function ansiToHex(code: number): string {
   const ansiColors = [
-    "#000000", "#800000", "#008000", "#808000", "#000080", "#800080", "#008080", "#c0c0c0",
-    "#808080", "#ff0000", "#00ff00", "#ffff00", "#0000ff", "#ff00ff", "#00ffff", "#ffffff",
+    "#000000",
+    "#800000",
+    "#008000",
+    "#808000",
+    "#000080",
+    "#800080",
+    "#008080",
+    "#c0c0c0",
+    "#808080",
+    "#ff0000",
+    "#00ff00",
+    "#ffff00",
+    "#0000ff",
+    "#ff00ff",
+    "#00ffff",
+    "#ffffff",
   ]
   if (code < 16) return ansiColors[code] ?? "#000000"
   if (code < 232) {
     const i = code - 16
-    const b = i % 6, g = Math.floor(i / 6) % 6, r = Math.floor(i / 36)
-    const v = (x: number) => x === 0 ? 0 : x * 40 + 55
+    const b = i % 6,
+      g = Math.floor(i / 6) % 6,
+      r = Math.floor(i / 36)
+    const v = (x: number) => (x === 0 ? 0 : x * 40 + 55)
     return `#${v(r).toString(16).padStart(2, "0")}${v(g).toString(16).padStart(2, "0")}${v(b).toString(16).padStart(2, "0")}`
   }
   if (code < 256) {
@@ -143,7 +187,7 @@ function ansiToHex(code: number): string {
   return "#000000"
 }
 
-export function resolveTheme(themeJson: ThemeJson, mode: "dark" | "light"): ThemeColors {
+function resolveTheme(themeJson: ThemeJson, mode: "dark" | "light"): ThemeColors {
   const defs = themeJson.defs ?? {}
   const t = themeJson.theme
   const resolve = (key: string): string => {
@@ -154,17 +198,47 @@ export function resolveTheme(themeJson: ThemeJson, mode: "dark" | "light"): Them
 
   const colors: Record<string, string> = {}
   const themeKeys: (keyof ThemeColors)[] = [
-    "primary", "secondary", "accent", "error", "warning", "success", "info",
-    "text", "textMuted", "background", "backgroundPanel", "backgroundElement",
-    "border", "borderActive", "borderSubtle",
-    "diffAdded", "diffRemoved", "diffContext", "diffHunkHeader",
-    "diffHighlightAdded", "diffHighlightRemoved",
-    "diffAddedBg", "diffRemovedBg", "diffContextBg", "diffLineNumber",
-    "diffAddedLineNumberBg", "diffRemovedLineNumberBg",
-    "markdownText", "markdownHeading", "markdownLink", "markdownLinkText",
-    "markdownCode", "markdownBlockQuote", "markdownEmph", "markdownStrong",
-    "markdownHorizontalRule", "markdownListItem", "markdownListEnumeration",
-    "markdownImage", "markdownImageText", "markdownCodeBlock",
+    "primary",
+    "secondary",
+    "accent",
+    "error",
+    "warning",
+    "success",
+    "info",
+    "text",
+    "textMuted",
+    "background",
+    "backgroundPanel",
+    "backgroundElement",
+    "border",
+    "borderActive",
+    "borderSubtle",
+    "diffAdded",
+    "diffRemoved",
+    "diffContext",
+    "diffHunkHeader",
+    "diffHighlightAdded",
+    "diffHighlightRemoved",
+    "diffAddedBg",
+    "diffRemovedBg",
+    "diffContextBg",
+    "diffLineNumber",
+    "diffAddedLineNumberBg",
+    "diffRemovedLineNumberBg",
+    "markdownText",
+    "markdownHeading",
+    "markdownLink",
+    "markdownLinkText",
+    "markdownCode",
+    "markdownBlockQuote",
+    "markdownEmph",
+    "markdownStrong",
+    "markdownHorizontalRule",
+    "markdownListItem",
+    "markdownListEnumeration",
+    "markdownImage",
+    "markdownImageText",
+    "markdownCodeBlock",
   ]
 
   for (const key of themeKeys) {
@@ -172,12 +246,14 @@ export function resolveTheme(themeJson: ThemeJson, mode: "dark" | "light"): Them
   }
 
   // Optional keys with fallbacks
-  colors.selectedListItemText = t.selectedListItemText !== undefined
-    ? resolveColor(t.selectedListItemText as ColorValue, mode, defs, t)
-    : colors.text
-  colors.backgroundMenu = t.backgroundMenu !== undefined
-    ? resolveColor(t.backgroundMenu as ColorValue, mode, defs, t)
-    : colors.backgroundElement
+  colors.selectedListItemText =
+    t.selectedListItemText !== undefined
+      ? resolveColor(t.selectedListItemText as ColorValue, mode, defs, t)
+      : colors.text
+  colors.backgroundMenu =
+    t.backgroundMenu !== undefined
+      ? resolveColor(t.backgroundMenu as ColorValue, mode, defs, t)
+      : colors.backgroundElement
 
   return colors as unknown as ThemeColors
 }
@@ -186,9 +262,7 @@ const CUSTOM_THEME_GLOB = new Bun.Glob("themes/*.json")
 async function getCustomThemes(): Promise<Record<string, ThemeJson>> {
   const directories = [
     Global.Path.config,
-    ...(await Array.fromAsync(
-      Filesystem.up({ targets: [".lobster"], start: process.cwd() }),
-    )),
+    ...(await Array.fromAsync(Filesystem.up({ targets: [".lobster"], start: process.cwd() }))),
   ]
   const result: Record<string, ThemeJson> = {}
   for (const dir of directories) {
@@ -217,11 +291,7 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 
-export function ThemeProvider(props: {
-  mode: "dark" | "light"
-  configTheme?: string
-  children: ReactNode
-}) {
+export function ThemeProvider(props: { mode: "dark" | "light"; configTheme?: string; children: ReactNode }) {
   const [themes, setThemes] = useState<Record<string, ThemeJson>>(DEFAULT_THEMES)
   const [mode, setMode] = useState(props.mode)
   const [active, setActive] = useState(props.configTheme ?? "lobster")
@@ -243,10 +313,7 @@ export function ThemeProvider(props: {
     }
   }, [])
 
-  const resolved = useMemo(
-    () => resolveTheme(themes[active] ?? themes.lobster, mode),
-    [themes, active, mode],
-  )
+  const resolved = useMemo(() => resolveTheme(themes[active] ?? themes.lobster, mode), [themes, active, mode])
 
   const value: ThemeContextValue = {
     theme: resolved,

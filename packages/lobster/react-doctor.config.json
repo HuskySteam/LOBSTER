@@ -1,0 +1,13 @@
+{
+  "ignore": {
+    "rules": [
+      "react/no-unknown-property",
+      "react-hooks/rules-of-hooks",
+      "react-doctor/no-giant-component",
+      "react-doctor/prefer-useReducer",
+      "react-doctor/no-render-in-render",
+      "react-doctor/no-cascading-set-state"
+    ],
+    "files": ["script/postinstall.mjs", "script/schema.ts", "script/seed-e2e.ts", "test/fixture/lsp/fake-lsp-server.js"]
+  }
+}

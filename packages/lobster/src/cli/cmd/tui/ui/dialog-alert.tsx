@@ -4,7 +4,7 @@ import { useDialog, type DialogContext } from "./dialog"
 import { useKeyboard } from "@opentui/solid"
 import { createSignal } from "solid-js"
 
-export type DialogAlertProps = {
+type DialogAlertProps = {
   title: string
   message: string
   onConfirm?: () => void

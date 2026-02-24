@@ -31,9 +31,15 @@ export function TextPart(props: { text: string }) {
       i++ // skip closing ```
       elements.push(
         <Box key={`code-${elements.length}`} flexDirection="column" marginTop={0} marginBottom={0} paddingLeft={1}>
-          {lang && <Text color={theme.textMuted} dimColor>{lang}</Text>}
-          {codeLines.map((cl, j) => (
-            <Text key={j} color={theme.accent}>{cl}</Text>
+          {lang && (
+            <Text color={theme.textMuted} dimColor>
+              {lang}
+            </Text>
+          )}
+          {withStableLineKeys(codeLines).map(({ line: cl, key }) => (
+            <Text key={key} color={theme.accent}>
+              {cl}
+            </Text>
           ))}
         </Box>,
       )
@@ -60,9 +66,7 @@ export function TextPart(props: { text: string }) {
     }
 
     // Normal line with inline formatting
-    elements.push(
-      <InlineText key={`t-${elements.length}`} line={line} theme={theme} />,
-    )
+    elements.push(<InlineText key={`t-${elements.length}`} line={line} theme={theme} />)
     i++
   }
 
@@ -84,7 +88,11 @@ function InlineText(props: { line: string; theme: ThemeColors }) {
     // Bold **text**
     const boldMatch = remaining.match(/^\*\*(.+?)\*\*/)
     if (boldMatch) {
-      parts.push(<Text key={key++} bold>{boldMatch[1]}</Text>)
+      parts.push(
+        <Text key={key++} bold>
+          {boldMatch[1]}
+        </Text>,
+      )
       remaining = remaining.slice(boldMatch[0].length)
       continue
     }
@@ -92,7 +100,11 @@ function InlineText(props: { line: string; theme: ThemeColors }) {
     // Inline code `text`
     const codeMatch = remaining.match(/^`([^`]+)`/)
     if (codeMatch) {
-      parts.push(<Text key={key++} color={theme.accent}>{codeMatch[1]}</Text>)
+      parts.push(
+        <Text key={key++} color={theme.accent}>
+          {codeMatch[1]}
+        </Text>,
+      )
       remaining = remaining.slice(codeMatch[0].length)
       continue
     }
@@ -100,7 +112,11 @@ function InlineText(props: { line: string; theme: ThemeColors }) {
     // Italic *text*
     const italicMatch = remaining.match(/^\*([^*]+)\*/)
     if (italicMatch) {
-      parts.push(<Text key={key++} dimColor>{italicMatch[1]}</Text>)
+      parts.push(
+        <Text key={key++} dimColor>
+          {italicMatch[1]}
+        </Text>,
+      )
       remaining = remaining.slice(italicMatch[0].length)
       continue
     }
@@ -108,18 +124,42 @@ function InlineText(props: { line: string; theme: ThemeColors }) {
     // Regular text up to next special char
     const nextSpecial = remaining.search(/[*`]/)
     if (nextSpecial === -1) {
-      parts.push(<Text key={key++} color={theme.text}>{remaining}</Text>)
+      parts.push(
+        <Text key={key++} color={theme.text}>
+          {remaining}
+        </Text>,
+      )
       break
     }
     if (nextSpecial > 0) {
-      parts.push(<Text key={key++} color={theme.text}>{remaining.slice(0, nextSpecial)}</Text>)
+      parts.push(
+        <Text key={key++} color={theme.text}>
+          {remaining.slice(0, nextSpecial)}
+        </Text>,
+      )
       remaining = remaining.slice(nextSpecial)
       continue
     }
     // Special char that didn't match a pattern - consume it
-    parts.push(<Text key={key++} color={theme.text}>{remaining[0]}</Text>)
+    parts.push(
+      <Text key={key++} color={theme.text}>
+        {remaining[0]}
+      </Text>,
+    )
     remaining = remaining.slice(1)
   }
 
   return <Text>{parts}</Text>
+}
+
+function withStableLineKeys(lines: string[]): Array<{ line: string; key: string }> {
+  const seen = new Map<string, number>()
+  return lines.map((line) => {
+    const count = seen.get(line) ?? 0
+    seen.set(line, count + 1)
+    return {
+      line,
+      key: count === 0 ? line : `${line}:${count}`,
+    }
+  })
 }

@@ -3,7 +3,7 @@ import { createResource, createMemo } from "solid-js"
 import { useDialog } from "@tui/ui/dialog"
 import { useSDK } from "@tui/context/sdk"
 
-export type DialogSkillProps = {
+type DialogSkillProps = {
   onSelect: (skill: string) => void
 }
 

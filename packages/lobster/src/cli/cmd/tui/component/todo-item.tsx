@@ -1,6 +1,6 @@
 import { useTheme } from "../context/theme"
 
-export interface TodoItemProps {
+interface TodoItemProps {
   status: string
   content: string
 }

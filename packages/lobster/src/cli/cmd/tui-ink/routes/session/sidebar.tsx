@@ -15,7 +15,9 @@ function Section(props: { title: string; children: React.ReactNode }) {
   const tokens = useDesignTokens()
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Text color={tokens.text.accent} bold>{props.title}</Text>
+      <Text color={tokens.text.accent} bold>
+        {props.title}
+      </Text>
       {props.children}
     </Box>
   )
@@ -110,7 +112,9 @@ export function Sidebar(props: { sessionID: string }) {
         <>
           <Section title={`TEAMS (${teamNames.length})`}>
             {teamNames.map((name) => (
-              <Text key={name} color={tokens.text.primary}>{name}</Text>
+              <Text key={name} color={tokens.text.primary}>
+                {name}
+              </Text>
             ))}
           </Section>
           <Divider />
@@ -120,10 +124,11 @@ export function Sidebar(props: { sessionID: string }) {
       {activeTodos.length > 0 ? (
         <>
           <Section title="TASKS">
-            {activeTodos.slice(0, 8).map((item, index) => {
+            {activeTodos.slice(0, 8).map((item) => {
               const tone = item.status === "in_progress" ? "warning" : "muted"
+              const key = (item as any).id ?? `${item.status}:${item.content}`
               return (
-                <Box key={`${item.content}:${index}`} gap={1}>
+                <Box key={key} gap={1}>
                   <StatusBadge tone={tone} label={item.status === "in_progress" ? "active" : "todo"} />
                   <Text color={tokens.text.primary}>{item.content.slice(0, 24)}</Text>
                 </Box>
@@ -138,12 +143,19 @@ export function Sidebar(props: { sessionID: string }) {
       {diff.length > 0 ? (
         <>
           <Section title="MODIFIED FILES">
-            {diff.slice(0, 8).map((item, i) => (
-              <Box key={i} justifyContent="space-between">
+            {diff.slice(0, 8).map((item) => (
+              <Box
+                key={(item as any).file ?? `${(item as any).additions}:${(item as any).deletions}`}
+                justifyContent="space-between"
+              >
                 <Text color={tokens.text.primary}>{(item as any).file?.slice(0, 20)}</Text>
                 <Box gap={1}>
-                  {(item as any).additions > 0 ? <Text color={tokens.status.success}>+{(item as any).additions}</Text> : null}
-                  {(item as any).deletions > 0 ? <Text color={tokens.status.error}>-{(item as any).deletions}</Text> : null}
+                  {(item as any).additions > 0 ? (
+                    <Text color={tokens.status.success}>+{(item as any).additions}</Text>
+                  ) : null}
+                  {(item as any).deletions > 0 ? (
+                    <Text color={tokens.status.error}>-{(item as any).deletions}</Text>
+                  ) : null}
                 </Box>
               </Box>
             ))}
@@ -161,7 +173,12 @@ export function Sidebar(props: { sessionID: string }) {
               <StatusBadge tone="muted" label={`${mcpEntries.length} total`} />
             </Box>
             {mcpEntries.slice(0, 6).map(([key, item]) => {
-              const color = item.status === "connected" ? tokens.status.success : item.status === "failed" ? tokens.status.error : tokens.status.warning
+              const color =
+                item.status === "connected"
+                  ? tokens.status.success
+                  : item.status === "failed"
+                    ? tokens.status.error
+                    : tokens.status.warning
               return (
                 <Box key={key} gap={1}>
                   <Text color={color}>*</Text>

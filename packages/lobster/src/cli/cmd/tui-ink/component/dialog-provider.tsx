@@ -19,6 +19,14 @@ const PROVIDER_PRIORITY: Record<string, number> = {
   openrouter: 5,
 }
 
+async function refreshAfterAuth(sync: {
+  client: { instance: { dispose: () => Promise<unknown> } }
+  bootstrap: () => Promise<unknown>
+}) {
+  await sync.client.instance.dispose()
+  await sync.bootstrap()
+}
+
 export function DialogProvider() {
   const { theme } = useTheme()
   const { sync } = useSDK()
@@ -26,10 +34,7 @@ export function DialogProvider() {
   const providerNext = useAppStore((s) => s.provider_next)
   const providerAuth = useAppStore((s) => s.provider_auth)
 
-  const connected = useMemo(
-    () => new Set(providerNext.connected),
-    [providerNext.connected],
-  )
+  const connected = useMemo(() => new Set(providerNext.connected), [providerNext.connected])
 
   const options = useMemo<DialogSelectOption<string>[]>(() => {
     const sorted = [...providerNext.all].sort(
@@ -40,10 +45,12 @@ export function DialogProvider() {
       return {
         title: provider.name,
         value: provider.id,
-        description: ({
-          anthropic: "(Claude Max or API key)",
-          openai: "(ChatGPT Plus/Pro or API key)",
-        } as Record<string, string>)[provider.id],
+        description: (
+          {
+            anthropic: "(Claude Max or API key)",
+            openai: "(ChatGPT Plus/Pro or API key)",
+          } as Record<string, string>
+        )[provider.id],
         category: provider.id in PROVIDER_PRIORITY ? "Popular" : "Other",
         footer: isConnected ? "Connected" : undefined,
       }
@@ -81,22 +88,12 @@ export function DialogProvider() {
         })
         if (result.data?.method === "auto") {
           dialog.replace(
-            <AutoMethod
-              providerID={providerID}
-              title={method.label}
-              index={index}
-              authorization={result.data}
-            />,
+            <AutoMethod providerID={providerID} title={method.label} index={index} authorization={result.data} />,
           )
         }
         if (result.data?.method === "code") {
           dialog.replace(
-            <CodeMethod
-              providerID={providerID}
-              title={method.label}
-              index={index}
-              authorization={result.data}
-            />,
+            <CodeMethod providerID={providerID} title={method.label} index={index} authorization={result.data} />,
           )
         }
         return
@@ -134,12 +131,16 @@ function AutoMethod(props: {
         method: props.index,
       })
       if (cancelled) return
-      if (result.error) { dialog.clear(); return }
-      await sync.client.instance.dispose()
-      await sync.bootstrap()
+      if (result.error) {
+        dialog.clear()
+        return
+      }
+      await refreshAfterAuth(sync)
       dialog.replace(<DialogModel />)
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useInput((_ch, key) => {
@@ -149,7 +150,9 @@ function AutoMethod(props: {
   return (
     <Box flexDirection="column" paddingLeft={1} paddingRight={1}>
       <Box justifyContent="space-between">
-        <Text color={theme.text} bold>{props.title}</Text>
+        <Text color={theme.text} bold>
+          {props.title}
+        </Text>
         <Text color={theme.textMuted}>esc cancel</Text>
       </Box>
       <Box marginTop={1} flexDirection="column" gap={1}>
@@ -191,9 +194,11 @@ function CodeMethod(props: {
           method: props.index,
           code: value,
         })
-        if (result.error) { setError(true); return }
-        await sync.client.instance.dispose()
-        await sync.bootstrap()
+        if (result.error) {
+          setError(true)
+          return
+        }
+        await refreshAfterAuth(sync)
         dialog.replace(<DialogModel />)
       }}
     />
@@ -214,8 +219,7 @@ function ApiMethod(props: { providerID: string; title: string }) {
           providerID: props.providerID,
           auth: { type: "api", key: value },
         })
-        await sync.client.instance.dispose()
-        await sync.bootstrap()
+        await refreshAfterAuth(sync)
         dialog.replace(<DialogModel />)
       }}
     />

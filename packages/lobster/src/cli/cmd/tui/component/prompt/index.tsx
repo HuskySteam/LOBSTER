@@ -34,7 +34,7 @@ import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
 import { DialogPlugin } from "../dialog-plugin"
 
-export type PromptProps = {
+type PromptProps = {
   sessionID?: string
   visible?: boolean
   disabled?: boolean
@@ -559,7 +559,11 @@ export function Prompt(props: PromptProps) {
         clearInput()
         // Validate source format: must be owner/repo (e.g. anthropics/claude-code)
         if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(source)) {
-          toast.show({ message: "Invalid source format. Use: owner/repo (e.g. anthropics/claude-code)", variant: "error", duration: 3000 })
+          toast.show({
+            message: "Invalid source format. Use: owner/repo (e.g. anthropics/claude-code)",
+            variant: "error",
+            duration: 3000,
+          })
           return
         }
         try {
@@ -600,7 +604,11 @@ export function Prompt(props: PromptProps) {
       // /plugin marketplace refresh
       if (sub === "marketplace" && parts[2]?.toLowerCase() === "refresh") {
         clearInput()
-        toast.show({ message: "Marketplace cache cleared. Will refresh on next open.", variant: "info", duration: 3000 })
+        toast.show({
+          message: "Marketplace cache cleared. Will refresh on next open.",
+          variant: "info",
+          duration: 3000,
+        })
         return
       }
 
@@ -616,10 +624,7 @@ export function Prompt(props: PromptProps) {
         clearInput()
         try {
           const config = await sdk.client.global.config.get()
-          const sources = Array.from(new Set([
-            ...(config.data?.plugin_marketplaces ?? []),
-            "anthropics/claude-code",
-          ]))
+          const sources = Array.from(new Set([...(config.data?.plugin_marketplaces ?? []), "anthropics/claude-code"]))
 
           let foundSpec: string | undefined
           let foundName: string | undefined
@@ -638,11 +643,12 @@ export function Prompt(props: PromptProps) {
               )
               if (match && typeof match.name === "string") {
                 const itemSource = typeof match.source === "string" ? match.source : ""
-                const spec = typeof match.spec === "string"
-                  ? match.spec
-                  : itemSource.startsWith("./")
-                    ? `github:${source}/${itemSource.slice(2)}`
-                    : `github:${source}/plugins/${match.name}`
+                const spec =
+                  typeof match.spec === "string"
+                    ? match.spec
+                    : itemSource.startsWith("./")
+                      ? `github:${source}/${itemSource.slice(2)}`
+                      : `github:${source}/plugins/${match.name}`
                 return { spec, name: match.name as string }
               }
               return null
@@ -1006,7 +1012,9 @@ export function Prompt(props: PromptProps) {
           paddingRight={1}
         >
           <box flexDirection="row">
-            <text fg={highlight()} flexShrink={0}>{">"} </text>
+            <text fg={highlight()} flexShrink={0}>
+              {">"}{" "}
+            </text>
             <box flexGrow={1}>
               <textarea
                 placeholder={props.sessionID ? undefined : `Ask anything... "${PLACEHOLDERS[store.placeholder]}"`}
@@ -1094,7 +1102,8 @@ export function Prompt(props: PromptProps) {
                       return
                     }
 
-                    if (keybind.match("history_previous", e) && input.visualCursor.visualRow === 0) input.cursorOffset = 0
+                    if (keybind.match("history_previous", e) && input.visualCursor.visualRow === 0)
+                      input.cursorOffset = 0
                     if (keybind.match("history_next", e) && input.visualCursor.visualRow === input.height - 1)
                       input.cursorOffset = input.plainText.length
                   }
@@ -1187,9 +1196,7 @@ export function Prompt(props: PromptProps) {
             </box>
           </box>
           <box flexDirection="row" flexShrink={0} paddingTop={0} gap={1} paddingLeft={2}>
-            <text fg={theme.textMuted}>
-              {store.mode === "shell" ? "Shell" : local.model.parsed().model}
-            </text>
+            <text fg={theme.textMuted}>{store.mode === "shell" ? "Shell" : local.model.parsed().model}</text>
             <Show when={store.mode === "normal"}>
               <box flexDirection="row" gap={1}>
                 <text fg={theme.textMuted}>·</text>

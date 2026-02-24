@@ -2,18 +2,18 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
 import type { PromptInfo } from "../types"
 
-export type HomeRoute = {
+type HomeRoute = {
   type: "home"
   initialPrompt?: PromptInfo
 }
 
-export type SessionRoute = {
+type SessionRoute = {
   type: "session"
   sessionID: string
   initialPrompt?: PromptInfo
 }
 
-export type Route = HomeRoute | SessionRoute
+type Route = HomeRoute | SessionRoute
 
 function parseRouteEnv(raw: string): Route {
   try {
@@ -37,18 +37,12 @@ interface RouteContextValue {
 const RouteContext = createContext<RouteContextValue | undefined>(undefined)
 
 export function RouteProvider(props: { children: ReactNode }) {
-  const initial = process.env["LOBSTER_ROUTE"]
-    ? parseRouteEnv(process.env["LOBSTER_ROUTE"])
-    : { type: "home" as const }
+  const initial = process.env["LOBSTER_ROUTE"] ? parseRouteEnv(process.env["LOBSTER_ROUTE"]) : { type: "home" as const }
 
   const [route, setRoute] = useState<Route>(initial)
   const navigate = useCallback((r: Route) => setRoute(r), [])
 
-  return (
-    <RouteContext.Provider value={{ data: route, navigate }}>
-      {props.children}
-    </RouteContext.Provider>
-  )
+  return <RouteContext.Provider value={{ data: route, navigate }}>{props.children}</RouteContext.Provider>
 }
 
 export function useRoute() {
@@ -57,4 +51,4 @@ export function useRoute() {
   return ctx
 }
 
-export type RouteContext = ReturnType<typeof useRoute>
+type RouteContext = ReturnType<typeof useRoute>

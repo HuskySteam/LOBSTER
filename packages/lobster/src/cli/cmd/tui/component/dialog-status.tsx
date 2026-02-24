@@ -5,7 +5,7 @@ import { useSync } from "@tui/context/sync"
 import { For, Match, Switch, Show, createMemo, createSignal } from "solid-js"
 import { Installation } from "@/installation"
 
-export type DialogStatusProps = {}
+type DialogStatusProps = {}
 
 export function DialogStatus() {
   const sync = useSync()

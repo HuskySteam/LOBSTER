@@ -5,7 +5,7 @@ import { useRoute } from "./route"
 import { markGlobalHotkeyConsumed } from "../ui/hotkey-input-guard"
 import { isCtrlCharacterForLetter, isCtrlShortcut } from "../ui/hotkey"
 
-export interface KeybindAction {
+interface KeybindAction {
   key: string
   ctrl?: boolean
   meta?: boolean
@@ -106,11 +106,7 @@ export function KeybindProvider(props: { children: ReactNode }) {
     [setBlocker, register, unregister],
   )
 
-  return (
-    <KeybindContext.Provider value={value}>
-      {props.children}
-    </KeybindContext.Provider>
-  )
+  return <KeybindContext.Provider value={value}>{props.children}</KeybindContext.Provider>
 }
 
 export function useKeybind(): KeybindContextValue {

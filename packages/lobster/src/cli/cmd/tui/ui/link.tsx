@@ -2,7 +2,7 @@ import type { JSX } from "solid-js"
 import type { RGBA } from "@opentui/core"
 import open from "open"
 
-export interface LinkProps {
+interface LinkProps {
   href: string
   children?: JSX.Element | string
   fg?: RGBA

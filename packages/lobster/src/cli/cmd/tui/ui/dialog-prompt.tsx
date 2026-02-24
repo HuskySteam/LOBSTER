@@ -4,7 +4,7 @@ import { useDialog, type DialogContext } from "./dialog"
 import { createSignal, onMount, type JSX } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 
-export type DialogPromptProps = {
+type DialogPromptProps = {
   title: string
   description?: () => JSX.Element
   placeholder?: string

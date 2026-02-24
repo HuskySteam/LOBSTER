@@ -139,31 +139,35 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
           {(props.request.metadata.diff as string)
             .split("\n")
             .slice(0, 10)
-            .map((line, i) => (
+            .map((line) => (
               <Text
-                key={i}
+                key={line}
                 color={
-                  line.startsWith("+") ? tokens.status.success
-                    : line.startsWith("-") ? tokens.status.error
-                    : tokens.text.muted
+                  line.startsWith("+")
+                    ? tokens.status.success
+                    : line.startsWith("-")
+                      ? tokens.status.error
+                      : tokens.text.muted
                 }
               >
                 {line}
               </Text>
             ))}
           {(props.request.metadata.diff as string).split("\n").length > 10 ? (
-            <Text color={tokens.text.muted}>... ({(props.request.metadata.diff as string).split("\n").length - 10} more lines)</Text>
+            <Text color={tokens.text.muted}>
+              ... ({(props.request.metadata.diff as string).split("\n").length - 10} more lines)
+            </Text>
           ) : null}
         </Box>
       ) : null}
 
       <Box marginTop={1} gap={1}>
-        {options.map((opt, i) => (
-          <Box key={i} paddingLeft={1} paddingRight={1}>
+        {options.map((opt, index) => (
+          <Box key={opt} paddingLeft={1} paddingRight={1}>
             <Text
-              color={i === selected ? tokens.text.primary : tokens.text.muted}
-              bold={i === selected}
-              inverse={i === selected}
+              color={index === selected ? tokens.text.primary : tokens.text.muted}
+              bold={index === selected}
+              inverse={index === selected}
             >
               {` ${opt} `}
             </Text>

@@ -6,7 +6,7 @@ import { createSignal, For } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 import { Locale } from "@/util/locale"
 
-export type DialogConfirmProps = {
+type DialogConfirmProps = {
   title: string
   message: string
   onConfirm?: () => void

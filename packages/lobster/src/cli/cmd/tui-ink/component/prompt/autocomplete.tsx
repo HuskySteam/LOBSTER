@@ -21,10 +21,7 @@ export function Autocomplete({ options, selected, maxVisible = 8 }: Autocomplete
   const { theme } = useTheme()
   const tokens = useDesignTokens()
   const { stdout } = useStdout()
-  const popupWidth = useMemo(
-    () => Math.max(30, Math.min(120, (stdout?.columns ?? 80) - 4)),
-    [stdout?.columns],
-  )
+  const popupWidth = useMemo(() => Math.max(30, Math.min(120, (stdout?.columns ?? 80) - 4)), [stdout?.columns])
   const contentWidth = useMemo(() => Math.max(20, popupWidth - 4), [popupWidth])
   const layout = useMemo(() => computeAutocompleteLayout(contentWidth), [contentWidth])
 
@@ -65,11 +62,7 @@ export function Autocomplete({ options, selected, maxVisible = 8 }: Autocomplete
         const label = truncateWithEllipsis(opt.label, layout.labelWidth).padEnd(layout.labelWidth, " ")
         const description = truncateWithEllipsis(opt.description ?? "", layout.descriptionWidth)
         return (
-          <Box
-            key={opt.value + idx}
-            flexDirection="row"
-            overflow="hidden"
-          >
+          <Box key={`${opt.value}:${opt.label}`} flexDirection="row" overflow="hidden">
             <Text
               color={isSelected ? tokens.list.selectedText : theme.text}
               bold={isSelected}

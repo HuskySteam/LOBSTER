@@ -18,7 +18,7 @@ export interface DialogSelectOption<T = any> {
   disabled?: boolean
 }
 
-export interface DialogSelectProps<T> {
+interface DialogSelectProps<T> {
   title: string
   placeholder?: string
   options: DialogSelectOption<T>[]
@@ -86,10 +86,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   }, [filtered])
 
   const flat = useMemo(() => grouped.flatMap(([, items]) => items), [grouped])
-  const activeKeybinds = useMemo(
-    () => (props.keybind ?? []).filter((x) => !x.disabled && x.keybind),
-    [props.keybind],
-  )
+  const activeKeybinds = useMemo(() => (props.keybind ?? []).filter((x) => !x.disabled && x.keybind), [props.keybind])
 
   useEffect(() => {
     if (flat.length === 0) {
@@ -115,10 +112,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     },
     [props.onFilter],
   )
-  const guardedFilterChange = useMemo(
-    () => wrapOnChange(handleFilter),
-    [handleFilter, wrapOnChange],
-  )
+  const guardedFilterChange = useMemo(() => wrapOnChange(handleFilter), [handleFilter, wrapOnChange])
 
   useEffect(() => {
     const next = selected >= 0 && selected < flat.length ? flat[selected] : undefined
@@ -175,6 +169,16 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
   const visibleItems = useMemo(() => flat.slice(scrollOffset, scrollOffset + maxVisible), [flat, scrollOffset])
 
+  const optionKey = useCallback((opt: DialogSelectOption<T>) => {
+    let value = ""
+    try {
+      value = JSON.stringify(opt.value)
+    } catch {
+      value = String(opt.value)
+    }
+    return `${opt.category ?? ""}:${opt.title}:${value}`
+  }, [])
+
   let globalIndex = scrollOffset
 
   return (
@@ -183,30 +187,21 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
       <Box marginTop={1}>
         <Text color={tokens.text.accent}>{"> "}</Text>
-        <TextInput
-          value={filter}
-          onChange={guardedFilterChange}
-          placeholder={props.placeholder ?? "Search..."}
-        />
+        <TextInput value={filter} onChange={guardedFilterChange} placeholder={props.placeholder ?? "Search..."} />
       </Box>
 
       {flat.length === 0 ? (
         <EmptyState title="No results found" detail="Adjust your search query." />
       ) : (
         <Box flexDirection="column" marginTop={1}>
-          {scrollOffset > 0 && <Text color={tokens.text.muted}>  ... {scrollOffset} more above</Text>}
+          {scrollOffset > 0 && <Text color={tokens.text.muted}> ... {scrollOffset} more above</Text>}
           {visibleItems.map((opt) => {
             const idx = globalIndex++
             const isSelected = idx === selected
             const isCurrent = props.current !== undefined && isEqual(opt.value, props.current as T)
             const marker = isSelected ? ">" : " "
             return (
-              <Box
-                key={`${idx}:${opt.title}`}
-                flexDirection="row"
-                paddingLeft={1}
-                paddingRight={1}
-              >
+              <Box key={optionKey(opt)} flexDirection="row" paddingLeft={1} paddingRight={1}>
                 <Text
                   color={isSelected ? tokens.list.selectedText : tokens.list.marker}
                   backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
@@ -251,7 +246,9 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
             )
           })}
           {scrollOffset + maxVisible < flat.length && (
-            <Text color={tokens.text.muted}>{"  "}... {flat.length - scrollOffset - maxVisible} more below</Text>
+            <Text color={tokens.text.muted}>
+              {"  "}... {flat.length - scrollOffset - maxVisible} more below
+            </Text>
           )}
         </Box>
       )}

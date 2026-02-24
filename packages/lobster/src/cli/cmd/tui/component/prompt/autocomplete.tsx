@@ -51,7 +51,7 @@ export type AutocompleteRef = {
   visible: false | "@" | "/"
 }
 
-export type AutocompleteOption = {
+type AutocompleteOption = {
   display: string
   value?: string
   aliases?: string[]

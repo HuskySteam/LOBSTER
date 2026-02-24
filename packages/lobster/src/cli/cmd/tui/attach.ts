@@ -55,7 +55,7 @@ export const AttachCommand = cmd({
       headers,
     }
     if (args.ui === "ink") {
-      const { tui: inkTui } = await import("@tui-ink/app")
+      const { tui: inkTui } = await import("../tui-ink/app")
       await inkTui(tuiOptions)
     } else {
       await tui(tuiOptions)
