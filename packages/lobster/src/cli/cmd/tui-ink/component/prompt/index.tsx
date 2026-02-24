@@ -44,7 +44,7 @@ import {
 } from "../plugin-marketplace"
 import { Spinner } from "../spinner"
 import { Autocomplete, type AutocompleteOption } from "./autocomplete"
-import { normalizePromptInput } from "./input-normalize"
+import { getTriggerDeleteFallback, normalizePromptInput } from "./input-normalize"
 import { BUILT_IN_COMMANDS, parseSlashCommand, resolveBuiltInCommand } from "./command-registry"
 import { Clipboard } from "@tui/util/clipboard"
 import { formatTranscript } from "@tui/util/transcript"
@@ -900,6 +900,16 @@ export function Prompt(props: PromptProps) {
     }
 
     if (isDialogOpen) return
+
+    const deleteFallback = getTriggerDeleteFallback(input, {
+      acMode,
+      acTriggerPos,
+      isDeleteKey: !!key.backspace,
+    })
+    if (deleteFallback !== undefined) {
+      handleInputChange(deleteFallback)
+      return
+    }
 
     if (acMode && filteredOptions.length > 0) {
       if (key.upArrow) {

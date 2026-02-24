@@ -1,5 +1,7 @@
 const CONTROL_CHAR = /[\u0000-\u001f\u007f-\u009f]/
 
+export type PromptAutocompleteMode = false | "/" | "@"
+
 function removeLastCodePoint(input: string) {
   if (!input) return input
   const lastIndex = input.length - 1
@@ -23,4 +25,25 @@ export function normalizePromptInput(input: string) {
     output += char
   }
   return output
+}
+
+export function getTriggerDeleteFallback(input: string, opts: {
+  acMode: PromptAutocompleteMode
+  acTriggerPos: number
+  isDeleteKey: boolean
+}) {
+  if (!opts.isDeleteKey) return undefined
+
+  if (opts.acMode === "/") {
+    if (input === "/") return ""
+    return undefined
+  }
+
+  if (opts.acMode === "@") {
+    if (opts.acTriggerPos < 0 || opts.acTriggerPos > input.length) return undefined
+    if (input.slice(opts.acTriggerPos) !== "@") return undefined
+    return input.slice(0, opts.acTriggerPos)
+  }
+
+  return undefined
 }

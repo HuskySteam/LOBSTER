@@ -298,6 +298,55 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: "prompt-trigger-backspace-critical",
+    title: "Prompt clears slash and mention triggers immediately on backspace",
+    category: "critical",
+    widths: [100],
+    startupWaitMs: 45_000,
+    steps: [
+      { kind: "text", text: "/", note: "Open slash autocomplete" },
+      { kind: "wait", ms: 250 },
+      {
+        kind: "capture",
+        label: "slash-open",
+        expectation: {
+          required: ["enter/tab select"],
+          forbidden: ["^P commands"],
+        },
+      },
+      { kind: "keys", keys: ["BSpace"], note: "Delete slash trigger" },
+      { kind: "wait", ms: 250 },
+      {
+        kind: "capture",
+        label: "slash-cleared",
+        expectation: {
+          required: ["[build]", "Type a message", "^P commands"],
+          forbidden: ["> /", "enter/tab select"],
+        },
+      },
+      { kind: "text", text: "@", note: "Open mention autocomplete" },
+      { kind: "wait", ms: 250 },
+      {
+        kind: "capture",
+        label: "mention-open",
+        expectation: {
+          required: ["enter/tab select"],
+          forbidden: ["^P commands"],
+        },
+      },
+      { kind: "keys", keys: ["BSpace"], note: "Delete mention trigger" },
+      { kind: "wait", ms: 250 },
+      {
+        kind: "capture",
+        label: "mention-cleared",
+        expectation: {
+          required: ["[build]", "Type a message", "^P commands"],
+          forbidden: ["> @", "enter/tab select"],
+        },
+      },
+    ],
+  },
+  {
     id: "command-search-session-critical",
     title: "Command search filters session-related entries",
     category: "critical",
