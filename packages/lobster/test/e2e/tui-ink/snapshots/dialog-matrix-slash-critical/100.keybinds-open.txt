@@ -2,28 +2,28 @@
   │  Keyboard Shortcuts                                                               esc close  │
   │                                                                                              │
   │  Session                                                                                     │
-  │   Browse sessions                                                                    Ctrl+S  │
+  │   Browse logbook                                                                     Ctrl+S  │
   │   Interrupt agent                                                                    Ctrl+C  │
-  │   Exit                                                                          Ctrl+C (×2)  │
+  │   Exit                                                                          Ctrl+C (x2)  │
   │                                                                                              │
   │  Agent & Model                                                                               │
   │   Cycle agent                                                                           Tab  │
   │   Pick agent                                                                         Ctrl+A  │
   │   Pick model                                                                         Ctrl+M  │
   │                                                                                              │
-  │  Navigation                                                                                  │
-  │   Command palette                                                                    Ctrl+P  │
-  │   Connect provider                                                                   Ctrl+O  │
-  │   Toggle sidebar                                                                     Ctrl+T  │
+  │  Layout                                                                                      │
+  │   Command palette                                                           Ctrl+K (Ctrl+P)  │
+  │   Connect engine                                                                     Ctrl+O  │
+  │   Cycle dock side                                                                    Ctrl+T  │
+  │   Quick-switch tabs                                                                Alt+1..4  │
+  │   Vim tab nav                                                                 Alt+H / Alt+L  │
+  │   Vim panel nav                                                               Alt+J / Alt+K  │
+  │   Expand activity                                                                     Alt+E  │
   │                                                                                              │
   │  System                                                                                      │
   │   Keyboard shortcuts                                                                 Ctrl+/  │
   │                                                                                              │
   │  enter/esc close                                                                             │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │

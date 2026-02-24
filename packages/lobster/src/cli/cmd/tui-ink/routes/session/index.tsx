@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { useTheme } from "../../theme"
 import { useAppStore } from "../../store"
 import { useSDK } from "../../context/sdk"
+import { useLocal } from "../../context/local"
 import { useKeybind } from "../../context/keybind"
 import { Prompt } from "../../component/prompt"
 import { ActivityBar } from "../../component/activity-bar"
@@ -15,6 +16,14 @@ import { QuestionPrompt } from "./question"
 import { Identifier } from "@/id/id"
 import { KeyHints, PanelHeader, StatusBadge } from "../../ui/chrome"
 import { separator, useDesignTokens } from "../../ui/design"
+import {
+  PANEL_TABS,
+  cycleDockSide,
+  cyclePanelTab,
+  resolveInteractionMode,
+  type DockSide,
+  type PanelTab,
+} from "./layout-model"
 
 const EMPTY_MESSAGES: never[] = []
 const EMPTY_PERMISSIONS: never[] = []
@@ -137,22 +146,30 @@ export function Session(props: { sessionID: string }) {
   const { theme } = useTheme()
   const tokens = useDesignTokens()
   const { sync } = useSDK()
+  const local = useLocal()
   const { stdout } = useStdout()
   const keybind = useKeybind()
-  const [showSidebar, setShowSidebar] = useState(false)
+  const [dockSide, setDockSide] = useState<DockSide>("right")
+  const [panelTab, setPanelTab] = useState<PanelTab>("context")
   const [showThinking, setShowThinking] = useState(true)
   const [showTimestamps, setShowTimestamps] = useState(false)
+  const [promptPlanning, setPromptPlanning] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
   const [scrollOffset, setScrollOffset] = useState(0)
+  const [diffCursor, setDiffCursor] = useState(0)
+  const [activityCursor, setActivityCursor] = useState(0)
+  const [expandedActivity, setExpandedActivity] = useState(false)
   const session = useAppStore((s) =>
     s.session.find((ses) => ses.id === props.sessionID),
   )
+  const providers = useAppStore((s) => s.provider)
   const messages = useAppStore((s) => s.message[props.sessionID] ?? EMPTY_MESSAGES)
   const parts = useAppStore((s) => s.part)
   const permissions = useAppStore((s) => s.permission[props.sessionID] ?? EMPTY_PERMISSIONS)
   const questions = useAppStore((s) => s.question[props.sessionID] ?? EMPTY_QUESTIONS)
+  const sessionStatus = useAppStore((s) => s.session_status[props.sessionID])
 
-  // Scroll viewport — estimate rendered lines per message to avoid clipping
+  // Scroll viewport - estimate rendered lines per message to avoid clipping
   const termHeight = stdout?.rows ?? 24
   const termCols = stdout?.columns ?? 80
   
@@ -172,9 +189,10 @@ export function Session(props: { sessionID: string }) {
     promptLines += 10
   }
 
+  const panelWidth = dockSide === "hidden" ? 0 : 42
   const availableRows = Math.max(termHeight - 12 - promptLines, 5)
-  // Usable width after paddingLeft(2) + paddingRight(2) and sidebar
-  const contentWidth = Math.max(termCols - (showSidebar ? 42 : 4), 20)
+  // Usable width after shell padding and optional docked panel
+  const contentWidth = Math.max(termCols - panelWidth - 4, 20)
 
   const estimateLines = useCallback(
     (msg: { id: string; role: string; agent?: string }) => {
@@ -274,18 +292,55 @@ export function Session(props: { sessionID: string }) {
     setScrollOffset((prev) => (prev === nextOffset ? prev : nextOffset))
   }, [autoScroll, messages, availableRows, estimateLines])
 
-  // Register sidebar toggle keybinding
   useEffect(() => {
-    keybind.register("toggle-sidebar", {
+    if (panelTab !== "activity") setExpandedActivity(false)
+  }, [panelTab])
+
+  const isBusy = sessionStatus?.type === "busy"
+  const interactionMode = resolveInteractionMode({
+    activeTab: panelTab,
+    isBusy,
+    isPlanning: promptPlanning,
+  })
+
+  // Register panel and dock keybindings
+  useEffect(() => {
+    keybind.register("dock-cycle", {
       key: "t",
       ctrl: true,
-      description: "Toggle sidebar",
-      action: () => setShowSidebar((prev) => !prev),
+      description: "Cycle dock panel",
+      action: () => setDockSide((prev) => cycleDockSide(prev)),
     })
-    return () => keybind.unregister("toggle-sidebar")
+    keybind.register("panel-prev", {
+      key: "h",
+      meta: true,
+      description: "Previous panel tab",
+      action: () => setPanelTab((prev) => cyclePanelTab(prev, -1)),
+    })
+    keybind.register("panel-next", {
+      key: "l",
+      meta: true,
+      description: "Next panel tab",
+      action: () => setPanelTab((prev) => cyclePanelTab(prev, 1)),
+    })
+    PANEL_TABS.forEach((tab, index) => {
+      keybind.register(`panel-tab-${tab}`, {
+        key: String(index + 1),
+        meta: true,
+        description: `Open ${tab} panel`,
+        action: () => setPanelTab(tab),
+      })
+    })
+
+    return () => {
+      keybind.unregister("dock-cycle")
+      keybind.unregister("panel-prev")
+      keybind.unregister("panel-next")
+      PANEL_TABS.forEach((tab) => keybind.unregister(`panel-tab-${tab}`))
+    }
   }, [keybind.register, keybind.unregister])
 
-  // Register scroll keybindings — step by ~half-page worth of messages
+  // Register scroll keybindings - step by ~half-page worth of messages
   const halfPage = Math.max(1, Math.floor(availableRows / 6))
   useEffect(() => {
     keybind.register("scroll-up", {
@@ -305,17 +360,58 @@ export function Session(props: { sessionID: string }) {
         if (messages.length === 0) return
         setScrollOffset((s) => {
           const next = Math.min(messages.length - 1, s + halfPage)
-          // Re-enable auto-scroll when near the bottom
           if (next >= messages.length - halfPage - 1) setAutoScroll(true)
           return next
         })
       },
     })
+    keybind.register("panel-cursor-up", {
+      key: "k",
+      meta: true,
+      description: "Move panel selection up",
+      action: () => {
+        if (panelTab === "diff") {
+          setDiffCursor((current) => Math.max(0, current - 1))
+          return
+        }
+        if (panelTab === "activity") {
+          setActivityCursor((current) => Math.max(0, current - 1))
+          return
+        }
+      },
+    })
+    keybind.register("panel-cursor-down", {
+      key: "j",
+      meta: true,
+      description: "Move panel selection down",
+      action: () => {
+        if (panelTab === "diff") {
+          setDiffCursor((current) => current + 1)
+          return
+        }
+        if (panelTab === "activity") {
+          setActivityCursor((current) => current + 1)
+          return
+        }
+      },
+    })
+    keybind.register("panel-expand", {
+      key: "e",
+      meta: true,
+      description: "Expand activity details",
+      action: () => {
+        if (panelTab !== "activity") return
+        setExpandedActivity((current) => !current)
+      },
+    })
     return () => {
       keybind.unregister("scroll-up")
       keybind.unregister("scroll-down")
+      keybind.unregister("panel-cursor-up")
+      keybind.unregister("panel-cursor-down")
+      keybind.unregister("panel-expand")
     }
-  }, [keybind.register, keybind.unregister, halfPage, messages.length])
+  }, [keybind.register, keybind.unregister, halfPage, messages.length, panelTab])
 
   // Sync session data on mount
   useEffect(() => {
@@ -338,38 +434,74 @@ export function Session(props: { sessionID: string }) {
 
   const title = session?.title ?? "Untitled"
   const cols = stdout?.columns ?? 80
-  const divider = separator(Math.max(Math.min(cols - (showSidebar ? 42 : 4), 120), 10))
+  const divider = separator(Math.max(Math.min(cols - panelWidth - 4, 120), 10))
 
   return (
     <Box flexDirection="row" height="100%">
-      {/* Main panel */}
+      {dockSide === "left" && (
+        <Sidebar
+          sessionID={props.sessionID}
+          activeTab={panelTab}
+          onSelectTab={setPanelTab}
+          dockSide="left"
+          diffCursor={diffCursor}
+          activityCursor={activityCursor}
+          expandedActivity={expandedActivity}
+        />
+      )}
+
       <Box flexDirection="column" flexGrow={1}>
-        {/* Header */}
-        <Box paddingLeft={2} paddingRight={2} flexShrink={0}>
+        <Box paddingLeft={1} paddingRight={1} flexShrink={0}>
+          <Box justifyContent="space-between">
+            <Box gap={1}>
+              <Text color={tokens.text.muted} dimColor>
+                ~lob~
+              </Text>
+              <StatusBadge
+                tone={
+                  interactionMode === "EXEC"
+                    ? "warning"
+                    : interactionMode === "DIFF"
+                      ? "accent"
+                      : interactionMode === "PLAN"
+                        ? "success"
+                        : "muted"
+                }
+                label={`MODE ${interactionMode}`}
+              />
+              <StatusBadge tone="muted" label={`TAB ${panelTab.toUpperCase()}`} />
+              <StatusBadge tone="muted" label={`DOCK ${dockSide}`} />
+            </Box>
+            <Box gap={1}>
+              <Text color={providers.length > 0 ? tokens.status.success : tokens.status.error}>
+                {providers.length > 0 ? "LED:ON connected" : "LED:OFF disconnected"}
+              </Text>
+              <Text color={tokens.text.muted}>engine {local.model.parsed().provider}</Text>
+            </Box>
+          </Box>
+        </Box>
+
+        <Box paddingLeft={1} paddingRight={1} flexShrink={0}>
           <PanelHeader
-            title="Session"
+            title="Workspace"
             subtitle={title.length > 60 ? title.slice(0, 57) + "..." : title}
-            right={`${messages.length} msg`}
+            right={`${messages.length} msg | ${sessionStatus?.type ?? "idle"}`}
           />
         </Box>
 
-        <Box paddingLeft={2} paddingRight={2} gap={1} flexShrink={0}>
+        <Box paddingLeft={1} paddingRight={1} gap={1} flexShrink={0}>
           <StatusBadge tone="accent" label={showThinking ? "thinking on" : "thinking off"} />
           <StatusBadge tone={showTimestamps ? "success" : "muted"} label={showTimestamps ? "time on" : "time off"} />
         </Box>
 
-        <Box paddingLeft={2} paddingRight={2} flexShrink={0}>
+        <Box paddingLeft={1} paddingRight={1} flexShrink={0}>
           <Text color={tokens.text.muted}>{divider}</Text>
         </Box>
 
-        {/* Activity bar */}
         <ActivityBar sessionID={props.sessionID} />
 
-        {/* Messages area */}
-        <Box flexDirection="column" flexGrow={1} paddingLeft={2} paddingRight={2} overflow="hidden">
-          {hasAbove && (
-            <Text color={theme.textMuted}>  ... {aboveCount} more above (Ctrl+U to scroll up)</Text>
-          )}
+        <Box flexDirection="column" flexGrow={1} paddingLeft={1} paddingRight={1} overflow="hidden">
+          {hasAbove && <Text color={theme.textMuted}>  ... {aboveCount} more above (Ctrl+U to scroll up)</Text>}
           {visibleMessages.map((msg) => (
             <MessageRow
               key={msg.id}
@@ -380,46 +512,62 @@ export function Session(props: { sessionID: string }) {
               showTimestamps={showTimestamps}
             />
           ))}
-          {hasBelow && (
-            <Text color={theme.textMuted}>  ... {belowCount} more below (Ctrl+D to scroll down)</Text>
-          )}
+          {hasBelow && <Text color={theme.textMuted}>  ... {belowCount} more below (Ctrl+D to scroll down)</Text>}
         </Box>
 
-        {/* Permission prompts */}
         {permissions.map((req) => (
           <PermissionPrompt key={req.id} request={req} />
         ))}
 
-        {/* Question prompts */}
         {questions.map((req) => (
           <QuestionPrompt key={req.id} request={req} />
         ))}
 
-        {/* Footer: cost + prompt */}
         <Box flexDirection="column" flexShrink={0}>
-          <Box paddingLeft={2} paddingRight={2}>
+          <Box paddingLeft={1} paddingRight={1}>
             <Text color={tokens.text.muted}>{divider}</Text>
           </Box>
-          <Box paddingLeft={2} justifyContent="space-between" paddingRight={2}>
+          <Box paddingLeft={1} justifyContent="space-between" paddingRight={1}>
             <CostTracker sessionID={props.sessionID} />
-            <Text color={tokens.text.muted}>scroll + layout controls</Text>
+            <Text color={tokens.text.muted}>compact workspace shell</Text>
           </Box>
-          <Box paddingLeft={2} paddingRight={2}>
-            <KeyHints items={["Ctrl+U up", "Ctrl+D down", "Ctrl+T sidebar"]} />
+          <Box paddingLeft={1} paddingRight={1}>
+            <KeyHints
+              items={[
+                "Ctrl+K palette",
+                "Ctrl+U/D scroll",
+                "Alt+H/L tabs",
+                "Alt+1..4 quick-switch",
+                "Alt+J/K nav",
+                "Ctrl+T dock",
+              ]}
+            />
           </Box>
           <Prompt
             sessionID={props.sessionID}
             onSubmit={handleSubmit}
             showThinking={showThinking}
             showTimestamps={showTimestamps}
+            activePanelTab={panelTab}
             onToggleThinking={() => setShowThinking((prev) => !prev)}
             onToggleTimestamps={() => setShowTimestamps((prev) => !prev)}
+            onPlanningChange={setPromptPlanning}
           />
         </Box>
       </Box>
 
-      {/* Sidebar */}
-      {showSidebar && <Sidebar sessionID={props.sessionID} />}
+      {dockSide === "right" && (
+        <Sidebar
+          sessionID={props.sessionID}
+          activeTab={panelTab}
+          onSelectTab={setPanelTab}
+          dockSide="right"
+          diffCursor={diffCursor}
+          activityCursor={activityCursor}
+          expandedActivity={expandedActivity}
+        />
+      )}
     </Box>
   )
 }
+

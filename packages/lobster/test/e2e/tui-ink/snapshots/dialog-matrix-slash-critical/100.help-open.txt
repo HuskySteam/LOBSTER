@@ -4,7 +4,12 @@
   │  Tab           Cycle agent                                                                   │
   │  Ctrl+M        Select model                                                                  │
   │  Ctrl+A        Select agent                                                                  │
-  │  Ctrl+S        Session list                                                                  │
+  │  Ctrl+S        Logbook list                                                                  │
+  │  Ctrl+K        Command palette                                                               │
+  │  Ctrl+T        Cycle dock side                                                               │
+  │  Alt+1..4      Quick-switch panel tabs                                                       │
+  │  Alt+H/L       Vim tab navigation                                                            │
+  │  Alt+J/K       Vim panel navigation                                                          │
   │  Ctrl+C        Interrupt / Exit                                                              │
   │  Esc           Close dialog                                                                  │
   │  Enter         Submit / Select                                                               │
@@ -12,11 +17,6 @@
   │  [enter/esc close]                                                                           │
   │                                                                                              │
   │  enter close  esc close                                                                      │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │

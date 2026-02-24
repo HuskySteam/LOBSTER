@@ -56,9 +56,9 @@ type HotkeyMatrixEntry = {
 }
 
 const DIALOG_CLOSED_EXPECTATION: ScenarioExpectation = {
-  required: ["[build]", "Type a message"],
+  required: ["[build]"],
   forbidden: ["esc close"],
-  softRequired: ["^P commands"],
+  softRequired: ["^K palette"],
 }
 
 const SLASH_DIALOG_MATRIX: DialogMatrixEntry[] = [
@@ -167,8 +167,8 @@ const HOTKEY_DIALOG_MATRIX: HotkeyMatrixEntry[] = [
   },
   {
     id: "commands",
-    key: "C-p",
-    leakedPrompt: "> p",
+    key: "C-k",
+    leakedPrompt: "> k",
     openExpectation: {
       required: ["Commands", "Search commands", "esc close"],
       softRequired: ["/connect", "/model", "/agent"],
@@ -252,8 +252,8 @@ const SCENARIOS: ScenarioDefinition[] = [
     startupWaitMs: 45_000,
     steps: [],
     finalExpectation: {
-      required: ["LOBSTER Code", "[build]", "Type a message"],
-      softRequired: ["Welcome back", "Operator Notes", "^P commands"],
+      required: ["LOBSTER Workspace", "MODE NORMAL", "[build]"],
+      softRequired: ["Welcome back", "Operator Notes", "^K palette"],
     },
   },
   {
@@ -263,14 +263,14 @@ const SCENARIOS: ScenarioDefinition[] = [
     widths: [100],
     startupWaitMs: 45_000,
     steps: [
-      { kind: "keys", keys: ["C-p"], note: "Open command palette with hotkey" },
+      { kind: "keys", keys: ["C-k"], note: "Open command palette with hotkey" },
       { kind: "wait", ms: 700 },
       {
         kind: "capture",
         label: "open",
         expectation: {
           required: ["Commands", "Search commands", "esc close"],
-          forbidden: ["> p"],
+          forbidden: ["> k"],
           softRequired: ["/connect", "/model", "/agent"],
         },
       },
@@ -283,7 +283,7 @@ const SCENARIOS: ScenarioDefinition[] = [
     widths: [100],
     startupWaitMs: 45_000,
     steps: [
-      { kind: "keys", keys: ["C-p"] },
+      { kind: "keys", keys: ["C-k"] },
       { kind: "wait", ms: 700 },
       { kind: "keys", keys: ["Escape"], note: "Close palette" },
       { kind: "wait", ms: 300 },
@@ -291,8 +291,8 @@ const SCENARIOS: ScenarioDefinition[] = [
         kind: "capture",
         label: "closed",
         expectation: {
-          required: ["[build]", "Type a message"],
-          forbidden: ["Commands", "Search commands", "esc close", "> p"],
+          required: ["[build]"],
+          forbidden: ["Commands", "Search commands", "esc close", "> k"],
         },
       },
     ],
@@ -311,7 +311,7 @@ const SCENARIOS: ScenarioDefinition[] = [
         label: "slash-open",
         expectation: {
           required: ["enter/tab select"],
-          forbidden: ["^P commands"],
+          forbidden: ["^K palette"],
         },
       },
       { kind: "keys", keys: ["BSpace"], note: "Delete slash trigger" },
@@ -320,7 +320,7 @@ const SCENARIOS: ScenarioDefinition[] = [
         kind: "capture",
         label: "slash-cleared",
         expectation: {
-          required: ["[build]", "Type a message", "^P commands"],
+          required: ["[build]", "^K palette"],
           forbidden: ["> /", "enter/tab select"],
         },
       },
@@ -331,7 +331,7 @@ const SCENARIOS: ScenarioDefinition[] = [
         label: "mention-open",
         expectation: {
           required: ["enter/tab select"],
-          forbidden: ["^P commands"],
+          forbidden: ["^K palette"],
         },
       },
       { kind: "keys", keys: ["BSpace"], note: "Delete mention trigger" },
@@ -340,7 +340,7 @@ const SCENARIOS: ScenarioDefinition[] = [
         kind: "capture",
         label: "mention-cleared",
         expectation: {
-          required: ["[build]", "Type a message", "^P commands"],
+          required: ["[build]", "^K palette"],
           forbidden: ["> @", "enter/tab select"],
         },
       },
@@ -353,7 +353,7 @@ const SCENARIOS: ScenarioDefinition[] = [
     widths: [100],
     startupWaitMs: 45_000,
     steps: [
-      { kind: "keys", keys: ["C-p"] },
+      { kind: "keys", keys: ["C-k"] },
       { kind: "wait", ms: 600 },
       { kind: "text", text: "session", note: "Type query in command search input" },
       { kind: "wait", ms: 450 },
@@ -363,7 +363,7 @@ const SCENARIOS: ScenarioDefinition[] = [
         expectation: {
           required: ["Commands", "session"],
           oneOf: [["/sessions", "Browse sessions"]],
-          forbidden: ["> p"],
+          forbidden: ["> k"],
         },
       },
     ],
@@ -411,7 +411,7 @@ const SCENARIOS: ScenarioDefinition[] = [
         kind: "capture",
         label: "closed",
         expectation: {
-          required: ["[build]", "Type a message"],
+          required: ["[build]"],
           forbidden: ["Sessions", "No results found", "> d", "> r", "> dr"],
         },
       },
@@ -458,7 +458,7 @@ const SCENARIOS: ScenarioDefinition[] = [
         kind: "capture",
         label: "closed",
         expectation: {
-          required: ["[build]", "Type a message"],
+          required: ["[build]"],
           forbidden: ["Plugin Manager", "esc close", "> /plugin marketplace"],
         },
       },
@@ -472,8 +472,8 @@ const SCENARIOS: ScenarioDefinition[] = [
     startupWaitMs: 45_000,
     steps: [],
     finalExpectation: {
-      required: ["[build]", "Type a message"],
-      softRequired: ["LOBSTER Code", "Welcome back"],
+      required: ["[build]"],
+      softRequired: ["LOBSTER Workspace", "Welcome back"],
     },
   },
   {
@@ -483,14 +483,14 @@ const SCENARIOS: ScenarioDefinition[] = [
     widths: [...DEFAULT_RESPONSIVE_WIDTHS],
     startupWaitMs: 45_000,
     steps: [
-      { kind: "keys", keys: ["C-p"] },
+      { kind: "keys", keys: ["C-k"] },
       { kind: "wait", ms: 700 },
       {
         kind: "capture",
         label: "open",
         expectation: {
           required: ["Commands", "Search commands", "esc close"],
-          forbidden: ["> p"],
+          forbidden: ["> k"],
           softRequired: ["/connect", "/model", "/agent"],
         },
       },

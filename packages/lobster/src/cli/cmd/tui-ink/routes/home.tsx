@@ -75,7 +75,20 @@ export function Home() {
 
   return (
     <Box flexDirection="column" padding={1} height="100%">
-      <PanelHeader title="LOBSTER Code" right={hasProvider ? "connected" : "provider required"} />
+      <Box justifyContent="space-between" marginBottom={1}>
+        <Box gap={1}>
+          <Text color={tokens.text.muted} dimColor>
+            ~lob~
+          </Text>
+          <StatusBadge tone="muted" label="MODE NORMAL" />
+          <StatusBadge tone="muted" label="TAB CONTEXT" />
+        </Box>
+        <Text color={hasProvider ? tokens.status.success : tokens.status.error}>
+          {hasProvider ? "LED:ON engine connected" : "LED:OFF engine disconnected"}
+        </Text>
+      </Box>
+
+      <PanelHeader title="LOBSTER Workspace" right={hasProvider ? "connected" : "engine required"} />
 
       <Box
         borderStyle="round"
@@ -103,7 +116,7 @@ export function Home() {
 
           <Text color={tokens.text.muted}>
             Press <Text color={tokens.text.primary} bold>{hasProvider ? "/new" : "Enter"}</Text>
-            {hasProvider ? " to start a fresh session." : " or Ctrl+O to connect a provider."}
+            {hasProvider ? " to start a fresh logbook session." : " or Ctrl+O to connect an engine."}
           </Text>
         </Box>
 
@@ -150,10 +163,11 @@ export function Home() {
         </Box>
       </Box>
 
-      <KeyHints items={["tab agent", "Ctrl+M model", "Ctrl+S sessions", "Ctrl+P commands", "Ctrl+O connect"]} />
+      <KeyHints items={["tab agent", "Ctrl+M model", "Ctrl+S logbook", "Ctrl+K palette", "Ctrl+O connect"]} />
       <Box marginTop={1}>
         <Prompt onSubmit={handleSubmit} />
       </Box>
     </Box>
   )
 }
+

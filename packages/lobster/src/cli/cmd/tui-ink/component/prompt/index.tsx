@@ -58,8 +58,10 @@ interface PromptProps {
   onSubmit: (input: string, options: { agent: string; model: { providerID: string; modelID: string } }) => void
   showThinking?: boolean
   showTimestamps?: boolean
+  activePanelTab?: "context" | "logbook" | "diff" | "activity"
   onToggleThinking?: () => void
   onToggleTimestamps?: () => void
+  onPlanningChange?: (planning: boolean) => void
 }
 
 const HEALTH_ANALYSIS_PROMPT = `Analyze this project's quality and call the project_quality tool with your assessment.
@@ -121,6 +123,7 @@ export function Prompt(props: PromptProps) {
   const currentAgent = local.agent.current()
   const currentModel = local.model.current()
   const modelParsed = local.model.parsed()
+  const isPlanning = isDialogOpen || acMode === "/" || input.trimStart().startsWith("/")
 
   const refreshAfterConfigChange = useCallback(async () => {
     await sync.client.instance.dispose()
@@ -131,6 +134,10 @@ export function Prompt(props: PromptProps) {
     setBlocker("prompt-autocomplete", !!acMode)
     return () => setBlocker("prompt-autocomplete", false)
   }, [acMode, setBlocker])
+
+  useEffect(() => {
+    props.onPlanningChange?.(isPlanning)
+  }, [isPlanning, props.onPlanningChange])
 
   const fileSearchTimer = useRef<ReturnType<typeof setTimeout>>()
   const fileSearchQuery = useRef("")
@@ -746,6 +753,13 @@ export function Prompt(props: PromptProps) {
     )
   }, [acMode, input, acTriggerPos, commandOptions, mentionOptions])
 
+  const promptPlaceholder = useMemo(() => {
+    if (props.activePanelTab === "diff") return "Describe a patch, review a hunk, or request a refactor..."
+    if (props.activePanelTab === "activity") return "Inspect logs, ask for context, or continue execution..."
+    if (route.data.type === "home") return "Start from the workspace command palette (Ctrl+K) or ask directly..."
+    return "Type a message... (/ commands, @ mentions)"
+  }, [props.activePanelTab, route.data.type])
+
   const safeAcIndex = useMemo(() => {
     if (filteredOptions.length <= 0) return 0
     if (acIndex < 0) return 0
@@ -962,6 +976,11 @@ export function Prompt(props: PromptProps) {
       return
     }
 
+    if (isCtrlShortcut(ch, key, "k")) {
+      openHotkeyDialog(<DialogCommand onTrigger={handlePaletteCommand} />)
+      return
+    }
+
     if (isCtrlShortcut(ch, key, "o")) {
       openHotkeyDialog(<DialogProvider />)
       return
@@ -986,7 +1005,7 @@ export function Prompt(props: PromptProps) {
       <Box paddingLeft={2} gap={1}>
         <StatusBadge tone="accent" label={currentAgent?.name ?? "build"} />
         <StatusBadge tone="muted" label={modelParsed.model} />
-        <StatusBadge tone="muted" label={modelParsed.provider} />
+        <StatusBadge tone="muted" label={`engine ${modelParsed.provider}`} />
         {isBusy ? <Spinner color={tokens.text.accent} /> : null}
       </Box>
 
@@ -1005,7 +1024,7 @@ export function Prompt(props: PromptProps) {
             value={input}
             onChange={guardedInputChange}
             onSubmit={handleSubmit}
-            placeholder="Type a message... (/ commands, @ mentions)"
+            placeholder={promptPlaceholder}
             focus={!isDialogOpen}
           />
         )}
@@ -1013,7 +1032,7 @@ export function Prompt(props: PromptProps) {
 
       {!isBusy && !acMode && (
         <Box paddingLeft={2}>
-          <KeyHints items={["tab agent", "^M model", "^S sessions", "^P commands", "^O connect"]} />
+          <KeyHints items={["tab agent", "^M model", "^S logbook", "^K palette", "^O connect"]} />
         </Box>
       )}
       {!isBusy && acMode && (

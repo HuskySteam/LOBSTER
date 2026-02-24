@@ -18,7 +18,7 @@
   │     /review- Review loop dashboard                                       │
   │     /findings- Review findings                                           │
   │     /health- Project health dashboard                                    │
-  │    ... 16 more below                                                     │
+  │    ... 76 more below                                                     │
   │                                                                          │
   │  up/down navigate  enter select  esc close                               │
   │                                                                          │

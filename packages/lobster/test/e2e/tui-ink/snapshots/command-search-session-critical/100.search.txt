@@ -8,18 +8,18 @@
   │     /continue- resume previous session context                                               │
   │    /learn- Extract non-obvious learnings from session to AGENTS.md files to build codebase   │
   │           understanding                                                                      │
+  │     /verification-loop- A comprehensive verification system for Claude Code sessions.        │
+  │    /eval-harnes- Formal evaluation framework for Claude Code sessions implementing           │
+  │                eval-driven development (EDD) principles                                      │
+  │    /continuous-learnin- Instinct-based learning system that observes sessions via hooks,     │
+  │    -v2                creates atomic instincts with confidence scoring, and evolves them     │
+  │                       into skills/commands/agents.                                           │
+  │    /continuous-learn- Automatically extract reusable patterns from Claude Code sessions      │
+  │    ng               and save them as learned skills for future use.                          │
   │    /team- Use this when you need to coordinate multiple agents working on a complex task     │
   │         in parallel, or check team session status                                            │
   │                                                                                              │
   │  up/down navigate  enter select  esc close                                                   │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │

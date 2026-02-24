@@ -1,4 +1,6 @@
-LOBSTER Code                                                 provider required
+~lob~ [MODE NORMAL] [TAB CONTEXT]                  LED:OFF engine disconnected
+
+ LOBSTER Workspace                                              engine required
  ╭────────────────────────────────────────────────────────────────────────────╮
  │                                                                            │
  │ Welcome back rutth!                                                        │
@@ -12,7 +14,7 @@ LOBSTER Code                                                 provider required
  │                                                                            │
  │                                                                            │
  │ [no providers connected]                                                   │
- │ Press Enter or Ctrl+O to connect a provider.                               │
+ │ Press Enter or Ctrl+O to connect an engine.                                │
  │                                                                            │
  │ ────────────────────────────────────────────────────────────────────────── │
  │ Operator Notes                                                             │
@@ -27,9 +29,9 @@ LOBSTER Code                                                 provider required
  │                                                                            │
  ╰────────────────────────────────────────────────────────────────────────────╯
 
- tab agent  Ctrl+M model  Ctrl+S sessions  Ctrl+P commands  Ctrl+O connect
+ tab agent  Ctrl+M model  Ctrl+S logbook  Ctrl+K palette  Ctrl+O connect
 
-   [build] [No model] [No provider]
-  > Type a message... (/ commands, @ mentions)
+   [build] [No model] [engine No provider]
+  > Start from the workspace command palette (Ctrl+K) or ask directly...
 
-   tab agent  ^M model  ^S sessions  ^P commands  ^O connect
+   tab agent  ^M model  ^S logbook  ^K palette  ^O connect

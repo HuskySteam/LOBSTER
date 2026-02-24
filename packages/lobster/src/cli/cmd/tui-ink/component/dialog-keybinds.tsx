@@ -8,9 +8,9 @@ const KEYBIND_GROUPS = [
   {
     title: "Session",
     bindings: [
-      { action: "Browse sessions", key: "Ctrl+S" },
+      { action: "Browse logbook", key: "Ctrl+S" },
       { action: "Interrupt agent", key: "Ctrl+C" },
-      { action: "Exit", key: "Ctrl+C (×2)" },
+      { action: "Exit", key: "Ctrl+C (x2)" },
     ],
   },
   {
@@ -22,11 +22,15 @@ const KEYBIND_GROUPS = [
     ],
   },
   {
-    title: "Navigation",
+    title: "Layout",
     bindings: [
-      { action: "Command palette", key: "Ctrl+P" },
-      { action: "Connect provider", key: "Ctrl+O" },
-      { action: "Toggle sidebar", key: "Ctrl+T" },
+      { action: "Command palette", key: "Ctrl+K (Ctrl+P)" },
+      { action: "Connect engine", key: "Ctrl+O" },
+      { action: "Cycle dock side", key: "Ctrl+T" },
+      { action: "Quick-switch tabs", key: "Alt+1..4" },
+      { action: "Vim tab nav", key: "Alt+H / Alt+L" },
+      { action: "Vim panel nav", key: "Alt+J / Alt+K" },
+      { action: "Expand activity", key: "Alt+E" },
     ],
   },
   {
@@ -70,3 +74,4 @@ export function DialogKeybinds() {
     </Box>
   )
 }
+
