@@ -75,24 +75,9 @@ export function Home() {
 
   return (
     <Box flexDirection="column" padding={1} height="100%">
-      <Box justifyContent="space-between" marginBottom={1}>
-        <Box gap={1}>
-          <Text color={tokens.text.muted} dimColor>
-            ~lob~
-          </Text>
-          <StatusBadge tone="muted" label="MODE NORMAL" />
-          <StatusBadge tone="muted" label="TAB CONTEXT" />
-        </Box>
-        <Text color={hasProvider ? tokens.status.success : tokens.status.error}>
-          {hasProvider ? "LED:ON engine connected" : "LED:OFF engine disconnected"}
-        </Text>
-      </Box>
-
       <PanelHeader title="LOBSTER Workspace" right={hasProvider ? "connected" : "engine required"} />
 
       <Box
-        borderStyle="round"
-        borderColor={tokens.panel.borderActive}
         flexDirection={isCompact ? "column" : "row"}
         paddingLeft={1}
         paddingRight={1}
@@ -100,7 +85,9 @@ export function Home() {
         paddingBottom={1}
       >
         <Box flexDirection="column" flexGrow={1} paddingRight={isCompact ? 0 : 2}>
-          <Text color={tokens.text.primary} bold>Welcome back {username}!</Text>
+          <Text color={tokens.text.primary} bold>
+            Welcome back {username}!
+          </Text>
           <Box marginTop={1} marginBottom={1} alignItems={isCompact ? "flex-start" : "center"}>
             <Logo />
           </Box>
@@ -115,7 +102,10 @@ export function Home() {
           )}
 
           <Text color={tokens.text.muted}>
-            Press <Text color={tokens.text.primary} bold>{hasProvider ? "/new" : "Enter"}</Text>
+            Press{" "}
+            <Text color={tokens.text.primary} bold>
+              {hasProvider ? "/new" : "Enter"}
+            </Text>
             {hasProvider ? " to start a fresh logbook session." : " or Ctrl+O to connect an engine."}
           </Text>
         </Box>
@@ -132,7 +122,9 @@ export function Home() {
           borderBottom={false}
           borderRight={false}
         >
-          <Text color={tokens.text.accent} bold>Operator Notes</Text>
+          <Text color={tokens.text.accent} bold>
+            Operator Notes
+          </Text>
           <Text color={tokens.text.muted}>
             {hasProvider
               ? "Ask Lobster to scaffold, debug, or review code in this repo."
@@ -148,7 +140,9 @@ export function Home() {
           </Box>
 
           <Box marginTop={1} flexDirection="column">
-            <Text color={tokens.text.accent} bold>Recent activity</Text>
+            <Text color={tokens.text.accent} bold>
+              Recent activity
+            </Text>
             {recentSessions.length === 0 ? (
               <EmptyState title="No recent activity" />
             ) : (
@@ -170,4 +164,3 @@ export function Home() {
     </Box>
   )
 }
-

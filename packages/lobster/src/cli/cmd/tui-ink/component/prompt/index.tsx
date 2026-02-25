@@ -1002,10 +1002,14 @@ export function Prompt(props: PromptProps) {
 
   return (
     <Box flexDirection="column">
-      <Box paddingLeft={2} gap={1}>
-        <StatusBadge tone="accent" label={currentAgent?.name ?? "build"} />
-        <StatusBadge tone="muted" label={modelParsed.model} />
-        <StatusBadge tone="muted" label={`engine ${modelParsed.provider}`} />
+      <Box paddingLeft={2} gap={1} marginBottom={1}>
+        <Text color={tokens.text.muted}>
+          <Text color={tokens.status.accent}>{currentAgent?.name ?? "build"}</Text>
+          <Text dimColor> · </Text>
+          <Text>
+            {modelParsed.provider}/{modelParsed.model}
+          </Text>
+        </Text>
         {isBusy ? <Spinner color={tokens.text.accent} /> : null}
       </Box>
 
@@ -1014,7 +1018,7 @@ export function Prompt(props: PromptProps) {
       )}
 
       <Box paddingLeft={1}>
-        <Text color={tokens.text.accent}>{"> "}</Text>
+        <Text color={tokens.text.accent}>{"❯ "}</Text>
         {isBusy ? (
           <Text color={tokens.text.muted} dimColor>
             {interruptCount > 0 ? "Press Ctrl+C again to exit" : "Agent is working... Press Ctrl+C to interrupt"}

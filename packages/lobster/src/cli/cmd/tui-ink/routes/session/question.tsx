@@ -109,7 +109,7 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
   return (
     <Box
       flexDirection="column"
-      borderStyle="round"
+      borderStyle="single"
       borderColor={tokens.panel.borderActive}
       paddingLeft={1}
       paddingRight={1}

@@ -43,7 +43,7 @@ export function Autocomplete({ options, selected, maxVisible = 8 }: Autocomplete
     <Box
       flexDirection="column"
       marginLeft={1}
-      borderStyle="round"
+      borderStyle="single"
       borderColor={tokens.panel.borderActive}
       paddingLeft={1}
       paddingRight={1}

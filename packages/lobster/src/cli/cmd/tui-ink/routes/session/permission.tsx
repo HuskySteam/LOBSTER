@@ -121,7 +121,7 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
   return (
     <Box
       flexDirection="column"
-      borderStyle="round"
+      borderStyle="single"
       borderColor={tokens.status.warning}
       paddingLeft={1}
       paddingRight={1}

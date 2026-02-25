@@ -37,11 +37,7 @@ export function MessageRow(props: {
 
   if (message.role === "user") {
     return (
-      <UserMessage
-        parts={parts}
-        theme={tokens}
-        timestamp={props.showTimestamps ? message.time?.created : undefined}
-      />
+      <UserMessage parts={parts} theme={tokens} timestamp={props.showTimestamps ? message.time?.created : undefined} />
     )
   }
 
@@ -69,13 +65,18 @@ function UserMessage(props: {
   timestamp?: number
 }) {
   const textParts = props.parts.filter((p) => p.type === "text" && !p.synthetic)
-  const text = textParts.map((p) => p.text ?? "").join("").trim()
+  const text = textParts
+    .map((p) => p.text ?? "")
+    .join("")
+    .trim()
   if (!text) return null
 
   return (
     <Box marginBottom={1} flexDirection="column">
       <Box gap={1}>
-        <StatusBadge tone="muted" label="user" />
+        <Text color={props.theme.text.muted} bold>
+          User
+        </Text>
         {props.timestamp ? (
           <Text color={props.theme.text.muted} dimColor>
             {new Date(props.timestamp).toLocaleTimeString()}
@@ -83,7 +84,6 @@ function UserMessage(props: {
         ) : null}
       </Box>
       <Box paddingLeft={1}>
-        <Text color={props.theme.text.accent} bold>{"> "}</Text>
         <Text color={props.theme.text.primary}>{text}</Text>
       </Box>
     </Box>
@@ -103,21 +103,22 @@ function AssistantMessage(props: {
   const { message, parts, theme, showThinking } = props
 
   // Check if still streaming (has running/pending tool or is last message with no completed marker)
-  const isStreaming = props.isLast && parts.some(
-    (p) => p.type === "tool" && (p.state?.status === "running" || p.state?.status === "pending"),
-  )
+  const isStreaming =
+    props.isLast &&
+    parts.some((p) => p.type === "tool" && (p.state?.status === "running" || p.state?.status === "pending"))
 
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box gap={1}>
-        <StatusBadge tone="accent" label={message.agent ?? "assistant"} />
+        <Text color={theme.text.accent} bold>
+          {message.agent ?? "assistant"}
+        </Text>
         {props.timestamp ? (
           <Text color={theme.text.muted} dimColor>
             {new Date(props.timestamp).toLocaleTimeString()}
           </Text>
         ) : null}
       </Box>
-      {message.agent ? <AgentBadge name={message.agent} variant="dot" color={theme.text.accent} /> : null}
       {parts.map((part) => (
         <PartView key={part.id} part={part} theme={theme} showThinking={showThinking} />
       ))}
@@ -150,7 +151,10 @@ function PartView(props: {
     if (!text) return null
     return (
       <Box flexDirection="column" marginTop={1} paddingLeft={1}>
-        <Text color={theme.text.muted} dimColor italic>Thinking: {text.slice(0, 200)}{text.length > 200 ? "..." : ""}</Text>
+        <Text color={theme.text.muted} dimColor italic>
+          Thinking: {text.slice(0, 200)}
+          {text.length > 200 ? "..." : ""}
+        </Text>
       </Box>
     )
   }
@@ -187,18 +191,31 @@ function ToolPartView(props: { part: Record<string, any> }) {
   }
 
   switch (part.tool) {
-    case "bash": return <BashTool {...toolProps} />
-    case "write": return <WriteTool {...toolProps} />
-    case "edit": return <EditTool {...toolProps} />
-    case "apply_patch": return <ApplyPatchTool {...toolProps} />
-    case "read": return <ReadTool {...toolProps} />
-    case "glob": return <GlobTool {...toolProps} />
-    case "grep": return <GrepTool {...toolProps} />
-    case "webfetch": return <WebFetchTool {...toolProps} />
-    case "websearch": return <WebSearchTool {...toolProps} />
-    case "codesearch": return <CodeSearchTool {...toolProps} />
-    case "task": return <TaskTool {...toolProps} />
-    case "todowrite": return <TodoWriteTool {...toolProps} />
-    default: return <GenericTool {...toolProps} />
+    case "bash":
+      return <BashTool {...toolProps} />
+    case "write":
+      return <WriteTool {...toolProps} />
+    case "edit":
+      return <EditTool {...toolProps} />
+    case "apply_patch":
+      return <ApplyPatchTool {...toolProps} />
+    case "read":
+      return <ReadTool {...toolProps} />
+    case "glob":
+      return <GlobTool {...toolProps} />
+    case "grep":
+      return <GrepTool {...toolProps} />
+    case "webfetch":
+      return <WebFetchTool {...toolProps} />
+    case "websearch":
+      return <WebSearchTool {...toolProps} />
+    case "codesearch":
+      return <CodeSearchTool {...toolProps} />
+    case "task":
+      return <TaskTool {...toolProps} />
+    case "todowrite":
+      return <TodoWriteTool {...toolProps} />
+    default:
+      return <GenericTool {...toolProps} />
   }
 }

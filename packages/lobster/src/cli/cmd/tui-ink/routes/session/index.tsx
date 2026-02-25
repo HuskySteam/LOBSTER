@@ -28,7 +28,7 @@ import {
 const EMPTY_MESSAGES: never[] = []
 const EMPTY_PERMISSIONS: never[] = []
 const EMPTY_QUESTIONS: never[] = []
-const BLOCK_TOOL_CHROME_LINES = 5 // marginTop + border(top/bottom) + padding(top/bottom)
+const BLOCK_TOOL_CHROME_LINES = 3 // marginTop + title + marginBottom
 
 /** Count rendered terminal rows for a string, accounting for soft-wrap at cols. */
 function wrappedLineCount(text: string, cols: number): number {
@@ -84,10 +84,15 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
       // BlockTool: title(1) + up to 30 diff lines + overflow + diagnostics
       const allLines = (meta.diff ?? "").split("\n")
       const diffRows = wrappedSliceCount(allLines, 30, blockCols)
-      const diags = ((meta.diagnostics?.[input.filePath] ?? []) as any[]).filter((x: any) => x.severity === 1).slice(0, 3)
+      const diags = ((meta.diagnostics?.[input.filePath] ?? []) as any[])
+        .filter((x: any) => x.severity === 1)
+        .slice(0, 3)
       let diagRows = 0
       for (const d of diags) {
-        diagRows += wrappedLineCount(`Error [${d.range?.start?.line}:${d.range?.start?.character}] ${d.message}`, blockCols)
+        diagRows += wrappedLineCount(
+          `Error [${d.range?.start?.line}:${d.range?.start?.character}] ${d.message}`,
+          blockCols,
+        )
       }
       return BLOCK_TOOL_CHROME_LINES + 1 + diffRows + (allLines.length > 30 ? 1 : 0) + diagRows + (state.error ? 1 : 0)
     }
@@ -96,7 +101,10 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
       const diags = (meta.diagnostics?.[input.filePath] ?? []).slice(0, 3)
       let diagRows = 0
       for (const d of diags) {
-        diagRows += wrappedLineCount(`Error [${d.range?.start?.line}:${d.range?.start?.character}] ${d.message}`, blockCols)
+        diagRows += wrappedLineCount(
+          `Error [${d.range?.start?.line}:${d.range?.start?.character}] ${d.message}`,
+          blockCols,
+        )
       }
       return BLOCK_TOOL_CHROME_LINES + 1 + diagRows + (state.error ? 1 : 0)
     }
@@ -106,7 +114,9 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
       // title(1) + per-file: filename(1) + up to 15 diff lines
       let total = 1
       for (const f of files) {
-        total += wrappedLineCount(String(f.file ?? ""), blockCols) + (f.diff ? wrappedSliceCount(f.diff.split("\n"), 15, blockCols) : 0)
+        total +=
+          wrappedLineCount(String(f.file ?? ""), blockCols) +
+          (f.diff ? wrappedSliceCount(f.diff.split("\n"), 15, blockCols) : 0)
       }
       return BLOCK_TOOL_CHROME_LINES + total + (state.error ? 1 : 0)
     }
@@ -159,9 +169,7 @@ export function Session(props: { sessionID: string }) {
   const [diffCursor, setDiffCursor] = useState(0)
   const [activityCursor, setActivityCursor] = useState(0)
   const [expandedActivity, setExpandedActivity] = useState(false)
-  const session = useAppStore((s) =>
-    s.session.find((ses) => ses.id === props.sessionID),
-  )
+  const session = useAppStore((s) => s.session.find((ses) => ses.id === props.sessionID))
   const providers = useAppStore((s) => s.provider)
   const messages = useAppStore((s) => s.message[props.sessionID] ?? EMPTY_MESSAGES)
   const parts = useAppStore((s) => s.part)
@@ -172,7 +180,7 @@ export function Session(props: { sessionID: string }) {
   // Scroll viewport - estimate rendered lines per message to avoid clipping
   const termHeight = stdout?.rows ?? 24
   const termCols = stdout?.columns ?? 80
-  
+
   // Estimate height of permissions and questions
   let promptLines = 0
   for (const req of permissions) {
@@ -452,56 +460,17 @@ export function Session(props: { sessionID: string }) {
 
       <Box flexDirection="column" flexGrow={1}>
         <Box paddingLeft={1} paddingRight={1} flexShrink={0}>
-          <Box justifyContent="space-between">
-            <Box gap={1}>
-              <Text color={tokens.text.muted} dimColor>
-                ~lob~
-              </Text>
-              <StatusBadge
-                tone={
-                  interactionMode === "EXEC"
-                    ? "warning"
-                    : interactionMode === "DIFF"
-                      ? "accent"
-                      : interactionMode === "PLAN"
-                        ? "success"
-                        : "muted"
-                }
-                label={`MODE ${interactionMode}`}
-              />
-              <StatusBadge tone="muted" label={`TAB ${panelTab.toUpperCase()}`} />
-              <StatusBadge tone="muted" label={`DOCK ${dockSide}`} />
-            </Box>
-            <Box gap={1}>
-              <Text color={providers.length > 0 ? tokens.status.success : tokens.status.error}>
-                {providers.length > 0 ? "LED:ON connected" : "LED:OFF disconnected"}
-              </Text>
-              <Text color={tokens.text.muted}>engine {local.model.parsed().provider}</Text>
-            </Box>
-          </Box>
-        </Box>
-
-        <Box paddingLeft={1} paddingRight={1} flexShrink={0}>
           <PanelHeader
-            title="Workspace"
-            subtitle={title.length > 60 ? title.slice(0, 57) + "..." : title}
+            title={title.length > 60 ? title.slice(0, 57) + "..." : title}
+            subtitle={`[${interactionMode}]`}
             right={`${messages.length} msg | ${sessionStatus?.type ?? "idle"}`}
           />
-        </Box>
-
-        <Box paddingLeft={1} paddingRight={1} gap={1} flexShrink={0}>
-          <StatusBadge tone="accent" label={showThinking ? "thinking on" : "thinking off"} />
-          <StatusBadge tone={showTimestamps ? "success" : "muted"} label={showTimestamps ? "time on" : "time off"} />
-        </Box>
-
-        <Box paddingLeft={1} paddingRight={1} flexShrink={0}>
-          <Text color={tokens.text.muted}>{divider}</Text>
         </Box>
 
         <ActivityBar sessionID={props.sessionID} />
 
         <Box flexDirection="column" flexGrow={1} paddingLeft={1} paddingRight={1} overflow="hidden">
-          {hasAbove && <Text color={theme.textMuted}>  ... {aboveCount} more above (Ctrl+U to scroll up)</Text>}
+          {hasAbove && <Text color={theme.textMuted}> ... {aboveCount} more above (Ctrl+U to scroll up)</Text>}
           {visibleMessages.map((msg) => (
             <MessageRow
               key={msg.id}
@@ -512,7 +481,7 @@ export function Session(props: { sessionID: string }) {
               showTimestamps={showTimestamps}
             />
           ))}
-          {hasBelow && <Text color={theme.textMuted}>  ... {belowCount} more below (Ctrl+D to scroll down)</Text>}
+          {hasBelow && <Text color={theme.textMuted}> ... {belowCount} more below (Ctrl+D to scroll down)</Text>}
         </Box>
 
         {permissions.map((req) => (
@@ -524,12 +493,8 @@ export function Session(props: { sessionID: string }) {
         ))}
 
         <Box flexDirection="column" flexShrink={0}>
-          <Box paddingLeft={1} paddingRight={1}>
-            <Text color={tokens.text.muted}>{divider}</Text>
-          </Box>
-          <Box paddingLeft={1} justifyContent="space-between" paddingRight={1}>
+          <Box paddingLeft={1} justifyContent="space-between" paddingRight={1} marginTop={1}>
             <CostTracker sessionID={props.sessionID} />
-            <Text color={tokens.text.muted}>compact workspace shell</Text>
           </Box>
           <Box paddingLeft={1} paddingRight={1}>
             <KeyHints
@@ -570,4 +535,3 @@ export function Session(props: { sessionID: string }) {
     </Box>
   )
 }
-

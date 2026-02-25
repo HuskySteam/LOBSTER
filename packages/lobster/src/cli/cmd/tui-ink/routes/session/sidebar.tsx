@@ -171,7 +171,10 @@ export function Sidebar(props: {
           </Text>
           <Box gap={1}>
             <StatusBadge tone="accent" label={`${tokenInfo.display} tokens`} />
-            <StatusBadge tone={sessionStatus?.type === "busy" ? "warning" : "success"} label={sessionStatus?.type ?? "idle"} />
+            <StatusBadge
+              tone={sessionStatus?.type === "busy" ? "warning" : "success"}
+              label={sessionStatus?.type ?? "idle"}
+            />
           </Box>
           <Text color={tokens.text.muted}>engine {local.model.parsed().provider}</Text>
           <Text color={tokens.text.primary}>{local.model.parsed().model}</Text>
@@ -239,10 +242,15 @@ export function Sidebar(props: {
             recentSessions.map((session) => {
               const active = session.id === props.sessionID
               const label = (session.title || "Untitled").slice(0, 24)
-              const updated = new Date(session.time.updated).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+              const updated = new Date(session.time.updated).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              })
               return (
                 <Box key={session.id} justifyContent="space-between">
-                  <Text color={active ? tokens.text.primary : tokens.text.muted}>{active ? ">" : " "} {label}</Text>
+                  <Text color={active ? tokens.text.primary : tokens.text.muted}>
+                    {active ? ">" : " "} {label}
+                  </Text>
                   <Text color={tokens.text.muted}>{updated}</Text>
                 </Box>
               )
@@ -265,10 +273,11 @@ export function Sidebar(props: {
                 const selected = index === clampIndex(props.diffCursor, diff.length)
                 return (
                   <Box key={String(item.file)} justifyContent="space-between">
-                    <Text color={selected ? tokens.text.primary : tokens.text.muted}>{selected ? ">" : " "} {String(item.file).slice(0, 22)}</Text>
+                    <Text color={selected ? tokens.text.primary : tokens.text.muted}>
+                      {selected ? ">" : " "} {String(item.file).slice(0, 22)}
+                    </Text>
                     <Text color={tokens.text.muted}>
-                      <Text color={tokens.status.success}>+{item.additions ?? 0}</Text>
-                      {" "}
+                      <Text color={tokens.status.success}>+{item.additions ?? 0}</Text>{" "}
                       <Text color={tokens.status.error}>-{item.deletions ?? 0}</Text>
                     </Text>
                   </Box>
@@ -276,14 +285,22 @@ export function Sidebar(props: {
               })}
               {selectedDiff ? (
                 <Box flexDirection="column" marginTop={1}>
-                  {buildInlinePreview(String(selectedDiff.before ?? ""), String(selectedDiff.after ?? "")).map((line) => (
-                    <Text
-                      key={`${selectedDiff.file}:${line}`}
-                      color={line.startsWith("+") ? tokens.status.success : line.startsWith("-") ? tokens.status.error : tokens.text.muted}
-                    >
-                      {line.slice(0, 34)}
-                    </Text>
-                  ))}
+                  {buildInlinePreview(String(selectedDiff.before ?? ""), String(selectedDiff.after ?? "")).map(
+                    (line) => (
+                      <Text
+                        key={`${selectedDiff.file}:${line}`}
+                        color={
+                          line.startsWith("+")
+                            ? tokens.status.success
+                            : line.startsWith("-")
+                              ? tokens.status.error
+                              : tokens.text.muted
+                        }
+                      >
+                        {line.slice(0, 34)}
+                      </Text>
+                    ),
+                  )}
                 </Box>
               ) : null}
             </>
@@ -334,13 +351,6 @@ export function Sidebar(props: {
       )}
 
       <Box flexGrow={1} />
-      <Box marginBottom={1}>
-        <Text color={tokens.text.muted} dimColor>
-          ~lob~
-        </Text>
-      </Box>
     </Box>
   )
 }
-
-

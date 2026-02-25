@@ -47,7 +47,7 @@ function DialogOverlay(props: { children: ReactNode }) {
   return (
     <Box
       flexDirection="column"
-      borderStyle="round"
+      borderStyle="single"
       borderColor={theme.borderActive}
       paddingLeft={1}
       paddingRight={1}
