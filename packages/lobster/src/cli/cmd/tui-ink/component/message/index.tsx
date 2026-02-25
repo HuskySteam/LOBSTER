@@ -1,44 +1,58 @@
 /** @jsxImportSource react */
 import { Box, Text } from "ink"
 import React from "react"
-import { AgentBadge } from "../agent-badge"
 import { Spinner } from "../spinner"
-import { StatusBadge } from "../../ui/chrome"
 import { useDesignTokens } from "../../ui/design"
 import { TextPart } from "./text-part"
 import {
+  ApplyPatchTool,
   BashTool,
-  WriteTool,
+  CodeSearchTool,
   EditTool,
-  ReadTool,
+  GenericTool,
   GlobTool,
   GrepTool,
+  ReadTool,
+  TaskTool,
+  TodoWriteTool,
+  type ToolProps,
   WebFetchTool,
   WebSearchTool,
-  CodeSearchTool,
-  TaskTool,
-  ApplyPatchTool,
-  TodoWriteTool,
-  GenericTool,
-  type ToolProps,
+  WriteTool,
 } from "./tools"
 
-// ─── Message Row ──────────────────────────────────────────
+const FILE_BADGE: Record<string, string> = {
+  "text/plain": "txt",
+  "image/png": "img",
+  "image/jpeg": "img",
+  "image/gif": "img",
+  "image/webp": "img",
+  "application/pdf": "pdf",
+  "application/x-directory": "dir",
+}
+
+function formatTime(timestamp?: number) {
+  if (!timestamp) return ""
+  return new Date(timestamp).toLocaleTimeString()
+}
 
 export function MessageRow(props: {
-  message: { id: string; role: string; agent?: string; time?: { created?: number } }
+  message: {
+    id: string
+    role: string
+    agent?: string
+    error?: { data?: { message?: string }; name?: string }
+    time?: { created?: number }
+  }
   parts: Array<{ id: string; type: string; [key: string]: any }>
   isLast: boolean
   showThinking?: boolean
   showTimestamps?: boolean
 }) {
-  const tokens = useDesignTokens()
   const { message, parts } = props
 
   if (message.role === "user") {
-    return (
-      <UserMessage parts={parts} theme={tokens} timestamp={props.showTimestamps ? message.time?.created : undefined} />
-    )
+    return <UserMessage parts={parts} showTimestamp={props.showTimestamps ? message.time?.created : undefined} />
   }
 
   if (message.role === "assistant") {
@@ -46,10 +60,9 @@ export function MessageRow(props: {
       <AssistantMessage
         message={message}
         parts={parts}
-        theme={tokens}
         isLast={props.isLast}
         showThinking={props.showThinking ?? true}
-        timestamp={props.showTimestamps ? message.time?.created : undefined}
+        showTimestamp={props.showTimestamps ? message.time?.created : undefined}
       />
     )
   }
@@ -57,88 +70,100 @@ export function MessageRow(props: {
   return null
 }
 
-// ─── User Message ─────────────────────────────────────────
-
-function UserMessage(props: {
-  parts: Array<Record<string, any>>
-  theme: ReturnType<typeof useDesignTokens>
-  timestamp?: number
-}) {
-  const textParts = props.parts.filter((p) => p.type === "text" && !p.synthetic)
+function UserMessage(props: { parts: Array<Record<string, any>>; showTimestamp?: number }) {
+  const tokens = useDesignTokens()
+  const textParts = props.parts.filter((part) => part.type === "text" && !part.synthetic)
   const text = textParts
-    .map((p) => p.text ?? "")
+    .map((part) => part.text ?? "")
     .join("")
     .trim()
-  if (!text) return null
+  const files = props.parts.filter((part) => part.type === "file")
+
+  if (!text && files.length === 0) return null
 
   return (
     <Box marginBottom={1} flexDirection="column">
-      <Box gap={1}>
-        <Text color={props.theme.text.muted} bold>
-          User
-        </Text>
-        {props.timestamp ? (
-          <Text color={props.theme.text.muted} dimColor>
-            {new Date(props.timestamp).toLocaleTimeString()}
-          </Text>
-        ) : null}
-      </Box>
-      <Box paddingLeft={1}>
-        <Text color={props.theme.text.primary}>{text}</Text>
-      </Box>
+      {text ? (
+        <Box>
+          <Text color={tokens.text.accent}>{"> "}</Text>
+          <Text color={tokens.text.primary}>{text}</Text>
+          {props.showTimestamp ? (
+            <Text color={tokens.text.muted} dimColor>
+              {`  ${formatTime(props.showTimestamp)}`}
+            </Text>
+          ) : null}
+        </Box>
+      ) : null}
+
+      {files.length > 0 ? (
+        <Box paddingLeft={2} flexDirection="column">
+          {files.map((file) => {
+            const badge = FILE_BADGE[file.mime] ?? file.mime ?? "file"
+            return (
+              <Text key={file.id} color={tokens.text.muted}>
+                <Text color={tokens.text.accent}>[{badge}]</Text> {file.filename}
+              </Text>
+            )
+          })}
+        </Box>
+      ) : null}
     </Box>
   )
 }
 
-// ─── Assistant Message ────────────────────────────────────
-
 function AssistantMessage(props: {
-  message: { id: string; role: string; agent?: string }
+  message: { id: string; role: string; agent?: string; error?: { data?: { message?: string }; name?: string } }
   parts: Array<Record<string, any>>
-  theme: ReturnType<typeof useDesignTokens>
   isLast: boolean
   showThinking: boolean
-  timestamp?: number
+  showTimestamp?: number
 }) {
-  const { message, parts, theme, showThinking } = props
-
-  // Check if still streaming (has running/pending tool or is last message with no completed marker)
-  const isStreaming =
+  const tokens = useDesignTokens()
+  const running =
     props.isLast &&
-    parts.some((p) => p.type === "tool" && (p.state?.status === "running" || p.state?.status === "pending"))
+    props.parts.some(
+      (part) => part.type === "tool" && (part.state?.status === "running" || part.state?.status === "pending"),
+    )
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Box gap={1}>
-        <Text color={theme.text.accent} bold>
-          {message.agent ?? "assistant"}
-        </Text>
-        {props.timestamp ? (
-          <Text color={theme.text.muted} dimColor>
-            {new Date(props.timestamp).toLocaleTimeString()}
+      <Box>
+        <Text color={tokens.text.accent}>{props.message.agent ?? "assistant"}</Text>
+        {props.showTimestamp ? (
+          <Text color={tokens.text.muted} dimColor>
+            {`  ${formatTime(props.showTimestamp)}`}
           </Text>
         ) : null}
       </Box>
-      {parts.map((part) => (
-        <PartView key={part.id} part={part} theme={theme} showThinking={showThinking} />
+
+      {props.parts.map((part) => (
+        <PartView key={part.id} part={part} showThinking={props.showThinking} />
       ))}
-      {isStreaming && parts.every((p) => p.type !== "tool" || p.state?.status !== "running") && (
+
+      {props.message.error?.name === "MessageAbortedError" ? (
         <Box paddingLeft={2}>
-          <Spinner />
+          <Text color={tokens.text.muted}>-- interrupted</Text>
         </Box>
-      )}
+      ) : null}
+
+      {props.message.error?.name !== "MessageAbortedError" && props.message.error?.data?.message ? (
+        <Box paddingLeft={2}>
+          <Text color={tokens.status.error}>{props.message.error.data.message}</Text>
+        </Box>
+      ) : null}
+
+      {running ? (
+        <Box paddingLeft={2}>
+          <Spinner color={tokens.text.accent} />
+        </Box>
+      ) : null}
     </Box>
   )
 }
 
-// ─── Part Dispatcher ──────────────────────────────────────
-
-function PartView(props: {
-  part: Record<string, any>
-  theme: ReturnType<typeof useDesignTokens>
-  showThinking: boolean
-}) {
-  const { part, theme } = props
+function PartView(props: { part: Record<string, any>; showThinking: boolean }) {
+  const tokens = useDesignTokens()
+  const { part } = props
 
   if (part.type === "text") {
     return <TextPart text={part.text ?? ""} />
@@ -146,14 +171,12 @@ function PartView(props: {
 
   if (part.type === "reasoning") {
     if (!props.showThinking) return null
-    // Show reasoning/thinking blocks dimmed
-    const text = (part.text ?? "").trim()
+    const text = (part.text ?? "").replace("[REDACTED]", "").trim()
     if (!text) return null
     return (
-      <Box flexDirection="column" marginTop={1} paddingLeft={1}>
-        <Text color={theme.text.muted} dimColor italic>
-          Thinking: {text.slice(0, 200)}
-          {text.length > 200 ? "..." : ""}
+      <Box marginTop={1} paddingLeft={2}>
+        <Text color={tokens.text.muted} dimColor>
+          _Thinking:_ {text}
         </Text>
       </Box>
     )
@@ -165,9 +188,9 @@ function PartView(props: {
 
   if (part.type === "step-start") {
     return (
-      <Box>
-        <Text color={theme.text.muted} dimColor>
-          --- step {part.step ?? ""} ---
+      <Box paddingLeft={2}>
+        <Text color={tokens.text.muted} dimColor>
+          -- step {part.step ?? ""} --
         </Text>
       </Box>
     )
@@ -175,8 +198,6 @@ function PartView(props: {
 
   return null
 }
-
-// ─── Tool Part Dispatcher ─────────────────────────────────
 
 function ToolPartView(props: { part: Record<string, any> }) {
   const { part } = props

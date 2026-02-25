@@ -4,7 +4,6 @@ import React, { useState, useCallback, useEffect } from "react"
 import { useSDK } from "../../context/sdk"
 import { useKeybind } from "../../context/keybind"
 import type { QuestionRequest } from "@lobster-ai/sdk/v2"
-import { KeyHints, PanelHeader, StatusBadge } from "../../ui/chrome"
 import { useDesignTokens } from "../../ui/design"
 
 export function QuestionPrompt(props: { request: QuestionRequest }) {
@@ -107,15 +106,8 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
   })
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={tokens.panel.borderActive}
-      paddingLeft={1}
-      paddingRight={1}
-      marginTop={1}
-    >
-      <PanelHeader title="Question" right="esc dismiss" />
+    <Box flexDirection="column" paddingLeft={2} paddingRight={1} marginTop={1}>
+      <Text color={tokens.text.accent}>Question required</Text>
 
       {!single ? (
         <Box gap={1} marginBottom={1}>
@@ -141,10 +133,10 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
 
       {!isConfirmTab && question ? (
         <Box flexDirection="column">
-          <Box gap={1}>
-            <StatusBadge tone="accent" label={question.header} />
-            {isMulti ? <StatusBadge tone="muted" label="multi-select" /> : null}
-          </Box>
+          <Text color={tokens.text.muted}>
+            {question.header}
+            {isMulti ? " · multi-select" : ""}
+          </Text>
           <Text color={tokens.text.primary} bold>
             {question.question}
           </Text>
@@ -193,13 +185,11 @@ export function QuestionPrompt(props: { request: QuestionRequest }) {
         </Box>
       ) : null}
 
-      <KeyHints
-        items={
-          !single
-            ? ["tab switch", "up/down select", "enter confirm", "esc dismiss"]
-            : ["up/down select", "enter submit", "esc dismiss"]
-        }
-      />
+      <Text color={tokens.text.muted} dimColor>
+        {!single
+          ? "tab switch · up/down select · enter confirm · esc dismiss"
+          : "up/down select · enter submit · esc dismiss"}
+      </Text>
     </Box>
   )
 }

@@ -3,7 +3,6 @@ import { Box, Text, useInput } from "ink"
 import TextInput from "ink-text-input"
 import React, { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import path from "path"
-import { useTheme } from "../../theme"
 import { useAppStore } from "../../store"
 import { useSDK } from "../../context/sdk"
 import { useArgs } from "../../context/args"
@@ -32,7 +31,6 @@ import { DialogReviewDashboard } from "../dialog-review-dashboard"
 import { DialogReviewResults } from "../dialog-review-results"
 import { DialogHealth } from "../dialog-health"
 import { DialogPatterns } from "../dialog-patterns"
-import { KeyHints, StatusBadge } from "../../ui/chrome"
 import { useDesignTokens } from "../../ui/design"
 import {
   clearPluginMarketplaceCache,
@@ -59,6 +57,7 @@ interface PromptProps {
   showThinking?: boolean
   showTimestamps?: boolean
   activePanelTab?: "context" | "logbook" | "diff" | "activity"
+  hint?: React.ReactNode
   onToggleThinking?: () => void
   onToggleTimestamps?: () => void
   onPlanningChange?: (planning: boolean) => void
@@ -86,7 +85,6 @@ Calibration guide:
 Be honest and specific in findings and suggestions.`
 
 export function Prompt(props: PromptProps) {
-  const { theme } = useTheme()
   const tokens = useDesignTokens()
   const exit = useExit()
   const route = useRoute()
@@ -1002,16 +1000,24 @@ export function Prompt(props: PromptProps) {
 
   return (
     <Box flexDirection="column">
-      <Box paddingLeft={2} gap={1} marginBottom={1}>
+      <Box paddingLeft={1} gap={1} marginBottom={1}>
         <Text color={tokens.text.muted}>
           <Text color={tokens.status.accent}>{currentAgent?.name ?? "build"}</Text>
           <Text dimColor> · </Text>
           <Text>
             {modelParsed.provider}/{modelParsed.model}
           </Text>
+          {props.sessionID ? (
+            <>
+              <Text dimColor> · </Text>
+              <Text>{props.sessionID.slice(0, 8)}</Text>
+            </>
+          ) : null}
         </Text>
         {isBusy ? <Spinner color={tokens.text.accent} /> : null}
       </Box>
+
+      {props.hint ? <Box paddingLeft={1}>{props.hint}</Box> : null}
 
       {acMode && filteredOptions.length > 0 && !isBusy && (
         <Autocomplete options={filteredOptions} selected={safeAcIndex} />
@@ -1034,16 +1040,15 @@ export function Prompt(props: PromptProps) {
         )}
       </Box>
 
-      {!isBusy && !acMode && (
+      {!isBusy ? (
         <Box paddingLeft={2}>
-          <KeyHints items={["tab agent", "^M model", "^S logbook", "^K palette", "^O connect"]} />
+          <Text color={tokens.text.muted} dimColor>
+            {acMode
+              ? "up/down navigate · enter/tab select · esc dismiss"
+              : "tab agent · Ctrl+M model · Ctrl+S sessions · Ctrl+K palette · Ctrl+O connect"}
+          </Text>
         </Box>
-      )}
-      {!isBusy && acMode && (
-        <Box paddingLeft={2}>
-          <KeyHints items={["up/down navigate", "enter/tab select", "esc dismiss"]} />
-        </Box>
-      )}
+      ) : null}
     </Box>
   )
 }

@@ -4,7 +4,6 @@ import React, { useMemo } from "react"
 import { useAppStore } from "../store"
 import { Spinner } from "./spinner"
 import path from "path"
-import { StatusBadge } from "../ui/chrome"
 import { useDesignTokens } from "../ui/design"
 
 const EMPTY_MESSAGES: never[] = []
@@ -21,9 +20,7 @@ export function ActivityBar(props: { sessionID: string }) {
   const activityInfo = useMemo(() => {
     if (!isBusy) return null
 
-    const pendingMessage = messages.findLast(
-      (x) => x.role === "assistant" && !x.time.completed,
-    )
+    const pendingMessage = messages.findLast((x) => x.role === "assistant" && !x.time.completed)
     if (!pendingMessage) return { text: "Thinking...", count: "" }
 
     const msgParts = parts[pendingMessage.id] ?? EMPTY_PARTS
@@ -31,9 +28,7 @@ export function ActivityBar(props: { sessionID: string }) {
     if (toolParts.length === 0) return { text: "Thinking...", count: "" }
 
     const running = toolParts.filter((p) => p.state.status === "running")
-    const completed = toolParts.filter(
-      (p) => p.state.status === "completed" || p.state.status === "error",
-    )
+    const completed = toolParts.filter((p) => p.state.status === "completed" || p.state.status === "error")
 
     if (running.length === 0) return { text: "Thinking...", count: "" }
     if (running.length > 1) return { text: `${running.length} tools running...`, count: "" }
@@ -50,8 +45,7 @@ export function ActivityBar(props: { sessionID: string }) {
   if (!isBusy || !activityInfo) return null
 
   return (
-    <Box flexShrink={0} paddingLeft={2} paddingRight={2} gap={1}>
-      <StatusBadge tone="accent" label="busy" />
+    <Box flexShrink={0} paddingLeft={2} paddingRight={2}>
       <Spinner color={tokens.text.accent}>
         {activityInfo.text}
         {activityInfo.count}

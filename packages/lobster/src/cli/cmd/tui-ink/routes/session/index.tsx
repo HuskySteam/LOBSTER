@@ -8,14 +8,11 @@ import { useLocal } from "../../context/local"
 import { useKeybind } from "../../context/keybind"
 import { Prompt } from "../../component/prompt"
 import { ActivityBar } from "../../component/activity-bar"
-import { CostTracker } from "../../component/cost-tracker"
 import { MessageRow } from "../../component/message"
 import { Sidebar } from "./sidebar"
 import { PermissionPrompt } from "./permission"
 import { QuestionPrompt } from "./question"
 import { Identifier } from "@/id/id"
-import { KeyHints, PanelHeader, StatusBadge } from "../../ui/chrome"
-import { separator, useDesignTokens } from "../../ui/design"
 import {
   PANEL_TABS,
   cycleDockSide,
@@ -154,12 +151,11 @@ function estimateToolLines(part: Record<string, any>, cols: number): number {
 
 export function Session(props: { sessionID: string }) {
   const { theme } = useTheme()
-  const tokens = useDesignTokens()
   const { sync } = useSDK()
   const local = useLocal()
   const { stdout } = useStdout()
   const keybind = useKeybind()
-  const [dockSide, setDockSide] = useState<DockSide>("right")
+  const [dockSide, setDockSide] = useState<DockSide>("hidden")
   const [panelTab, setPanelTab] = useState<PanelTab>("context")
   const [showThinking, setShowThinking] = useState(true)
   const [showTimestamps, setShowTimestamps] = useState(false)
@@ -170,7 +166,6 @@ export function Session(props: { sessionID: string }) {
   const [activityCursor, setActivityCursor] = useState(0)
   const [expandedActivity, setExpandedActivity] = useState(false)
   const session = useAppStore((s) => s.session.find((ses) => ses.id === props.sessionID))
-  const providers = useAppStore((s) => s.provider)
   const messages = useAppStore((s) => s.message[props.sessionID] ?? EMPTY_MESSAGES)
   const parts = useAppStore((s) => s.part)
   const permissions = useAppStore((s) => s.permission[props.sessionID] ?? EMPTY_PERMISSIONS)
@@ -441,8 +436,8 @@ export function Session(props: { sessionID: string }) {
   )
 
   const title = session?.title ?? "Untitled"
-  const cols = stdout?.columns ?? 80
-  const divider = separator(Math.max(Math.min(cols - panelWidth - 4, 120), 10))
+  const parsedModel = local.model.parsed()
+  const headerTitle = title.length > 72 ? title.slice(0, 69) + "..." : title
 
   return (
     <Box flexDirection="row" height="100%">
@@ -458,19 +453,23 @@ export function Session(props: { sessionID: string }) {
         />
       )}
 
-      <Box flexDirection="column" flexGrow={1}>
-        <Box paddingLeft={1} paddingRight={1} flexShrink={0}>
-          <PanelHeader
-            title={title.length > 60 ? title.slice(0, 57) + "..." : title}
-            subtitle={`[${interactionMode}]`}
-            right={`${messages.length} msg | ${sessionStatus?.type ?? "idle"}`}
-          />
+      <Box flexDirection="column" flexGrow={1} paddingLeft={1} paddingRight={1}>
+        <Box flexShrink={0} paddingLeft={1} paddingRight={1}>
+          <Text color={theme.textMuted}>
+            <Text color={theme.text}>{headerTitle}</Text>
+            <Text dimColor> · </Text>
+            <Text color={theme.accent}>{interactionMode}</Text>
+            <Text dimColor> · </Text>
+            {messages.length} msg
+            <Text dimColor> · </Text>
+            {sessionStatus?.type ?? "idle"}
+          </Text>
         </Box>
 
         <ActivityBar sessionID={props.sessionID} />
 
-        <Box flexDirection="column" flexGrow={1} paddingLeft={1} paddingRight={1} overflow="hidden">
-          {hasAbove && <Text color={theme.textMuted}> ... {aboveCount} more above (Ctrl+U to scroll up)</Text>}
+        <Box flexDirection="column" flexGrow={1} paddingLeft={1} paddingRight={1} overflow="hidden" marginTop={1}>
+          {hasAbove && <Text color={theme.textMuted}>↑ {aboveCount} more above (Ctrl+U)</Text>}
           {visibleMessages.map((msg) => (
             <MessageRow
               key={msg.id}
@@ -481,7 +480,7 @@ export function Session(props: { sessionID: string }) {
               showTimestamps={showTimestamps}
             />
           ))}
-          {hasBelow && <Text color={theme.textMuted}> ... {belowCount} more below (Ctrl+D to scroll down)</Text>}
+          {hasBelow && <Text color={theme.textMuted}>↓ {belowCount} more below (Ctrl+D)</Text>}
         </Box>
 
         {permissions.map((req) => (
@@ -492,21 +491,15 @@ export function Session(props: { sessionID: string }) {
           <QuestionPrompt key={req.id} request={req} />
         ))}
 
-        <Box flexDirection="column" flexShrink={0}>
-          <Box paddingLeft={1} justifyContent="space-between" paddingRight={1} marginTop={1}>
-            <CostTracker sessionID={props.sessionID} />
-          </Box>
+        <Box flexDirection="column" flexShrink={0} marginTop={1}>
           <Box paddingLeft={1} paddingRight={1}>
-            <KeyHints
-              items={[
-                "Ctrl+K palette",
-                "Ctrl+U/D scroll",
-                "Alt+H/L tabs",
-                "Alt+1..4 quick-switch",
-                "Alt+J/K nav",
-                "Ctrl+T dock",
-              ]}
-            />
+            <Text color={theme.textMuted}>
+              <Text color={theme.accent}>{local.agent.current().name}</Text>
+              <Text dimColor> · </Text>
+              {parsedModel.provider}/{parsedModel.model}
+              <Text dimColor> · </Text>
+              Ctrl+K palette · Ctrl+U/D scroll · Ctrl+T dock
+            </Text>
           </Box>
           <Prompt
             sessionID={props.sessionID}

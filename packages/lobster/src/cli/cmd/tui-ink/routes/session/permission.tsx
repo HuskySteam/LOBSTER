@@ -6,7 +6,6 @@ import { useKeybind } from "../../context/keybind"
 import { useAppStore } from "../../store"
 import type { PermissionRequest } from "@lobster-ai/sdk/v2"
 import path from "path"
-import { KeyHints, PanelHeader, StatusBadge } from "../../ui/chrome"
 import { useDesignTokens } from "../../ui/design"
 
 function normalizePath(input?: string) {
@@ -119,23 +118,15 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
   })
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={tokens.status.warning}
-      paddingLeft={1}
-      paddingRight={1}
-      marginTop={1}
-    >
-      <PanelHeader title="Permission Required" right="esc reject" />
-      <StatusBadge tone="warning" label={props.request.permission} />
+    <Box flexDirection="column" paddingLeft={2} paddingRight={1} marginTop={1}>
+      <Text color={tokens.status.warning}>Permission required · {props.request.permission}</Text>
 
-      <Box paddingLeft={1} marginTop={1}>
+      <Box marginTop={1}>
         <Text color={tokens.text.muted}>{description}</Text>
       </Box>
 
       {props.request.permission === "edit" && typeof props.request.metadata?.diff === "string" ? (
-        <Box paddingLeft={1} marginTop={1} flexDirection="column">
+        <Box marginTop={1} flexDirection="column" paddingLeft={2}>
           {(props.request.metadata.diff as string)
             .split("\n")
             .slice(0, 10)
@@ -163,7 +154,7 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
 
       <Box marginTop={1} gap={1}>
         {options.map((opt, index) => (
-          <Box key={opt} paddingLeft={1} paddingRight={1}>
+          <Box key={opt}>
             <Text
               color={index === selected ? tokens.text.primary : tokens.text.muted}
               bold={index === selected}
@@ -175,7 +166,9 @@ export function PermissionPrompt(props: { request: PermissionRequest }) {
         ))}
       </Box>
 
-      <KeyHints items={["left/right select", "enter confirm", "esc reject", "1/2/3 quick select"]} />
+      <Text color={tokens.text.muted} dimColor>
+        left/right select · enter confirm · esc reject · 1/2/3 quick select
+      </Text>
     </Box>
   )
 }

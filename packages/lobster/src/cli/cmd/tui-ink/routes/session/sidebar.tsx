@@ -3,7 +3,7 @@ import { Box, Text } from "ink"
 import React, { useMemo } from "react"
 import { useAppStore } from "../../store"
 import { useLocal } from "../../context/local"
-import { separator, useDesignTokens } from "../../ui/design"
+import { useDesignTokens } from "../../ui/design"
 import { SegmentedTabs, StatusBadge } from "../../ui/chrome"
 import type { PanelTab } from "./layout-model"
 
@@ -146,15 +146,11 @@ export function Sidebar(props: {
   return (
     <Box
       flexDirection="column"
-      width={40}
-      borderStyle="single"
-      borderLeft={props.dockSide === "right"}
-      borderTop={false}
-      borderBottom={false}
-      borderRight={props.dockSide === "left"}
-      borderColor={tokens.panel.border}
+      width={38}
       paddingLeft={1}
       paddingRight={1}
+      marginLeft={props.dockSide === "right" ? 1 : 0}
+      marginRight={props.dockSide === "left" ? 1 : 0}
     >
       <Box marginTop={1} marginBottom={1}>
         <SegmentedTabs
@@ -166,9 +162,7 @@ export function Sidebar(props: {
 
       {props.activeTab === "context" && (
         <Box flexDirection="column" gap={1}>
-          <Text color={tokens.text.accent} bold>
-            Context Sidebar
-          </Text>
+          <Text color={tokens.text.accent}>Context</Text>
           <Box gap={1}>
             <StatusBadge tone="accent" label={`${tokenInfo.display} tokens`} />
             <StatusBadge
@@ -178,8 +172,6 @@ export function Sidebar(props: {
           </Box>
           <Text color={tokens.text.muted}>engine {local.model.parsed().provider}</Text>
           <Text color={tokens.text.primary}>{local.model.parsed().model}</Text>
-
-          <Text color={tokens.text.muted}>{separator(34)}</Text>
 
           {vcs ? (
             <Box flexDirection="column">
@@ -215,26 +207,15 @@ export function Sidebar(props: {
             </Box>
           )}
 
-          <Box flexDirection="column">
-            <Text color={tokens.text.accent}>status leds</Text>
-            <Text color={tokens.text.muted}>
-              {connectedMcp > 0 ? "LED:ON" : "LED:OFF"} | MCP {connectedMcp}/{mcpEntries.length}
-            </Text>
-            <Text color={tokens.text.muted}>
-              {lsp.some((item) => item.status === "connected") ? "LED:ON" : "LED:OFF"} | LSP {lsp.length}
-            </Text>
-            <Text color={tokens.text.muted}>
-              {teamNames.length > 0 ? "LED:ON" : "LED:OFF"} | Team {teamNames.length}
-            </Text>
-          </Box>
+          <Text color={tokens.text.muted}>
+            MCP {connectedMcp}/{mcpEntries.length} · LSP {lsp.length} · Teams {teamNames.length}
+          </Text>
         </Box>
       )}
 
       {props.activeTab === "logbook" && (
         <Box flexDirection="column" gap={1}>
-          <Text color={tokens.text.accent} bold>
-            Logbook
-          </Text>
+          <Text color={tokens.text.accent}>Logbook</Text>
           <Text color={tokens.text.muted}>Recent sessions across this workspace</Text>
           {recentSessions.length === 0 ? (
             <Text color={tokens.text.muted}>No logbook entries yet.</Text>
@@ -261,9 +242,7 @@ export function Sidebar(props: {
 
       {props.activeTab === "diff" && (
         <Box flexDirection="column" gap={1}>
-          <Text color={tokens.text.accent} bold>
-            Inline Diff Preview
-          </Text>
+          <Text color={tokens.text.accent}>Diff</Text>
           <Text color={tokens.text.muted}>Alt+1..4 quick tabs | Alt+J/K move</Text>
           {diff.length === 0 ? (
             <Text color={tokens.text.muted}>No changed files in this session.</Text>
@@ -310,9 +289,7 @@ export function Sidebar(props: {
 
       {props.activeTab === "activity" && (
         <Box flexDirection="column" gap={1}>
-          <Text color={tokens.text.accent} bold>
-            Activity Log Pane
-          </Text>
+          <Text color={tokens.text.accent}>Activity</Text>
           <Text color={tokens.text.muted}>Alt+J/K navigate | Alt+E expand section</Text>
           {activityEntries.length === 0 ? (
             <Text color={tokens.text.muted}>No activity yet.</Text>

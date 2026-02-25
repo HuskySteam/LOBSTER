@@ -5,53 +5,67 @@ import { useAppStore } from "../store"
 import { useRoute } from "../context/route"
 import { useSDK } from "../context/sdk"
 import { useDialog } from "../ui/dialog"
+import { useTheme } from "../theme"
 import { Logo } from "../component/logo"
 import { Prompt } from "../component/prompt"
 import { DialogProvider as DialogProviderSetup } from "../component/dialog-provider"
 import { Identifier } from "@/id/id"
-import { EmptyState, KeyHints, PanelHeader, StatusBadge } from "../ui/chrome"
-import { separator, useDesignTokens } from "../ui/design"
+import { useLobster } from "../context/lobster"
+import { Installation } from "@/installation"
 
-function truncateTitle(value: string, max = 36) {
-  if (value.length <= max) return value
-  return value.slice(0, max - 3) + "..."
-}
+function formatRelativeTime(value: number) {
+  const diff = Date.now() - value
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
 
-function formatSessionDate(value: number) {
-  return new Date(value).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  })
+  if (seconds < 60) return "just now"
+  if (minutes < 60) return `${minutes}m ago`
+  if (hours < 24) return `${hours}h ago`
+  return `${days}d ago`
 }
 
 export function Home() {
-  const tokens = useDesignTokens()
+  const { theme } = useTheme()
   const { stdout } = useStdout()
   const route = useRoute()
   const { sync } = useSDK()
   const dialog = useDialog()
+  const lobster = useLobster()
   const sessions = useAppStore((s) => s.session)
   const providers = useAppStore((s) => s.provider)
+  const mcp = useAppStore((s) => s.mcp)
 
   const hasProvider = providers.length > 0
-  const username = process.env.USERNAME || process.env.USER || "there"
-  const isCompact = (stdout?.columns ?? 96) < 96
+  const isFirstTimeUser = sessions.length === 0
+  const columns = stdout?.columns ?? 80
+  const contentWidth = Math.max(44, Math.min(72, columns - 4))
+
   const recentSessions = useMemo(
-    () => [...sessions].sort((a, b) => b.time.updated - a.time.updated).slice(0, 4),
+    () =>
+      [...sessions]
+        .sort((left, right) => right.time.updated - left.time.updated)
+        .slice(0, 3)
+        .map((session) => ({
+          id: session.id,
+          title: session.title || "Untitled session",
+          updated: formatRelativeTime(session.time.updated),
+        })),
     [sessions],
   )
-  const rightDivider = useMemo(() => {
-    const columns = stdout?.columns ?? 100
-    const width = isCompact ? columns - 10 : Math.floor(columns * 0.4)
-    return separator(Math.max(18, Math.min(44, width)))
-  }, [isCompact, stdout?.columns])
+
+  const hasReviewHistory = (lobster.reviewLoop?.history?.length ?? 0) > 0
+
+  const connectedMcpCount = Object.values(mcp).filter((status) => status.status === "connected").length
+  const mcpError = Object.values(mcp).some((status) => status.status === "failed")
 
   const handleSubmit = useCallback(
     async (text: string, options: { agent: string; model: { providerID: string; modelID: string } }) => {
       const result = await sync.client.session.create({})
       if (!result.data?.id) return
-      const sessionID = result.data.id
 
+      const sessionID = result.data.id
       route.navigate({ type: "session", sessionID })
 
       await sync.client.session.prompt({
@@ -63,103 +77,79 @@ export function Home() {
         parts: [{ id: Identifier.ascending("part"), type: "text", text }],
       })
     },
-    [sync, route],
+    [route, sync],
   )
 
-  useInput((_ch, key) => {
+  useInput((_input, key) => {
     if (dialog.content !== null) return
     if (!hasProvider && key.return) {
       dialog.replace(<DialogProviderSetup />)
     }
   })
 
+  const promptHint =
+    connectedMcpCount > 0 ? (
+      <Text color={theme.textMuted}>
+        {mcpError ? (
+          <>
+            <Text color={theme.error}>●</Text> mcp errors <Text color={theme.textMuted}>ctrl+x s</Text>
+          </>
+        ) : (
+          <>
+            <Text color={theme.success}>●</Text>{" "}
+            {connectedMcpCount === 1 ? "1 mcp server" : `${connectedMcpCount} mcp servers`}
+          </>
+        )}
+      </Text>
+    ) : undefined
+
   return (
-    <Box flexDirection="column" padding={1} height="100%">
-      <PanelHeader title="LOBSTER Workspace" right={hasProvider ? "connected" : "engine required"} />
-
-      <Box
-        flexDirection={isCompact ? "column" : "row"}
-        paddingLeft={1}
-        paddingRight={1}
-        paddingTop={1}
-        paddingBottom={1}
-      >
-        <Box flexDirection="column" flexGrow={1} paddingRight={isCompact ? 0 : 2}>
-          <Text color={tokens.text.primary} bold>
-            Welcome back {username}!
-          </Text>
-          <Box marginTop={1} marginBottom={1} alignItems={isCompact ? "flex-start" : "center"}>
-            <Logo />
-          </Box>
-
-          {hasProvider ? (
-            <Box gap={1}>
-              <StatusBadge tone="success" label={`${sessions.length} sessions`} />
-              <StatusBadge tone="accent" label={`${providers.length} providers`} />
-            </Box>
-          ) : (
-            <StatusBadge tone="warning" label="no providers connected" />
-          )}
-
-          <Text color={tokens.text.muted}>
-            Press{" "}
-            <Text color={tokens.text.primary} bold>
-              {hasProvider ? "/new" : "Enter"}
-            </Text>
-            {hasProvider ? " to start a fresh logbook session." : " or Ctrl+O to connect an engine."}
-          </Text>
+    <Box
+      flexDirection="column"
+      flexGrow={1}
+      justifyContent="center"
+      alignItems="center"
+      paddingLeft={2}
+      paddingRight={2}
+    >
+      <Box width={contentWidth} flexDirection="column" alignItems="center">
+        <Logo />
+        <Box marginTop={1}>
+          <Text color={theme.textMuted}>LOBSTER v{Installation.VERSION}</Text>
         </Box>
 
-        <Box
-          flexDirection="column"
-          flexGrow={1}
-          paddingLeft={isCompact ? 0 : 2}
-          marginTop={isCompact ? 1 : 0}
-          borderStyle="single"
-          borderColor={tokens.panel.border}
-          borderLeft={!isCompact}
-          borderTop={isCompact}
-          borderBottom={false}
-          borderRight={false}
-        >
-          <Text color={tokens.text.accent} bold>
-            Operator Notes
-          </Text>
-          <Text color={tokens.text.muted}>
-            {hasProvider
-              ? "Ask Lobster to scaffold, debug, or review code in this repo."
-              : "Connect a provider first, then ask Lobster to create your first app."}
-          </Text>
-          <Text color={tokens.text.muted}>
-            Try <Text color={tokens.text.primary}>/model</Text>, <Text color={tokens.text.primary}>/agent</Text>, and{" "}
-            <Text color={tokens.text.primary}>/sessions</Text> to navigate faster.
-          </Text>
-
-          <Box marginTop={1}>
-            <Text color={tokens.text.muted}>{rightDivider}</Text>
-          </Box>
-
-          <Box marginTop={1} flexDirection="column">
-            <Text color={tokens.text.accent} bold>
-              Recent activity
-            </Text>
-            {recentSessions.length === 0 ? (
-              <EmptyState title="No recent activity" />
-            ) : (
-              recentSessions.map((session) => (
-                <Text key={session.id} color={tokens.text.primary}>
-                  - {truncateTitle(session.title || "Untitled session")}{" "}
-                  <Text color={tokens.text.muted}>({formatSessionDate(session.time.updated)})</Text>
-                </Text>
-              ))
-            )}
-          </Box>
+        <Box marginTop={2}>
+          <Text color={theme.textMuted}>What can I help you with?</Text>
         </Box>
+
+        {!isFirstTimeUser && recentSessions.length > 0 && !hasReviewHistory ? (
+          <Box flexDirection="column" marginTop={2} width="100%">
+            <Text color={theme.textMuted}>Recent sessions</Text>
+            {recentSessions.map((session) => (
+              <Text key={session.id} color={theme.textMuted}>
+                <Text color={theme.text}>{session.updated}</Text> {session.title}
+              </Text>
+            ))}
+          </Box>
+        ) : null}
+
+        {hasReviewHistory ? (
+          <Box marginTop={2} width="100%">
+            <Text color={theme.textMuted}>Review loop history is available. Run /review to open the dashboard.</Text>
+          </Box>
+        ) : null}
       </Box>
 
-      <KeyHints items={["tab agent", "Ctrl+M model", "Ctrl+S logbook", "Ctrl+K palette", "Ctrl+O connect"]} />
-      <Box marginTop={1}>
-        <Prompt onSubmit={handleSubmit} />
+      <Box width={contentWidth} marginTop={1} flexDirection="column">
+        {isFirstTimeUser ? (
+          <Box marginBottom={1}>
+            <Text color={theme.textMuted}>
+              Welcome! Try <Text color={theme.text}>/connect</Text> or <Text color={theme.text}>/help</Text> to get
+              started.
+            </Text>
+          </Box>
+        ) : null}
+        <Prompt onSubmit={handleSubmit} hint={promptHint} />
       </Box>
     </Box>
   )
