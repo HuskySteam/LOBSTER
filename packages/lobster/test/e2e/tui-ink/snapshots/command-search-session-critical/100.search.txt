@@ -19,7 +19,7 @@
   │         in parallel, or check team session status                                            │
   │     /verification-loop- A comprehensive verification system for Claude Code sessions.        │
   │                                                                                              │
-  │  up/down navigate | enter select | esc close                                                 │
+  │                         up/down navigate | enter select | esc close                          │
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │

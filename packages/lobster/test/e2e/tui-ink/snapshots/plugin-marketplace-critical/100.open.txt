@@ -1,6 +1,6 @@
 ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
   │  Plugin Manager 7 installed                                                       esc close  │
-  │  [MARKETPLACE]  updated <time>                                                          │
+  │  [MARKETPLACE]  updated <time>                                                           │
   │                                                                                              │
   │  Installed 7  Marketplace 45  Add                                                            │
   │  > Filter marketplace...                                                                     │
@@ -32,5 +32,5 @@
   │      Comprehensive toolkit for developing Claude Code plugins. Includes 7 expert ...         │
   │      Interactive self-referential AI loops for iterative development. Claude work...         │
   │      Security reminder hook that warns about potential security issues when editi...         │
-  │  tab switch | up/down navigate | enter install | ctrl+r refresh | esc close                  │
+  │          tab switch | up/down navigate | enter install | ctrl+r refresh | esc close          │
   └──────────────────────────────────────────────────────────────────────────────────────────────┘

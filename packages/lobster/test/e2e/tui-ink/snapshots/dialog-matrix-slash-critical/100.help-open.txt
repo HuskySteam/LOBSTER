@@ -51,7 +51,7 @@
   │  Alt+J/K       Vim panel navigation                                                          │
   │  Ctrl+C        Interrupt / Exit                                                              │    │  Esc           Close dialog                                                                  │    │  Enter         Submit / Select                                                               │    │                                                                                              │
   │  enter/esc close                                                                             │    │                                                                                              │
-  │  enter close | esc close                                                                     │    │                                                                                              │
+  │                                   enter close | esc close                                    │    │                                                                                              │
   │                                                                                              │    │                                                                                              │
   │                                                                                              │
   │                                                                                              │

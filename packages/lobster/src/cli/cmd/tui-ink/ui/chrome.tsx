@@ -48,7 +48,7 @@ export function StatusBadge(props: { tone?: BadgeTone; label: string }) {
 export function KeyHints(props: { items: string[] }) {
   const tokens = useDesignTokens()
   return (
-    <Box gap={1} marginTop={1}>
+    <Box gap={1} marginTop={1} flexWrap="wrap" justifyContent="center">
       {props.items.map((item, index) => (
         <React.Fragment key={item}>
           {index > 0 && (

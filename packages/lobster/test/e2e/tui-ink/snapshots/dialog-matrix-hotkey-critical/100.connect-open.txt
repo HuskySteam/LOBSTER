@@ -20,7 +20,7 @@
   │     QiHang                                                                                   │
   │    ... 82 more below                                                                         │
   │                                                                                              │
-  │  up/down navigate | enter select | esc close                                                 │
+  │                         up/down navigate | enter select | esc close                          │
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │

@@ -23,7 +23,7 @@
   │                                                                                              │
   │   > build current- native                                                                    │
   │     plan- native                                                                             │    │     docs- ALWAYS use this when writing docs                                                  │
-  │                                                                                              │    │  up/down navigate | enter select | esc close                                                 │
+  │                                                                                              │    │                         up/down navigate | enter select | esc close                          │
   │                                                                                              │    │                                                                                              │
   │                                                                                              │    │                                                                                              │
   │                                                                                              │    │                                                                                              │

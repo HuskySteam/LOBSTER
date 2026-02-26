@@ -142,7 +142,7 @@ export function Home() {
 
       <Box width={contentWidth} marginTop={1} flexDirection="column">
         {isFirstTimeUser ? (
-          <Box marginBottom={1}>
+          <Box marginBottom={1} alignItems="center">
             <Text color={theme.textMuted}>
               Welcome! Try <Text color={theme.text}>/connect</Text> or <Text color={theme.text}>/help</Text> to get
               started.

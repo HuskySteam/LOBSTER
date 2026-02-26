@@ -20,7 +20,7 @@
   │     /health- Project health dashboard                                                        │
   │    ... 76 more below                                                                         │
   │                                                                                              │
-  │  up/down navigate | enter select | esc close                                                 │
+  │                         up/down navigate | enter select | esc close                          │
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │
