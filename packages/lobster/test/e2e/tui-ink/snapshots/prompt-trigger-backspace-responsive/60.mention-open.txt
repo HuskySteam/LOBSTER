@@ -17,13 +17,6 @@
    │ > @build                                            │
    │   @plan                                             │
    │   @docs                                             │
-   │                                                     │
-   │                                                     │
-   │                                                     │
-   │                                                     │
-   │                                                     │
-   │                                                     │
-   │                                                     │
    └─────────────────────────────────────────────────────┘
    > @
     up/down navigate | enter/tab select | esc dismiss

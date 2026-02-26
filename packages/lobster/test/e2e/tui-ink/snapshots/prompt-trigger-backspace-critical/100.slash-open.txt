@@ -23,7 +23,6 @@
                │   /new                   Start a new session (clear)                │
                │   /status                System status                              │
                │   ... 81 more below                                                 │
-               │                                                                     │
                └─────────────────────────────────────────────────────────────────────┘
                > /
                 up/down navigate | enter/tab select | esc dismiss

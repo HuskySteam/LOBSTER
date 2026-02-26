@@ -1,6 +1,7 @@
 /** @jsxImportSource react */
 import { Box, Text, useInput } from "ink"
 import React, { useState, useMemo, useCallback, useEffect } from "react"
+import open from "open"
 import { useTheme } from "../theme"
 import { useAppStore } from "../store"
 import { useSDK } from "../context/sdk"
@@ -9,6 +10,8 @@ import { DialogSelect, type DialogSelectOption } from "../ui/dialog-select"
 import { DialogPrompt } from "../ui/dialog-prompt"
 import { DialogModel } from "./dialog-model"
 import { Link } from "../ui/link"
+import { useToast } from "../ui/toast"
+import { Clipboard } from "@tui/util/clipboard"
 import type { ProviderAuthAuthorization } from "@lobster-ai/sdk/v2"
 
 const PROVIDER_PRIORITY: Record<string, number> = {
@@ -122,9 +125,17 @@ function AutoMethod(props: {
   const { theme } = useTheme()
   const { sync } = useSDK()
   const dialog = useDialog()
+  const toast = useToast()
+
+  const openAuthURL = useCallback(async () => {
+    await open(props.authorization.url).catch(() => {
+      toast.show({ message: "Unable to open browser. Use the link below or press c to copy URL.", variant: "warning" })
+    })
+  }, [props.authorization.url, toast])
 
   useEffect(() => {
     let cancelled = false
+    void openAuthURL()
     ;(async () => {
       const result = await sync.client.provider.oauth.callback({
         providerID: props.providerID,
@@ -141,10 +152,19 @@ function AutoMethod(props: {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [openAuthURL, props.providerID, props.index, sync, dialog])
 
-  useInput((_ch, key) => {
+  useInput((ch, key) => {
     if (key.escape) dialog.clear()
+    if (!key.ctrl && !key.meta && ch.toLowerCase() === "o") {
+      void openAuthURL()
+      return
+    }
+    if (!key.ctrl && !key.meta && ch.toLowerCase() === "c") {
+      void Clipboard.copy(props.authorization.url)
+        .then(() => toast.show({ message: "Authorization URL copied to clipboard", variant: "info" }))
+        .catch(() => toast.show({ message: "Failed to copy URL", variant: "error" }))
+    }
   })
 
   return (
@@ -156,11 +176,18 @@ function AutoMethod(props: {
         <Text color={theme.textMuted}>esc cancel</Text>
       </Box>
       <Box marginTop={1} flexDirection="column" gap={1}>
-        <Link href={props.authorization.url}>{props.authorization.url}</Link>
+        <Link href={props.authorization.url}>Open authorization URL</Link>
         <Text color={theme.textMuted}>{props.authorization.instructions}</Text>
       </Box>
       <Box marginTop={1}>
         <Text color={theme.accent}>Waiting for authorization...</Text>
+      </Box>
+      <Box marginTop={1}>
+        <Text color={theme.textMuted}>
+          <Text color={theme.text}>o</Text> open browser {" | "}
+          <Text color={theme.text}>c</Text> copy URL {" | "}
+          <Text color={theme.text}>esc</Text> cancel
+        </Text>
       </Box>
     </Box>
   )
@@ -175,7 +202,18 @@ function CodeMethod(props: {
   const { theme } = useTheme()
   const { sync } = useSDK()
   const dialog = useDialog()
+  const toast = useToast()
   const [error, setError] = useState(false)
+
+  const openAuthURL = useCallback(async () => {
+    await open(props.authorization.url).catch(() => {
+      toast.show({ message: "Unable to open browser. Use the link below.", variant: "warning" })
+    })
+  }, [props.authorization.url, toast])
+
+  useEffect(() => {
+    void openAuthURL()
+  }, [openAuthURL])
 
   return (
     <DialogPrompt
@@ -184,7 +222,7 @@ function CodeMethod(props: {
       description={
         <Box flexDirection="column" gap={1}>
           <Text color={theme.textMuted}>{props.authorization.instructions}</Text>
-          <Link href={props.authorization.url}>{props.authorization.url}</Link>
+          <Link href={props.authorization.url}>Open authorization URL</Link>
           {error && <Text color={theme.error}>Invalid code</Text>}
         </Box>
       }

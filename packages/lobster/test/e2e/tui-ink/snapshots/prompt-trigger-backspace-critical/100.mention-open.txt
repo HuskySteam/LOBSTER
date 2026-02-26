@@ -17,13 +17,6 @@
                │ > @build                 The default agent. Executes tools based... │
                │   @plan                  Software architect agent for designing ... │
                │   @docs                  ALWAYS use this when writing docs          │
-               │                                                                     │
-               │                                                                     │
-               │                                                                     │
-               │                                                                     │
-               │                                                                     │
-               │                                                                     │
-               │                                                                     │
                └─────────────────────────────────────────────────────────────────────┘
                > @
                 up/down navigate | enter/tab select | esc dismiss
