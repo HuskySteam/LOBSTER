@@ -1,0 +1,18 @@
+█      █
+                                                                   █    █
+                                                                ████████████
+                                                                ██  ████  ██
+                                                              ██ ██████████ ██
+                                                                   ██  ██
+
+                                                               LOBSTER vlocal
+
+                                                          What can I help you with?
+
+                                  Welcome! Try /connect or /help to get started.
+
+                                   build  |  No provider/No model
+
+                                   > Start from the workspace command palette (Ctrl+K) or ask directly...
+                                    tab agent | Ctrl+M model | Ctrl+S sessions | Ctrl+K palette | Ctrl+O
+                                    connect

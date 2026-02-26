@@ -196,6 +196,7 @@ export function Session(props: { sessionID: string }) {
   const availableRows = Math.max(termHeight - 12 - promptLines, 5)
   // Usable width after shell padding and optional docked panel
   const contentWidth = Math.max(termCols - panelWidth - 4, 20)
+  const promptLayoutWidth = Math.max(contentWidth - 2, 20)
 
   const estimateLines = useCallback(
     (msg: { id: string; role: string; agent?: string }) => {
@@ -507,6 +508,7 @@ export function Session(props: { sessionID: string }) {
             showThinking={showThinking}
             showTimestamps={showTimestamps}
             activePanelTab={panelTab}
+            layoutWidth={promptLayoutWidth}
             onToggleThinking={() => setShowThinking((prev) => !prev)}
             onToggleTimestamps={() => setShowTimestamps((prev) => !prev)}
             onPlanningChange={setPromptPlanning}

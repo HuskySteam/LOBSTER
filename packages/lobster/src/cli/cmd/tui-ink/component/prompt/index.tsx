@@ -57,6 +57,8 @@ interface PromptProps {
   showThinking?: boolean
   showTimestamps?: boolean
   activePanelTab?: "context" | "logbook" | "diff" | "activity"
+  layoutWidth?: number
+  reserveAutocompleteRows?: number
   hint?: React.ReactNode
   onToggleThinking?: () => void
   onToggleTimestamps?: () => void
@@ -757,6 +759,15 @@ export function Prompt(props: PromptProps) {
     if (route.data.type === "home") return "Start from the workspace command palette (Ctrl+K) or ask directly..."
     return "Type a message... (/ commands, @ mentions)"
   }, [props.activePanelTab, route.data.type])
+  const promptLayoutWidth = useMemo(() => Math.max(20, props.layoutWidth ?? 80), [props.layoutWidth])
+  const showAutocomplete = acMode && filteredOptions.length > 0 && !isBusy
+  const idleHintText = useMemo(
+    () =>
+      promptLayoutWidth < 70
+        ? "tab agent | Ctrl+K palette | Ctrl+O connect"
+        : "tab agent | Ctrl+M model | Ctrl+S sessions | Ctrl+K palette | Ctrl+O connect",
+    [promptLayoutWidth],
+  )
 
   const safeAcIndex = useMemo(() => {
     if (filteredOptions.length <= 0) return 0
@@ -999,7 +1010,7 @@ export function Prompt(props: PromptProps) {
   }, [args.prompt, currentModel, currentAgent, handleSubmit])
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" width={props.layoutWidth}>
       <Box paddingLeft={1} gap={1} marginBottom={1}>
         <Text color={tokens.text.muted}>
           <Text color={tokens.status.accent}>{currentAgent?.name ?? "build"}</Text>
@@ -1019,9 +1030,15 @@ export function Prompt(props: PromptProps) {
 
       {props.hint ? <Box paddingLeft={1}>{props.hint}</Box> : null}
 
-      {acMode && filteredOptions.length > 0 && !isBusy && (
-        <Autocomplete options={filteredOptions} selected={safeAcIndex} />
-      )}
+      {props.reserveAutocompleteRows ? (
+        <Box minHeight={props.reserveAutocompleteRows}>
+          {showAutocomplete && (
+            <Autocomplete options={filteredOptions} selected={safeAcIndex} width={promptLayoutWidth} />
+          )}
+        </Box>
+      ) : showAutocomplete ? (
+        <Autocomplete options={filteredOptions} selected={safeAcIndex} width={promptLayoutWidth} />
+      ) : null}
 
       <Box paddingLeft={1}>
         <Text color={tokens.text.accent}>{"> "}</Text>
@@ -1045,7 +1062,7 @@ export function Prompt(props: PromptProps) {
           <Text color={tokens.text.muted} dimColor>
             {acMode
               ? "up/down navigate | enter/tab select | esc dismiss"
-              : "tab agent | Ctrl+M model | Ctrl+S sessions | Ctrl+K palette | Ctrl+O connect"}
+              : idleHintText}
           </Text>
         </Box>
       ) : null}

@@ -13,16 +13,17 @@
 
                build  |  No provider/No model
 
-               ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
-               │ > /connect                        Connect a provider                               │
-               │   /model                          Switch model (models)                            │
-               │   /agent                          Switch agent (agents)                            │
-               │   /mcp                            MCP servers (mcps)                               │
-               │   /theme                          Switch theme (themes)                            │
-               │   /sessions                       Browse sessions (resume, continue)               │
-               │   /new                            Start a new session (clear)                      │
-               │   /status                         System status                                    │
-               │   ... 81 more below                                                                │
-               └──────────────────────────────────────────────────────────────────────────────────────────────┘
+               ┌─────────────────────────────────────────────────────────────────────┐
+               │ > /connect               Connect a provider                         │
+               │   /model                 Switch model (models)                      │
+               │   /agent                 Switch agent (agents)                      │
+               │   /mcp                   MCP servers (mcps)                         │
+               │   /theme                 Switch theme (themes)                      │
+               │   /sessions              Browse sessions (resume, continue)         │
+               │   /new                   Start a new session (clear)                │
+               │   /status                System status                              │
+               │   ... 81 more below                                                 │
+               │                                                                     │
+               └─────────────────────────────────────────────────────────────────────┘
                > /
                 up/down navigate | enter/tab select | esc dismiss

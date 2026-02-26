@@ -1,43 +1,4 @@
-█      █
-                                               █    █
-                                            ████████████
-                                              █      █
-                                               █    █
-                                            ████████████
-                                            ██  ████  ██
-                                          ██ ██████████ ██
-                                               ██  ██
-                                              █      █
-                                               █    █
-                                            ████████████
-                                            ██  ████  ██
-                                          ██ ██████████ ██
-                                               ██  ██
-
-                                           LOBSTER vlocal
-
-                                              █      █
-                                               █    █
-                                            ████████████
-                                            ██  ████  ██
-                                          ██ ██████████ ██
-                                               ██  ██
-
-                                              █      █
-                                               █    █
-                                            ████████████
-                                            ██  ████  ██
-                                          ██ ██████████ ██
-                                               ██  ██
-                                              █      █
-                                               █    █
-                                            ████████████
-                                              █      █
-                                               █    █
-                                            ████████████
-                                            ██  ████  ██
-                                          ██ ██████████ ██
-  ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
   │  Keyboard Shortcuts                                                               esc close  │
   │                                                                                              │
   │  Tab           Cycle agent                                                                   │
@@ -49,10 +10,16 @@
   │  Alt+1..4      Quick-switch panel tabs                                                       │
   │  Alt+H/L       Vim tab navigation                                                            │
   │  Alt+J/K       Vim panel navigation                                                          │
-  │  Ctrl+C        Interrupt / Exit                                                              │    │  Esc           Close dialog                                                                  │    │  Enter         Submit / Select                                                               │    │                                                                                              │
-  │  enter/esc close                                                                             │    │                                                                                              │
-  │                                   enter close | esc close                                    │    │                                                                                              │
-  │                                                                                              │    │                                                                                              │
+  │  Ctrl+C        Interrupt / Exit                                                              │
+  │  Esc           Close dialog                                                                  │
+  │  Enter         Submit / Select                                                               │
+  │                                                                                              │
+  │  enter/esc close                                                                             │
+  │                                                                                              │
+  │                                   enter close | esc close                                    │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │

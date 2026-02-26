@@ -6,20 +6,20 @@
   │   > /sessions- Browse sessions                                                               │
   │     /new- Start a new session                                                                │
   │     /continue- resume previous session context                                               │
-  │    /continuous-learn- Automatically extract reusable patterns from Claude Code sessions      │
-  │    ng               and save them as learned skills for future use.                          │
-  │    /continuous-learnin- Instinct-based learning system that observes sessions via hooks,     │
-  │    -v2                creates atomic instincts with confidence scoring, and evolves them     │
-  │                       into skills/commands/agents.                                           │
-  │    /eval-harnes- Formal evaluation framework for Claude Code sessions implementing           │
-  │                eval-driven development (EDD) principles                                      │
-  │    /learn- Extract non-obvious learnings from session to AGENTS.md files to build codebase   │
-  │           understanding                                                                      │
-  │    /team- Use this when you need to coordinate multiple agents working on a complex task     │
-  │         in parallel, or check team session status                                            │
-  │     /verification-loop- A comprehensive verification system for Claude Code sessions.        │
+  │     /continuous-learning- Automatically extract reusable patterns fr...                      │
+  │     /continuous-learning-v2- Instinct-based learning system that observ...                   │
+  │     /eval-harness- Formal evaluation framework for Claude Cod...                             │
+  │     /learn- Extract non-obvious learnings from session...                                    │
+  │     /team- Use this when you need to coordinate multi...                                     │
+  │     /verification-loop- A comprehensive verification system for Cl...                        │
   │                                                                                              │
   │                         up/down navigate | enter select | esc close                          │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │

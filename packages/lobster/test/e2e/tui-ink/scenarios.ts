@@ -41,7 +41,7 @@ export type ScenarioDefinition = {
   finalExpectation?: ScenarioExpectation
 }
 
-const DEFAULT_RESPONSIVE_WIDTHS = [80, 100, 120] as const
+const DEFAULT_RESPONSIVE_WIDTHS = [60, 70, 80, 100, 120, 140] as const
 
 type DialogMatrixEntry = {
   command: string
@@ -492,6 +492,57 @@ const SCENARIOS: ScenarioDefinition[] = [
           required: ["Commands", "Search commands", "esc close"],
           forbidden: ["> k"],
           softRequired: ["/connect", "/model", "/agent"],
+        },
+      },
+    ],
+  },
+  {
+    id: "prompt-trigger-backspace-responsive",
+    title: "Prompt trigger autocomplete opens and clears cleanly across widths",
+    category: "responsive",
+    widths: [60, 70, 140],
+    startupWaitMs: 45_000,
+    steps: [
+      { kind: "text", text: "/", note: "Open slash autocomplete" },
+      { kind: "wait", ms: 250 },
+      {
+        kind: "capture",
+        label: "slash-open",
+        expectation: {
+          required: ["enter/tab select"],
+          forbidden: ["Ctrl+K palette"],
+        },
+      },
+      { kind: "keys", keys: ["BSpace"], note: "Delete slash trigger" },
+      { kind: "wait", ms: 450 },
+      {
+        kind: "capture",
+        label: "slash-cleared",
+        expectation: {
+          required: ["Start from the workspace command palette"],
+          forbidden: ["> /", "enter/tab select"],
+          softRequired: ["Ctrl+K palette"],
+        },
+      },
+      { kind: "text", text: "@", note: "Open mention autocomplete" },
+      { kind: "wait", ms: 250 },
+      {
+        kind: "capture",
+        label: "mention-open",
+        expectation: {
+          required: ["enter/tab select"],
+          forbidden: ["Ctrl+K palette"],
+        },
+      },
+      { kind: "keys", keys: ["BSpace"], note: "Delete mention trigger" },
+      { kind: "wait", ms: 450 },
+      {
+        kind: "capture",
+        label: "mention-cleared",
+        expectation: {
+          required: ["Start from the workspace command palette"],
+          forbidden: ["> @", "enter/tab select"],
+          softRequired: ["Ctrl+K palette"],
         },
       },
     ],

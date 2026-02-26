@@ -7,24 +7,23 @@
 
                                            LOBSTER vlocal
 
-                                              █      █
-                                               █    █
-                                            ████████████
-                                            ██  ████  ██
-                                          ██ ██████████ ██
-                                               ██  ██
-
-                                           LOBSTER vlocal
-
                                       What can I help you with?
 
               Welcome! Try /connect or /help to get started.
 
                build  |  No provider/No model
 
-               ┌──────────────────────────────────────────────────────────────────────────────────────────────┐                                                                                                        │ > @build                          The default agent. Executes tools based on configured p...│
-               │   @plan                           Software architect agent for designing implementation p...│
-               │   @docs                           ALWAYS use this when writing docs                │
-               └──────────────────────────────────────────────────────────────────────────────────────────────┘
+               ┌─────────────────────────────────────────────────────────────────────┐
+               │ > @build                 The default agent. Executes tools based... │
+               │   @plan                  Software architect agent for designing ... │
+               │   @docs                  ALWAYS use this when writing docs          │
+               │                                                                     │
+               │                                                                     │
+               │                                                                     │
+               │                                                                     │
+               │                                                                     │
+               │                                                                     │
+               │                                                                     │
+               └─────────────────────────────────────────────────────────────────────┘
                > @
                 up/down navigate | enter/tab select | esc dismiss

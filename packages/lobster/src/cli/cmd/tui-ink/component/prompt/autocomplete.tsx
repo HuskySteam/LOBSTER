@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import { Box, Text, useStdout } from "ink"
+import { Box, Text } from "ink"
 import React, { useMemo } from "react"
 import { useTheme } from "../../theme"
 import { computeAutocompleteLayout, truncateWithEllipsis } from "./autocomplete-layout"
@@ -15,13 +15,17 @@ interface AutocompleteProps {
   options: AutocompleteOption[]
   selected: number
   maxVisible?: number
+  width?: number
 }
 
-export function Autocomplete({ options, selected, maxVisible = 8 }: AutocompleteProps) {
+export function Autocomplete({ options, selected, maxVisible = 8, width }: AutocompleteProps) {
   const { theme } = useTheme()
   const tokens = useDesignTokens()
-  const { stdout } = useStdout()
-  const popupWidth = useMemo(() => Math.max(30, Math.min(120, (stdout?.columns ?? 80) - 4)), [stdout?.columns])
+  const popupWidth = useMemo(() => {
+    const layoutWidth = width ?? 80
+    const available = Math.max(16, layoutWidth - 1)
+    return Math.min(120, available)
+  }, [width])
   const contentWidth = useMemo(() => Math.max(20, popupWidth - 4), [popupWidth])
   const layout = useMemo(() => computeAutocompleteLayout(contentWidth), [contentWidth])
 

@@ -13,6 +13,9 @@ import { Identifier } from "@/id/id"
 import { useLobster } from "../context/lobster"
 import { Installation } from "@/installation"
 
+const HOME_PROMPT_MIN_HEIGHT = 16
+const HOME_AUTOCOMPLETE_RESERVE_ROWS = 12
+
 function formatRelativeTime(value: number) {
   const diff = Date.now() - value
   const seconds = Math.floor(diff / 1000)
@@ -140,7 +143,7 @@ export function Home() {
         ) : null}
       </Box>
 
-      <Box width={contentWidth} marginTop={1} flexDirection="column">
+      <Box width={contentWidth} marginTop={1} flexDirection="column" minHeight={HOME_PROMPT_MIN_HEIGHT}>
         {isFirstTimeUser ? (
           <Box marginBottom={1} alignItems="center">
             <Text color={theme.textMuted}>
@@ -149,7 +152,12 @@ export function Home() {
             </Text>
           </Box>
         ) : null}
-        <Prompt onSubmit={handleSubmit} hint={promptHint} />
+        <Prompt
+          onSubmit={handleSubmit}
+          hint={promptHint}
+          layoutWidth={contentWidth}
+          reserveAutocompleteRows={HOME_AUTOCOMPLETE_RESERVE_ROWS}
+        />
       </Box>
     </Box>
   )

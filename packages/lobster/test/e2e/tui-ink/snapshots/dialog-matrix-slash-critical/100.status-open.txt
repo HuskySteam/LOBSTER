@@ -1,35 +1,4 @@
-█      █
-                                               █    █
-                                            ████████████
-                                              █      █
-                                               █    █
-                                            ████████████
-                                            ██  ████  ██
-                                          ██ ██████████ ██
-                                               ██  ██
-                                              █      █
-                                               █    █
-                                            ████████████
-                                            ██  ████  ██
-                                          ██ ██████████ ██
-                                               ██  ██
-
-                                           LOBSTER vlocal
-
-                                              █      █
-                                               █    █
-                                            ████████████
-                                            ██  ████  ██
-                                          ██ ██████████ ██
-                                               ██  ██
-
-                                              █      █
-                                               █    █
-                                            ████████████
-                                            ██  ████  ██
-                                          ██ ██████████ ██
-                                               ██  ██
-  ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
   │  System Status                                                                    esc close  │
   │                                                                                              │
   │    None connected                                                                            │
@@ -40,11 +9,18 @@
   │                                                                                              │
   │  LSP (0)                                                                                     │
   │  Formatters (24)                                                                             │
-  │   ● biome                                                                                    │    │   ● clang-format                                                                             │    │   ● dart                                                                                     │    │   ● gleam                                                                                    │
-  │   ● htmlbeautifier                                                                           │    │   ● ktlint                                                                                   │
-  │   ● latexindent                                                                              │    │   ● mix                                                                                      │
-  │   ● nixfmt                                                                                   │    │   ● ocamlformat                                                                              │
-  │   ● ormolu                                                                                   │    │   ● oxfmt                                                                                    │
+  │   ● biome                                                                                    │
+  │   ● clang-format                                                                             │
+  │   ● dart                                                                                     │
+  │   ● gleam                                                                                    │
+  │   ● htmlbeautifier                                                                           │
+  │   ● ktlint                                                                                   │
+  │   ● latexindent                                                                              │
+  │   ● mix                                                                                      │
+  │   ● nixfmt                                                                                   │
+  │   ● ocamlformat                                                                              │
+  │   ● ormolu                                                                                   │
+  │   ● oxfmt                                                                                    │
   │   ● pint                                                                                     │
   │   ● prettier                                                                                 │
   │   ● rubocop                                                                                  │

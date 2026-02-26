@@ -1,0 +1,29 @@
+█      █
+                           █    █
+                        ████████████
+                        ██  ████  ██
+                      ██ ██████████ ██
+                           ██  ██
+
+                       LOBSTER vlocal
+
+                  What can I help you with?
+
+  Welcome! Try /connect or /help to get started.
+
+   build  |  No provider/No model
+
+   ┌─────────────────────────────────────────────────────┐
+   │ > @build                                            │
+   │   @plan                                             │
+   │   @docs                                             │
+   │                                                     │
+   │                                                     │
+   │                                                     │
+   │                                                     │
+   │                                                     │
+   │                                                     │
+   │                                                     │
+   └─────────────────────────────────────────────────────┘
+   > @
+    up/down navigate | enter/tab select | esc dismiss

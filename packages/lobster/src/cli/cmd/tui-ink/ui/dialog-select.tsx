@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import { Box, Text, useInput } from "ink"
+import { Box, Text, useInput, useStdout } from "ink"
 import TextInput from "ink-text-input"
 import React, { useState, useMemo, useCallback, useEffect, type ReactNode } from "react"
 import { Keybind } from "@/util/keybind"
@@ -37,8 +37,17 @@ interface DialogSelectProps<T> {
   }[]
 }
 
+function truncateLine(value: string, width: number) {
+  const normalized = value.replace(/\s+/g, " ").trim()
+  if (width <= 0) return ""
+  if (normalized.length <= width) return normalized
+  if (width <= 3) return ".".repeat(width)
+  return `${normalized.slice(0, width - 3)}...`
+}
+
 export function DialogSelect<T>(props: DialogSelectProps<T>) {
   const tokens = useDesignTokens()
+  const { stdout } = useStdout()
   const dialog = useDialog()
   const { markHotkeyConsumed, wrapOnChange } = useHotkeyInputGuard()
   const [selected, setSelected] = useState(0)
@@ -87,6 +96,10 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
   const flat = useMemo(() => grouped.flatMap(([, items]) => items), [grouped])
   const activeKeybinds = useMemo(() => (props.keybind ?? []).filter((x) => !x.disabled && x.keybind), [props.keybind])
+  const lineWidth = useMemo(() => {
+    const columns = stdout?.columns ?? 80
+    return Math.max(24, columns - 16)
+  }, [stdout?.columns])
 
   useEffect(() => {
     if (flat.length === 0) {
@@ -200,6 +213,14 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
             const isSelected = idx === selected
             const isCurrent = props.current !== undefined && isEqual(opt.value, props.current as T)
             const marker = isSelected ? ">" : " "
+            const hasDetails = !!(opt.description || opt.footer)
+            const availableWidth = Math.max(16, lineWidth - (isCurrent ? 10 : 0))
+            const titleWidth = hasDetails ? Math.max(12, Math.floor(availableWidth * 0.45)) : availableWidth
+            const detailWidth = Math.max(10, availableWidth - titleWidth - 2)
+            const title = truncateLine(opt.title, titleWidth)
+            const details = hasDetails
+              ? truncateLine([opt.description, opt.footer].filter(Boolean).join(" | "), detailWidth)
+              : ""
             return (
               <Box key={optionKey(opt)} flexDirection="row" paddingLeft={1} paddingRight={1}>
                 <Text
@@ -213,7 +234,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                   bold={isSelected}
                   backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
                 >
-                  {opt.title}
+                  {title}
                 </Text>
                 {isCurrent ? (
                   <>
@@ -226,20 +247,12 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                     <StatusBadge label="current" tone={isSelected ? "accent" : "muted"} />
                   </>
                 ) : null}
-                {opt.description ? (
+                {details ? (
                   <Text
                     color={isSelected ? tokens.list.selectedText : tokens.text.muted}
                     backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
                   >
-                    {"-"} {opt.description}
-                  </Text>
-                ) : null}
-                {opt.footer ? (
-                  <Text
-                    color={isSelected ? tokens.list.selectedText : tokens.text.muted}
-                    backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
-                  >
-                    {"|"} {opt.footer}
+                    {"-"} {details}
                   </Text>
                 ) : null}
               </Box>
