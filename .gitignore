@@ -39,3 +39,5 @@ opencode-dev
 logs/
 *.bun-build
 nul
+.acp-session/
+.opencode/
