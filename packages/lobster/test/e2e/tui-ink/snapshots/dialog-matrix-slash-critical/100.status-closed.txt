@@ -1,27 +1,48 @@
-~lob~ [MODE NORMAL] [TAB CONTEXT]                                      LED:OFF engine disconnected
+█      █
+                                               █    █
+                                            ████████████
+                                              █      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                               ██  ██
+                                              █      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                               ██  ██
 
- LOBSTER Workspace                                                                  engine required
- ╭────────────────────────────────────────────────────────────────────────────────────────────────╮
- │                                                                                                │
- │ Welcome back rutth!                 │  Operator Notes                                          │
- │                                     │  Connect a provider first, then ask Lobster to create    │
- │     █      █                        │  your first app.                                         │
- │      █    █                         │  Try /model, /agent, and /sessions to navigate faster.   │
- │   ████████████                      │                                                          │
- │   ██  ████  ██                      │  ----------------------------------------                │
- │ ██ ██████████ ██                    │                                                          │
- │      ██  ██                         │  Recent activity                                         │
- │                                     │                                                          │
- │                                     │  No recent activity                                      │
- │ [no providers connected]            │                                                          │
- │ Press Enter or Ctrl+O to connect an │                                                          │
- │  engine.                            │                                                          │
- │                                                                                                │
- ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                           LOBSTER vlocal
 
- tab agent  Ctrl+M model  Ctrl+S logbook  Ctrl+K palette  Ctrl+O connect
+                                              █      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                               ██  ██
 
-   [build] [No model] [engine No provider]
-  > Start from the workspace command palette (Ctrl+K) or ask directly...
+                                              █      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                               ██  ██
+                                              █      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                               ██  ██
 
-   tab agent  ^M model  ^S logbook  ^K palette  ^O connect
+                                           LOBSTER vlocal
+
+                                      What can I help you with?
+
+              Welcome! Try /connect or /help to get started.
+
+               build  |  No provider/No model
+
+               > Start from the workspace command palette (Ctrl+K) or ask directly...                               tab agent | Ctrl+M model | Ctrl+S sessions | Ctrl+K palette | Ctrl+O
+                connect

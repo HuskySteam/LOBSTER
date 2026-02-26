@@ -92,11 +92,11 @@ export function Home() {
       <Text color={theme.textMuted}>
         {mcpError ? (
           <>
-            <Text color={theme.error}>●</Text> mcp errors <Text color={theme.textMuted}>ctrl+x s</Text>
+            <Text color={theme.error}>!</Text> mcp errors <Text color={theme.textMuted}>Ctrl+X S</Text>
           </>
         ) : (
           <>
-            <Text color={theme.success}>●</Text>{" "}
+            <Text color={theme.success}>*</Text>{" "}
             {connectedMcpCount === 1 ? "1 mcp server" : `${connectedMcpCount} mcp servers`}
           </>
         )}

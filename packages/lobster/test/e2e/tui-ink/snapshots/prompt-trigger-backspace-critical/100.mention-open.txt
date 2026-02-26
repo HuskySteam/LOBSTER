@@ -1,32 +1,30 @@
-~lob~ [MODE NORMAL] [TAB CONTEXT]                                      LED:OFF engine disconnected
+█      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                               ██  ██
 
- LOBSTER Workspace                                                                  engine required
- ╭────────────────────────────────────────────────────────────────────────────────────────────────╮
- │                                                                                                │
- │ Welcome back rutth!                 │  Operator Notes                                          │
- │                                     │  Connect a provider first, then ask Lobster to create    │
- │     █      █                        │  your first app.                                         │
- │      █    █                         │  Try /model, /agent, and /sessions to navigate faster.   │
- │   ████████████                      │                                                          │
- │   ██  ████  ██                      │  ----------------------------------------                │
- │ ██ ██████████ ██                    │                                                          │
- │      ██  ██                         │  Recent activity                                         │
- │                                     │                                                          │
- │                                     │  No recent activity                                      │
- │ [no providers connected]            │                                                          │
- │ Press Enter or Ctrl+O to connect an │                                                          │
- │  engine.                            │                                                          │
- │                                                                                                │
- ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                           LOBSTER vlocal
 
- tab agent  Ctrl+M model  Ctrl+S logbook  Ctrl+K palette  Ctrl+O connect
+                                              █      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                               ██  ██
 
-   [build] [No model] [engine No provider]
-  ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-  │ > @build                          The default agent. Executes tools based on configured p... │
-  │   @plan                           Software architect agent for designing implementation p... │
-  │   @docs                           ALWAYS use this when writing docs                          │
-  ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-  > @
+                                           LOBSTER vlocal
 
-   up/down navigate  enter/tab select  esc dismiss
+                                      What can I help you with?
+
+              Welcome! Try /connect or /help to get started.
+
+               build  |  No provider/No model
+
+               ┌──────────────────────────────────────────────────────────────────────────────────────────────┐                                                                                                        │ > @build                          The default agent. Executes tools based on configured p...│
+               │   @plan                           Software architect agent for designing implementation p...│
+               │   @docs                           ALWAYS use this when writing docs                │
+               └──────────────────────────────────────────────────────────────────────────────────────────────┘
+               > @
+                up/down navigate | enter/tab select | esc dismiss

@@ -1003,13 +1003,13 @@ export function Prompt(props: PromptProps) {
       <Box paddingLeft={1} gap={1} marginBottom={1}>
         <Text color={tokens.text.muted}>
           <Text color={tokens.status.accent}>{currentAgent?.name ?? "build"}</Text>
-          <Text dimColor> · </Text>
+          <Text dimColor> {" | "} </Text>
           <Text>
             {modelParsed.provider}/{modelParsed.model}
           </Text>
           {props.sessionID ? (
             <>
-              <Text dimColor> · </Text>
+              <Text dimColor> {" | "} </Text>
               <Text>{props.sessionID.slice(0, 8)}</Text>
             </>
           ) : null}
@@ -1024,7 +1024,7 @@ export function Prompt(props: PromptProps) {
       )}
 
       <Box paddingLeft={1}>
-        <Text color={tokens.text.accent}>{"❯ "}</Text>
+        <Text color={tokens.text.accent}>{"> "}</Text>
         {isBusy ? (
           <Text color={tokens.text.muted} dimColor>
             {interruptCount > 0 ? "Press Ctrl+C again to exit" : "Agent is working... Press Ctrl+C to interrupt"}
@@ -1044,8 +1044,8 @@ export function Prompt(props: PromptProps) {
         <Box paddingLeft={2}>
           <Text color={tokens.text.muted} dimColor>
             {acMode
-              ? "up/down navigate · enter/tab select · esc dismiss"
-              : "tab agent · Ctrl+M model · Ctrl+S sessions · Ctrl+K palette · Ctrl+O connect"}
+              ? "up/down navigate | enter/tab select | esc dismiss"
+              : "tab agent | Ctrl+M model | Ctrl+S sessions | Ctrl+K palette | Ctrl+O connect"}
           </Text>
         </Box>
       ) : null}

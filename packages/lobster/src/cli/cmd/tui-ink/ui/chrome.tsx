@@ -53,7 +53,7 @@ export function KeyHints(props: { items: string[] }) {
         <React.Fragment key={item}>
           {index > 0 && (
             <Text color={tokens.text.muted} dimColor>
-              ·
+              |
             </Text>
           )}
           <Text color={tokens.text.muted} dimColor>

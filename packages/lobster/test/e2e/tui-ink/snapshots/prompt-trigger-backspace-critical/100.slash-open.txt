@@ -1,38 +1,28 @@
-~lob~ [MODE NORMAL] [TAB CONTEXT]                                      LED:OFF engine disconnected
+█      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                               ██  ██
 
- LOBSTER Workspace                                                                  engine required
- ╭────────────────────────────────────────────────────────────────────────────────────────────────╮
- │                                                                                                │
- │ Welcome back rutth!                 │  Operator Notes                                          │
- │                                     │  Connect a provider first, then ask Lobster to create    │
- │     █      █                        │  your first app.                                         │
- │      █    █                         │  Try /model, /agent, and /sessions to navigate faster.   │
- │   ████████████                      │                                                          │
- │   ██  ████  ██                      │  ----------------------------------------                │
- │ ██ ██████████ ██                    │                                                          │
- │      ██  ██                         │  Recent activity                                         │
- │                                     │                                                          │
- │                                     │  No recent activity                                      │
- │ [no providers connected]            │                                                          │
- │ Press Enter or Ctrl+O to connect an │                                                          │
- │  engine.                            │                                                          │
- │                                                                                                │
- ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                           LOBSTER vlocal
 
- tab agent  Ctrl+M model  Ctrl+S logbook  Ctrl+K palette  Ctrl+O connect
+                                      What can I help you with?
 
-   [build] [No model] [engine No provider]
-  ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-  │ > /connect                        Connect a provider                                         │
-  │   /model                          Switch model (models)                                      │
-  │   /agent                          Switch agent (agents)                                      │
-  │   /mcp                            MCP servers (mcps)                                         │
-  │   /theme                          Switch theme (themes)                                      │
-  │   /sessions                       Browse sessions (resume, continue)                         │
-  │   /new                            Start a new session (clear)                                │
-  │   /status                         System status                                              │
-  │   ... 81 more below                                                                          │
-  ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
-  > /
+              Welcome! Try /connect or /help to get started.
 
-   up/down navigate  enter/tab select  esc dismiss
+               build  |  No provider/No model
+
+               ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+               │ > /connect                        Connect a provider                               │
+               │   /model                          Switch model (models)                            │
+               │   /agent                          Switch agent (agents)                            │
+               │   /mcp                            MCP servers (mcps)                               │
+               │   /theme                          Switch theme (themes)                            │
+               │   /sessions                       Browse sessions (resume, continue)               │
+               │   /new                            Start a new session (clear)                      │
+               │   /status                         System status                                    │
+               │   ... 81 more below                                                                │
+               └──────────────────────────────────────────────────────────────────────────────────────────────┘
+               > /
+                up/down navigate | enter/tab select | esc dismiss

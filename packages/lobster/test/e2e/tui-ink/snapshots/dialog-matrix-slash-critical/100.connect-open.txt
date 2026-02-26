@@ -1,4 +1,7 @@
-╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+█      █
+                                               █    █
+                                            ████████████
+  ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
   │  Connect a provider                                                               esc close  │
   │                                                                                              │
   │  > Search providers...                                                                       │
@@ -12,15 +15,12 @@
   │     Privatemode AI                                                                           │
   │     StepFun                                                                                  │
   │     Moonshot AI (China)                                                                      │
-  │     Firmware                                                                                 │
-  │     Nova                                                                                     │
-  │     LucidQuery AI                                                                            │
-  │     Moonshot AI                                                                              │
-  │     302.AI                                                                                   │
-  │     QiHang                                                                                   │
-  │    ... 81 more below                                                                         │
+  │     Firmware                                                                                 │    │     Nova                                                                                     │
+  │     LucidQuery AI                                                                            │    │     Moonshot AI                                                                              │
+  │     302.AI                                                                                   │    │     QiHang                                                                                   │
+  │    ... 82 more below                                                                         │
   │                                                                                              │
-  │  up/down navigate  enter select  esc close                                                   │
+  │  up/down navigate | enter select | esc close                                                 │
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │
@@ -33,4 +33,4 @@
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │
-  ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+  └──────────────────────────────────────────────────────────────────────────────────────────────┘

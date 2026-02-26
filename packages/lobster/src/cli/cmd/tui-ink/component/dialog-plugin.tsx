@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import { Box, Text, useInput } from "ink"
+import { Box, Text, useInput, useStdout } from "ink"
 import TextInput from "ink-text-input"
 import React, { useState, useMemo, useCallback, useEffect } from "react"
 import { useAppStore } from "../store"
@@ -33,6 +33,14 @@ function nextTab(tab: PluginTab, reverse = false): PluginTab {
   if (index < 0) return "installed"
   if (reverse) return TAB_ORDER[(index - 1 + TAB_ORDER.length) % TAB_ORDER.length]
   return TAB_ORDER[(index + 1) % TAB_ORDER.length]
+}
+
+function truncateLine(value: string, width: number) {
+  const normalized = value.replace(/\s+/g, " ").trim()
+  if (width <= 0) return ""
+  if (normalized.length <= width) return normalized
+  if (width <= 3) return ".".repeat(width)
+  return `${normalized.slice(0, width - 3)}...`
 }
 
 export function resolveInitialPluginTab(input: { initialTab?: PluginTab; installedCount: number }): PluginTab {
@@ -71,6 +79,7 @@ interface DialogPluginProps {
 
 export function DialogPlugin(props: DialogPluginProps = {}) {
   const tokens = useDesignTokens()
+  const { stdout } = useStdout()
   const { sync } = useSDK()
   const dialog = useDialog()
   const { markHotkeyConsumed, wrapOnChange } = useHotkeyInputGuard()
@@ -94,6 +103,10 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
   const [marketplaceLoaded, setMarketplaceLoaded] = useState(false)
   const [marketplaceHadError, setMarketplaceHadError] = useState(false)
   const [marketplaceFetchedAt, setMarketplaceFetchedAt] = useState<number | undefined>(undefined)
+  const lineWidth = useMemo(() => {
+    const columns = stdout?.columns ?? 80
+    return Math.max(32, Math.min(96, columns - 18))
+  }, [stdout?.columns])
 
   const refreshAfterConfigChange = useCallback(async () => {
     await sync.client.instance.dispose()
@@ -273,8 +286,8 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
   return (
     <Box flexDirection="column" paddingLeft={1} paddingRight={1}>
       <PanelHeader title="Plugin Manager" subtitle={`${installed.length} installed`} right="esc close" />
-      <Box gap={1}>
-        <StatusBadge tone="accent" label={tab.toUpperCase()} />
+      <Box flexDirection="row" gap={2} marginTop={1}>
+        <StatusBadge tone="accent" label={`[${tab.toUpperCase()}]`} />
         {tab === "marketplace" && marketplaceFetchedAt ? (
           <Text color={tokens.text.muted} dimColor>
             updated {new Date(marketplaceFetchedAt).toLocaleTimeString()}
@@ -365,36 +378,31 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
             />
           ) : (
             <>
-              <Text color={tokens.text.muted}>{visibleMarketplace.length} available - Enter to install</Text>
+              <Text color={tokens.text.muted}>{visibleMarketplace.length} available | Enter to install</Text>
               {visibleMarketplace.map((plugin, index) => {
                 const isSelected = index === selected
+                const title = truncateLine(`[${plugin.source}] ${plugin.name}`, lineWidth)
+                const description = plugin.description ? truncateLine(plugin.description, Math.max(12, lineWidth - 3)) : ""
                 return (
-                  <Box key={`${plugin.source}:${plugin.spec}`} paddingLeft={1} paddingRight={1}>
-                    <Text
-                      color={isSelected ? tokens.list.selectedText : tokens.list.marker}
-                      backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
-                    >
-                      {isSelected ? "> " : "  "}
-                    </Text>
-                    <Text
-                      color={isSelected ? tokens.list.selectedText : tokens.text.accent}
-                      backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
-                    >
-                      [{plugin.source}]{" "}
-                    </Text>
+                  <Box
+                    key={`${plugin.source}:${plugin.spec}`}
+                    flexDirection="column"
+                    paddingLeft={1}
+                    paddingRight={1}
+                  >
                     <Text
                       color={isSelected ? tokens.list.selectedText : tokens.text.primary}
                       backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
                     >
-                      {plugin.name}
+                      {`${isSelected ? "> " : "  "}${title}`}
                     </Text>
-                    {plugin.description ? (
+                    {description ? (
                       <Text
                         color={isSelected ? tokens.list.selectedText : tokens.text.muted}
                         backgroundColor={isSelected ? tokens.list.selectedBackground : undefined}
+                        dimColor={!isSelected}
                       >
-                        {" - "}
-                        {plugin.description}
+                        {`   ${description}`}
                       </Text>
                     ) : null}
                   </Box>

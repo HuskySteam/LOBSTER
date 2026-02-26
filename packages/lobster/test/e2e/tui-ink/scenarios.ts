@@ -56,9 +56,9 @@ type HotkeyMatrixEntry = {
 }
 
 const DIALOG_CLOSED_EXPECTATION: ScenarioExpectation = {
-  required: ["[build]"],
+  required: ["Start from the workspace command palette"],
   forbidden: ["esc close"],
-  softRequired: ["^K palette"],
+  softRequired: ["Ctrl+K palette"],
 }
 
 const SLASH_DIALOG_MATRIX: DialogMatrixEntry[] = [
@@ -252,8 +252,8 @@ const SCENARIOS: ScenarioDefinition[] = [
     startupWaitMs: 45_000,
     steps: [],
     finalExpectation: {
-      required: ["LOBSTER Workspace", "MODE NORMAL", "[build]"],
-      softRequired: ["Welcome back", "Operator Notes", "^K palette"],
+      required: ["LOBSTER v", "What can I help you with?", "Start from the workspace command palette"],
+      softRequired: ["Welcome! Try /connect", "Ctrl+K palette"],
     },
   },
   {
@@ -291,7 +291,7 @@ const SCENARIOS: ScenarioDefinition[] = [
         kind: "capture",
         label: "closed",
         expectation: {
-          required: ["[build]"],
+          required: ["Start from the workspace command palette"],
           forbidden: ["Commands", "Search commands", "esc close", "> k"],
         },
       },
@@ -311,16 +311,16 @@ const SCENARIOS: ScenarioDefinition[] = [
         label: "slash-open",
         expectation: {
           required: ["enter/tab select"],
-          forbidden: ["^K palette"],
+          forbidden: ["Ctrl+K palette"],
         },
       },
       { kind: "keys", keys: ["BSpace"], note: "Delete slash trigger" },
-      { kind: "wait", ms: 250 },
+      { kind: "wait", ms: 450 },
       {
         kind: "capture",
         label: "slash-cleared",
         expectation: {
-          required: ["[build]", "^K palette"],
+          required: ["Start from the workspace command palette", "Ctrl+K palette"],
           forbidden: ["> /", "enter/tab select"],
         },
       },
@@ -331,16 +331,16 @@ const SCENARIOS: ScenarioDefinition[] = [
         label: "mention-open",
         expectation: {
           required: ["enter/tab select"],
-          forbidden: ["^K palette"],
+          forbidden: ["Ctrl+K palette"],
         },
       },
       { kind: "keys", keys: ["BSpace"], note: "Delete mention trigger" },
-      { kind: "wait", ms: 250 },
+      { kind: "wait", ms: 450 },
       {
         kind: "capture",
         label: "mention-cleared",
         expectation: {
-          required: ["[build]", "^K palette"],
+          required: ["Start from the workspace command palette", "Ctrl+K palette"],
           forbidden: ["> @", "enter/tab select"],
         },
       },
@@ -411,7 +411,7 @@ const SCENARIOS: ScenarioDefinition[] = [
         kind: "capture",
         label: "closed",
         expectation: {
-          required: ["[build]"],
+          required: ["Start from the workspace command palette"],
           forbidden: ["Sessions", "No results found", "> d", "> r", "> dr"],
         },
       },
@@ -458,7 +458,7 @@ const SCENARIOS: ScenarioDefinition[] = [
         kind: "capture",
         label: "closed",
         expectation: {
-          required: ["[build]"],
+          required: ["Start from the workspace command palette"],
           forbidden: ["Plugin Manager", "esc close", "> /plugin marketplace"],
         },
       },
@@ -472,8 +472,8 @@ const SCENARIOS: ScenarioDefinition[] = [
     startupWaitMs: 45_000,
     steps: [],
     finalExpectation: {
-      required: ["[build]"],
-      softRequired: ["LOBSTER Workspace", "Welcome back"],
+      required: ["LOBSTER v", "What can I help you with?"],
+      softRequired: ["Welcome! Try /connect", "Ctrl+K palette"],
     },
   },
   {

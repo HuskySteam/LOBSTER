@@ -34,6 +34,7 @@ export function DialogCommand(props: DialogCommandProps) {
         description: x.description,
         category: "Commands",
       }))
+      .toSorted((left, right) => left.title.localeCompare(right.title))
 
     return [...builtIn, ...sdkCommands]
   }, [commands, route.data.type])

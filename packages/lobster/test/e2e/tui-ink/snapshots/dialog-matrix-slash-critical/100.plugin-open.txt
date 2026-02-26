@@ -1,8 +1,51 @@
-╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+█      █
+                                               █    █
+                                            ████████████
+                                              █      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                               ██  ██
+                                              █      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                               ██  ██
+
+                                           LOBSTER vlocal
+
+                                              █      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                               ██  ██
+
+                                              █      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                               ██  ██
+                                              █      █
+                                               █    █
+                                            ████████████
+                                              █      █
+                                               █    █
+                                            ████████████
+                                            ██  ████  ██
+                                          ██ ██████████ ██
+                                              █      █
+                                               █    █
+                                            ████████████
+  ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
   │  Plugin Manager 7 installed                                                       esc close  │
+  │                                                                                              │
   │  [INSTALLED]                                                                                 │
   │                                                                                              │
-  │   Installed 7   Marketplace 0   Add                                                          │
+  │  Installed 7  Marketplace 0  Add                                                             │
   │                                                                                              │
   │  > Filter installed plugins...                                                               │
   │                                                                                              │
@@ -11,10 +54,8 @@
   │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-insights.ts                        │
   │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-memory.ts                          │
   │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-orchestrator.ts                    │
-  │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-sentiment.ts                       │
-  │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-team.ts                            │
-  │                                                                                              │
-  │  tab switch  up/down navigate  ctrl+x remove  esc close                                      │
+  │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-sentiment.ts                       │    │     [file] /C:/VIBEATHON/lobster/.lobster/plugins/lobster-team.ts                            │    │                                                                                              │    │  tab switch | up/down navigate | ctrl+x remove | esc close                                   │
+  │                                                                                              │    │                                                                                              │
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │
@@ -30,7 +71,4 @@
   │                                                                                              │
   │                                                                                              │
   │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
-  │                                                                                              │
-  ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+  └──────────────────────────────────────────────────────────────────────────────────────────────┘
