@@ -327,12 +327,12 @@ export const useAppStore = create<AppState & AppActions>()((set) => ({
   upsertTeamTask: (teamName, task) =>
     set((state) => {
       const tasks = state.team_tasks[teamName] ?? []
-      const idx = tasks.findIndex((t) => t.id === task.id)
+      const result = binarySearch(tasks, task.id, (t) => t.id)
       const next = [...tasks]
-      if (idx >= 0) {
-        next[idx] = task
+      if (result.found) {
+        next[result.index] = task
       } else {
-        next.push(task)
+        next.splice(result.index, 0, task)
       }
       return { team_tasks: { ...state.team_tasks, [teamName]: next } }
     }),

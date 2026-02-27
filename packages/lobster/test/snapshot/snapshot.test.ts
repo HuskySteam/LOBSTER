@@ -1,9 +1,26 @@
 import { test, expect } from "bun:test"
 import { $ } from "bun"
 import path from "path"
+import fs from "fs/promises"
 import { Snapshot } from "../../src/snapshot"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
+
+function isSymlinkUnavailable(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code
+  return code === "EPERM" || code === "EACCES" || code === "ENOSYS" || code === "ENOTSUP"
+}
+
+async function createSymlinkOrSkip(target: string, link: string, kind: "file" | "dir"): Promise<boolean> {
+  try {
+    const type = kind === "dir" ? (process.platform === "win32" ? "junction" : "dir") : "file"
+    await fs.symlink(target, link, type)
+    return true
+  } catch (error) {
+    if (isSymlinkUnavailable(error)) return false
+    throw error
+  }
+}
 
 async function bootstrap() {
   return tmpdir({
@@ -143,7 +160,8 @@ test("symlink handling", async () => {
       const before = await Snapshot.track()
       expect(before).toBeTruthy()
 
-      await $`ln -s ${tmp.path}/a.txt ${tmp.path}/link.txt`.quiet()
+      const created = await createSymlinkOrSkip(`${tmp.path}/a.txt`, `${tmp.path}/link.txt`, "file")
+      if (!created) return
 
       expect((await Snapshot.patch(before!)).files).toContain(`${tmp.path}${path.sep}link.txt`)
     },
@@ -395,8 +413,13 @@ test("nested symlinks", async () => {
 
       await $`mkdir -p ${tmp.path}/sub/dir`.quiet()
       await Bun.write(path.join(tmp.path, "sub", "dir", "target.txt"), "target content")
-      await $`ln -s ${tmp.path}/sub/dir/target.txt ${tmp.path}/sub/dir/link.txt`.quiet()
-      await $`ln -s ${tmp.path}/sub ${tmp.path}/sub-link`.quiet()
+      const fileSymlinkCreated = await createSymlinkOrSkip(
+        `${tmp.path}/sub/dir/target.txt`,
+        `${tmp.path}/sub/dir/link.txt`,
+        "file",
+      )
+      const dirSymlinkCreated = await createSymlinkOrSkip(`${tmp.path}/sub`, `${tmp.path}/sub-link`, "dir")
+      if (!fileSymlinkCreated || !dirSymlinkCreated) return
 
       const patch = await Snapshot.patch(before!)
       expect(patch.files).toContain(path.join(tmp.path, "sub", "dir", "link.txt"))
@@ -416,9 +439,10 @@ test("file permissions and ownership changes", async () => {
       expect(before).toBeTruthy()
 
       // Change permissions multiple times
-      await $`chmod 600 ${tmp.path}/a.txt`.quiet()
-      await $`chmod 755 ${tmp.path}/a.txt`.quiet()
-      await $`chmod 644 ${tmp.path}/a.txt`.quiet()
+      const file = path.join(tmp.path, "a.txt")
+      await fs.chmod(file, 0o600)
+      await fs.chmod(file, 0o755)
+      await fs.chmod(file, 0o644)
 
       const patch = await Snapshot.patch(before!)
       // Note: git doesn't track permission changes on existing files by default
@@ -437,7 +461,8 @@ test("circular symlinks", async () => {
       expect(before).toBeTruthy()
 
       // Create circular symlink
-      await $`ln -s ${tmp.path}/circular ${tmp.path}/circular`.quiet().nothrow()
+      const circular = `${tmp.path}/circular`
+      await createSymlinkOrSkip(circular, circular, "dir").catch(() => {})
 
       const patch = await Snapshot.patch(before!)
       expect(patch.files.length).toBeGreaterThanOrEqual(0) // Should not crash

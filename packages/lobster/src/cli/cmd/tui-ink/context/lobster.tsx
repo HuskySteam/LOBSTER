@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import path from "path"
 import { mkdir } from "node:fs/promises"
 import { useAppStore } from "../store"
@@ -125,6 +125,21 @@ async function readJson<T>(filePath: string, fallback: T): Promise<T> {
   }
 }
 
+export function computeNextFindings(
+  findings: ReviewFinding[],
+  id: string,
+  status: ReviewFinding["status"],
+): ReviewFinding[] {
+  let changed = false
+  const next = findings.map((item) => {
+    if (item.id !== id) return item
+    if (item.status === status) return item
+    changed = true
+    return { ...item, status }
+  })
+  return changed ? next : findings
+}
+
 export function LobsterProvider(props: { children: ReactNode }) {
   const projectDir = useAppStore((s) => s.path.directory)
   const allMessages = useAppStore((s) => s.message)
@@ -137,6 +152,8 @@ export function LobsterProvider(props: { children: ReactNode }) {
   const [patterns, setPatterns] = useState<PatternInsight[]>([])
   const [projectQuality, setProjectQuality] = useState<ProjectQuality | null>(null)
   const [analysisRunning, setAnalysisRunning] = useState(false)
+  const findingsRef = useRef<ReviewFinding[]>([])
+  const findingsWriteQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   const memoryDir = useMemo(() => {
     if (!projectDir) return ""
@@ -149,6 +166,7 @@ export function LobsterProvider(props: { children: ReactNode }) {
       setCost(null)
       setBudget(null)
       setFindings([])
+      findingsRef.current = []
       setMemoryIndex([])
       setPatterns([])
       setProjectQuality(null)
@@ -165,10 +183,13 @@ export function LobsterProvider(props: { children: ReactNode }) {
       readJson<ProjectQuality | null>(path.join(memoryDir, "project-quality.json"), null),
     ])
 
+    const nextFindings = Array.isArray(f) ? f : []
+
     setReviewLoop(rl)
     setCost(c)
     setBudget(b)
-    setFindings(Array.isArray(f) ? f : [])
+    setFindings(nextFindings)
+    findingsRef.current = nextFindings
     setMemoryIndex(Array.isArray(m) ? m : [])
     setPatterns(Array.isArray(p) ? p : [])
     setProjectQuality(q)
@@ -182,6 +203,10 @@ export function LobsterProvider(props: { children: ReactNode }) {
     }, 10_000)
     return () => clearInterval(timer)
   }, [memoryDir, refresh])
+
+  useEffect(() => {
+    findingsRef.current = findings
+  }, [findings])
 
   const totalCost = useMemo(() => {
     if (cost?.sessions) {
@@ -264,13 +289,20 @@ export function LobsterProvider(props: { children: ReactNode }) {
 
   const updateFinding = useCallback(
     async (id: string, status: ReviewFinding["status"]) => {
-      const next = findings.map((item) => (item.id === id ? { ...item, status } : item))
+      const next = computeNextFindings(findingsRef.current, id, status)
+      findingsRef.current = next
       setFindings(next)
       if (!memoryDir) return
-      await mkdir(memoryDir, { recursive: true }).catch(() => {})
-      await Bun.write(path.join(memoryDir, "review-findings.json"), JSON.stringify(next, null, 2))
+      const persistPromise = findingsWriteQueueRef.current
+        .catch(() => {})
+        .then(async () => {
+          await mkdir(memoryDir, { recursive: true }).catch(() => {})
+          await Bun.write(path.join(memoryDir, "review-findings.json"), JSON.stringify(next, null, 2))
+        })
+      findingsWriteQueueRef.current = persistPromise
+      await persistPromise
     },
-    [findings, memoryDir],
+    [memoryDir],
   )
 
   const value = useMemo<LobsterContextValue>(

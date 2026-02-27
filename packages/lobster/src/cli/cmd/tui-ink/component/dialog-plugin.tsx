@@ -1,7 +1,7 @@
 /** @jsxImportSource react */
 import { Box, Text, useInput, useStdout } from "ink"
 import TextInput from "ink-text-input"
-import React, { useState, useMemo, useCallback, useEffect } from "react"
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { useAppStore } from "../store"
 import { useSDK } from "../context/sdk"
 import { useDialog } from "../ui/dialog"
@@ -98,6 +98,7 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
   const [query, setQuery] = useState("")
   const [addInput, setAddInput] = useState("")
   const [loading, setLoading] = useState(false)
+  const loadingRef = useRef(false)
   const [selected, setSelected] = useState(0)
   const [marketplace, setMarketplace] = useState<MarketplacePlugin[]>([])
   const [marketplaceLoaded, setMarketplaceLoaded] = useState(false)
@@ -177,8 +178,10 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
 
   useEffect(() => {
     if (tab !== "marketplace") return
+    // Skip reload if marketplace was fetched within the last 30 seconds
+    if (marketplaceFetchedAt && Date.now() - marketplaceFetchedAt < 30_000) return
     void loadMarketplace()
-  }, [tab, loadMarketplace])
+  }, [tab, loadMarketplace, marketplaceFetchedAt])
 
   useEffect(() => {
     if (tab === "add") return
@@ -227,7 +230,8 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
 
   const removePlugin = useCallback(
     async (spec: string) => {
-      if (!spec || loading) return
+      if (!spec || loadingRef.current) return
+      loadingRef.current = true
       setLoading(true)
       try {
         await sync.client.global.config.get().then(async (result) => {
@@ -238,15 +242,17 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
         })
         setSelected((value) => Math.max(0, value - 1))
       } finally {
+        loadingRef.current = false
         setLoading(false)
       }
     },
-    [loading, refreshAfterConfigChange, sync],
+    [refreshAfterConfigChange, sync],
   )
 
   const installPlugin = useCallback(
     async (spec: string) => {
-      if (!spec.trim() || loading) return
+      if (!spec.trim() || loadingRef.current) return
+      loadingRef.current = true
       setLoading(true)
       try {
         await sync.client.global.config.get().then(async (result) => {
@@ -256,15 +262,17 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
           await refreshAfterConfigChange()
         })
       } finally {
+        loadingRef.current = false
         setLoading(false)
       }
     },
-    [loading, refreshAfterConfigChange, sync],
+    [refreshAfterConfigChange, sync],
   )
 
   const addPlugin = useCallback(
     async (spec: string) => {
-      if (!spec.trim() || loading) return
+      if (!spec.trim() || loadingRef.current) return
+      loadingRef.current = true
       setLoading(true)
       try {
         const trimmed = spec.trim()
@@ -277,10 +285,11 @@ export function DialogPlugin(props: DialogPluginProps = {}) {
         setAddInput("")
         switchTab("installed")
       } finally {
+        loadingRef.current = false
         setLoading(false)
       }
     },
-    [loading, refreshAfterConfigChange, switchTab, sync],
+    [refreshAfterConfigChange, switchTab, sync],
   )
 
   return (

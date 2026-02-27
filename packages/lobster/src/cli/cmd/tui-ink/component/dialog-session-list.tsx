@@ -5,12 +5,14 @@ import { useAppStore } from "../store"
 import { useRoute } from "../context/route"
 import { useSDK } from "../context/sdk"
 import { useDialog } from "../ui/dialog"
+import { useToast } from "../ui/toast"
 import { DialogSelect } from "../ui/dialog-select"
 import { DialogSessionRename } from "./dialog-session-rename"
 
 export function DialogSessionList() {
   const { sync } = useSDK()
   const dialog = useDialog()
+  const toast = useToast()
   const route = useRoute()
   const sessions = useAppStore((s) => s.session)
   const keybinds = useAppStore((s) => s.config.keybinds)
@@ -68,9 +70,13 @@ export function DialogSessionList() {
           keybind: sessionDeleteBinding,
           onTrigger: async (option) => {
             if (toDeleteSessionID === option.value) {
-              await sync.client.session.delete({
-                sessionID: option.value,
-              })
+              try {
+                await sync.client.session.delete({
+                  sessionID: option.value,
+                })
+              } catch (err) {
+                toast.error(err)
+              }
               setToDeleteSessionID(undefined)
               return
             }

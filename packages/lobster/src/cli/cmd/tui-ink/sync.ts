@@ -46,6 +46,7 @@ export function createSyncManager(input: {
   let flushTimer: Timer | undefined
   let lastFlush = 0
   const fullSyncedSessions = new Set<string>()
+  const syncPromises = new Map<string, Promise<void>>()
 
   function flush() {
     if (eventQueue.length === 0) return
@@ -132,12 +133,18 @@ export function createSyncManager(input: {
       case "lsp.updated":
         client.lsp.status().then((x) => {
           if (x.data) useAppStore.getState().setLsp(x.data)
-        }).catch(() => {})
+        }).catch((err) => {
+          Log.Default.warn("lsp.status failed", {
+            error: err instanceof Error ? err.message : String(err),
+          })
+        })
         break
 
-      case "vcs.branch.updated":
-        useAppStore.getState().setVcs({ branch: event.properties.branch } as any)
+      case "vcs.branch.updated": {
+        const currentVcs = useAppStore.getState().vcs
+        useAppStore.getState().setVcs({ ...currentVcs, branch: String(event.properties.branch ?? "") })
         break
+      }
     }
 
     // Handle team events
@@ -247,21 +254,30 @@ export function createSyncManager(input: {
 
   async function syncSession(sessionID: string) {
     if (fullSyncedSessions.has(sessionID)) return
-    const [session, messages, todo, diff] = await Promise.all([
-      client.session.get({ sessionID }, { throwOnError: true }),
-      client.session.messages({ sessionID, limit: 100 }),
-      client.session.todo({ sessionID }),
-      client.session.diff({ sessionID }),
-    ])
-    const s = useAppStore.getState()
-    s.upsertSession(session.data!)
-    s.setTodo(sessionID, todo.data ?? [])
-    s.setMessages(sessionID, messages.data!.map((x) => x.info))
-    for (const message of messages.data!) {
-      s.setParts(message.info.id, message.parts)
+    if (syncPromises.has(sessionID)) return syncPromises.get(sessionID)
+    const promise = (async () => {
+      const [session, messages, todo, diff] = await Promise.all([
+        client.session.get({ sessionID }, { throwOnError: true }),
+        client.session.messages({ sessionID, limit: 100 }),
+        client.session.todo({ sessionID }),
+        client.session.diff({ sessionID }),
+      ])
+      const s = useAppStore.getState()
+      s.upsertSession(session.data!)
+      s.setTodo(sessionID, todo.data ?? [])
+      s.setMessages(sessionID, messages.data!.map((x) => x.info))
+      for (const message of messages.data!) {
+        s.setParts(message.info.id, message.parts)
+      }
+      s.setSessionDiff(sessionID, diff.data ?? [])
+      fullSyncedSessions.add(sessionID)
+    })()
+    syncPromises.set(sessionID, promise)
+    try {
+      await promise
+    } finally {
+      syncPromises.delete(sessionID)
     }
-    s.setSessionDiff(sessionID, diff.data ?? [])
-    fullSyncedSessions.add(sessionID)
   }
 
   async function startEventLoop() {

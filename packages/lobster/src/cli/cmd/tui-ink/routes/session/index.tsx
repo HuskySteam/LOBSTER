@@ -21,133 +21,11 @@ import {
   type DockSide,
   type PanelTab,
 } from "./layout-model"
+import { estimateToolLines, wrappedLineCount } from "./line-estimate"
 
 const EMPTY_MESSAGES: never[] = []
 const EMPTY_PERMISSIONS: never[] = []
 const EMPTY_QUESTIONS: never[] = []
-const BLOCK_TOOL_CHROME_LINES = 3 // marginTop + title + marginBottom
-
-/** Count rendered terminal rows for a string, accounting for soft-wrap at cols. */
-function wrappedLineCount(text: string, cols: number): number {
-  const hardLines = text.split("\n")
-  let total = 0
-  for (const line of hardLines) {
-    total += Math.max(1, Math.ceil(line.length / cols))
-  }
-  return total
-}
-
-/** Count wrapped rows for an array of hard lines (already split), capped at maxLines. */
-function wrappedSliceCount(lines: string[], maxLines: number, cols: number): number {
-  const capped = lines.slice(0, maxLines)
-  let total = 0
-  for (const line of capped) {
-    total += Math.max(1, Math.ceil(line.length / cols))
-  }
-  return total
-}
-
-/** Estimate rendered lines for a tool part based on its state/metadata.
- *  Mirrors the rendering caps in component/message/tools.tsx. */
-function estimateToolLines(part: Record<string, any>, cols: number): number {
-  const state = part.state ?? {}
-  const meta = state.status === "pending" ? {} : (state.metadata ?? {})
-  const input = state.input ?? {}
-
-  // InlineTool tools render 1 line (+ optional error)
-  // We should account for wrapping in the inline tool text if possible, but as a baseline:
-  let inlineBase = state.error ? 2 : 1
-  if (input.command) {
-    inlineBase = wrappedLineCount(String(input.command), cols) + (state.error ? 1 : 0)
-  } else if (input.filePath) {
-    inlineBase = wrappedLineCount(String(input.filePath), cols) + (state.error ? 1 : 0)
-  }
-
-  // Block tools have borders and padding which reduce available width
-  const blockCols = Math.max(10, cols - 4)
-
-  switch (part.tool) {
-    case "bash": {
-      if (meta.output === undefined) return inlineBase
-      // BlockTool: title(1) + command(1) + up to 10 output lines + overflow indicator
-      const raw = (meta.output ?? "").trim()
-      const allLines = raw ? raw.split("\n") : []
-      const outputRows = raw ? wrappedSliceCount(allLines, 10, blockCols) : 0
-      const cmdRows = wrappedLineCount(String(input.command ?? ""), blockCols)
-      return BLOCK_TOOL_CHROME_LINES + 1 + cmdRows + outputRows + (allLines.length > 10 ? 1 : 0) + (state.error ? 1 : 0)
-    }
-    case "edit": {
-      if (meta.diff === undefined) return inlineBase
-      // BlockTool: title(1) + up to 30 diff lines + overflow + diagnostics
-      const allLines = (meta.diff ?? "").split("\n")
-      const diffRows = wrappedSliceCount(allLines, 30, blockCols)
-      const diags = ((meta.diagnostics?.[input.filePath] ?? []) as any[])
-        .filter((x: any) => x.severity === 1)
-        .slice(0, 3)
-      let diagRows = 0
-      for (const d of diags) {
-        diagRows += wrappedLineCount(
-          `Error [${d.range?.start?.line}:${d.range?.start?.character}] ${d.message}`,
-          blockCols,
-        )
-      }
-      return BLOCK_TOOL_CHROME_LINES + 1 + diffRows + (allLines.length > 30 ? 1 : 0) + diagRows + (state.error ? 1 : 0)
-    }
-    case "write": {
-      if (meta.diagnostics === undefined) return inlineBase
-      const diags = (meta.diagnostics?.[input.filePath] ?? []).slice(0, 3)
-      let diagRows = 0
-      for (const d of diags) {
-        diagRows += wrappedLineCount(
-          `Error [${d.range?.start?.line}:${d.range?.start?.character}] ${d.message}`,
-          blockCols,
-        )
-      }
-      return BLOCK_TOOL_CHROME_LINES + 1 + diagRows + (state.error ? 1 : 0)
-    }
-    case "apply_patch": {
-      const files: any[] = meta.files ?? []
-      if (files.length === 0) return inlineBase
-      // title(1) + per-file: filename(1) + up to 15 diff lines
-      let total = 1
-      for (const f of files) {
-        total +=
-          wrappedLineCount(String(f.file ?? ""), blockCols) +
-          (f.diff ? wrappedSliceCount(f.diff.split("\n"), 15, blockCols) : 0)
-      }
-      return BLOCK_TOOL_CHROME_LINES + total + (state.error ? 1 : 0)
-    }
-    case "read": {
-      const loaded: any[] = Array.isArray(meta.loaded) ? meta.loaded : []
-      let loadedLines = 0
-      for (const f of loaded) {
-        loadedLines += wrappedLineCount(`-> Loaded ${f}`, Math.max(10, cols - 5))
-      }
-      return inlineBase + loadedLines
-    }
-    case "task": {
-      if (input.description || input.subagent_type) {
-        // BlockTool: title + description (description may wrap)
-        const desc = String(input.description ?? "")
-        return BLOCK_TOOL_CHROME_LINES + 1 + wrappedLineCount(desc, blockCols) + (state.error ? 1 : 0)
-      }
-      return inlineBase
-    }
-    case "todowrite": {
-      const todos: any[] = input.todos ?? []
-      if (todos.length > 0) {
-        let todoLines = 0
-        for (const t of todos) {
-          todoLines += wrappedLineCount(`[x] ${t.content ?? ""}`, blockCols)
-        }
-        return BLOCK_TOOL_CHROME_LINES + 1 + todoLines + (state.error ? 1 : 0)
-      }
-      return inlineBase
-    }
-    default:
-      return inlineBase
-  }
-}
 
 export function Session(props: { sessionID: string }) {
   const { theme } = useTheme()
@@ -204,8 +82,8 @@ export function Session(props: { sessionID: string }) {
       if (msg.role === "user") {
         // UserMessage: StatusBadge(1) + "> " prefix + joined text parts + marginBottom(1)
         const text = msgParts
-          .filter((p: any) => p.type === "text" && !p.synthetic)
-          .map((p: any) => p.text ?? "")
+          .filter((p) => p.type === "text" && !(p as { synthetic?: boolean }).synthetic)
+          .map((p) => (p as { text?: string }).text ?? "")
           .join("")
           .trim()
         if (!text) return 1 // empty user message renders null, just marginBottom
@@ -217,7 +95,7 @@ export function Session(props: { sessionID: string }) {
       let lines = 2 + (msg.agent ? 1 : 0) + (isLast ? 1 : 0) // +1 for potential spinner
       for (const part of msgParts) {
         if (part.type === "text") {
-          const text = (part as any).text ?? ""
+          const text = (part as { text?: string }).text ?? ""
           const trimmed = text.trim()
           if (trimmed) {
             // TextPart has marginTop={1}
@@ -240,14 +118,14 @@ export function Session(props: { sessionID: string }) {
           }
         } else if (part.type === "reasoning") {
           if (showThinking) {
-            const text = (part as any).text ?? ""
+            const text = (part as { text?: string }).text ?? ""
             if (text.trim()) {
               const display = `Thinking: ${text.trim().slice(0, 200)}${text.trim().length > 200 ? "..." : ""}`
               lines += Math.max(1, wrappedLineCount(display, Math.max(10, contentWidth - 1))) + 1 // +1 for marginTop
             }
           }
         } else if (part.type === "tool") {
-          lines += estimateToolLines(part, contentWidth)
+          lines += estimateToolLines(part as Parameters<typeof estimateToolLines>[0], contentWidth)
         } else {
           lines += 1
         }

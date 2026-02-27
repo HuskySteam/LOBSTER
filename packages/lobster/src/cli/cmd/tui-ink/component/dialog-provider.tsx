@@ -134,14 +134,17 @@ function AutoMethod(props: {
   }, [props.authorization.url, toast])
 
   useEffect(() => {
-    let cancelled = false
+    const abortController = new AbortController()
     void openAuthURL()
     ;(async () => {
-      const result = await sync.client.provider.oauth.callback({
-        providerID: props.providerID,
-        method: props.index,
-      })
-      if (cancelled) return
+      const result = await sync.client.provider.oauth.callback(
+        {
+          providerID: props.providerID,
+          method: props.index,
+        },
+        { signal: abortController.signal },
+      ).catch(() => ({ error: true as const, data: undefined }))
+      if (abortController.signal.aborted) return
       if (result.error) {
         dialog.clear()
         return
@@ -150,7 +153,7 @@ function AutoMethod(props: {
       dialog.replace(<DialogModel />)
     })()
     return () => {
-      cancelled = true
+      abortController.abort()
     }
   }, [openAuthURL, props.providerID, props.index, sync, dialog])
 
@@ -246,16 +249,23 @@ function CodeMethod(props: {
 function ApiMethod(props: { providerID: string; title: string }) {
   const { sync } = useSDK()
   const dialog = useDialog()
+  const toast = useToast()
 
   return (
     <DialogPrompt
       title={props.title}
       placeholder="API key"
+      mask
       onConfirm={async (value) => {
         if (!value) return
+        const trimmed = value.trim()
+        if (trimmed.length < 8) {
+          toast.show({ message: "API key is too short", variant: "error" })
+          return
+        }
         await sync.client.auth.set({
           providerID: props.providerID,
-          auth: { type: "api", key: value },
+          auth: { type: "api", key: trimmed },
         })
         await refreshAfterAuth(sync)
         dialog.replace(<DialogModel />)

@@ -20,6 +20,14 @@ const ToastContext = createContext<ToastContextValue | undefined>(undefined)
 export function ToastProvider(props: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const nextId = useRef(0)
+  const timers = useRef<Map<number, Timer>>(new Map())
+
+  useEffect(() => {
+    return () => {
+      timers.current.forEach((t) => clearTimeout(t))
+      timers.current.clear()
+    }
+  }, [])
 
   const show = useCallback((input: Omit<Toast, "id">) => {
     const id = nextId.current++
@@ -27,9 +35,11 @@ export function ToastProvider(props: { children: ReactNode }) {
     setToasts((prev) => [...prev, toast])
 
     const duration = input.duration ?? 3000
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id))
+      timers.current.delete(id)
     }, duration)
+    timers.current.set(id, timer)
   }, [])
 
   const error = useCallback(

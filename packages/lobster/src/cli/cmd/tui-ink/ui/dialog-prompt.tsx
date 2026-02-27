@@ -11,6 +11,7 @@ interface DialogPromptProps {
   description?: ReactNode
   placeholder?: string
   value?: string
+  mask?: boolean
   onConfirm: (value: string) => void
 }
 
@@ -48,6 +49,7 @@ export function DialogPrompt(props: DialogPromptProps) {
           onChange={guardedValueChange}
           onSubmit={(v) => props.onConfirm(v)}
           placeholder={props.placeholder ?? ""}
+          mask={props.mask ? "*" : undefined}
         />
       </Box>
 
